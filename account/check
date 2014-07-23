@@ -1,0 +1,200 @@
+#!/bin/sh
+
+# look up user for relevant account information
+# quick and simple, daradib@OCF 2011-05-13
+# merged contributions from sanjayk@OCF, daradib@OCF 2011-08-29
+# rewritten, daradib@OCF 2011-10-07
+# revised, daradib@OCF 2011-10-13
+# added print history support, daradib@OCF 2011-10-26
+# added file quota support, daradib@OCF 2011-10-29
+# revised, daradib@OCF 2011-11-01
+# added basic CalNet support, daradib@OCF 2012-03-12
+# added vhost, webdir, sorry shell checks daradib@OCF 2012-10-16
+
+# specify location of User_Info file
+User_Info_file='/home/s/st/staff/User_Info'
+# specify location of over quota file
+quota_file='/var/mail/etc/quota'
+# specify location of wtmp files
+wtmp_files='/var/log/wtmp /var/log/wtmp.1'
+# default number of logins to display from wtmp files
+login_count=5
+
+usage(){
+  echo "Usage: '`basename $0` USER [login_count]'"
+  echo "USER is the username to look up, must be alphanumeric"
+  echo "login_count is the number of logins to display, default is 5"
+  echo
+  echo "This script will look up relevant account information for a given"
+  echo "username. Some information may only be accessible to privileged users"
+  echo "or root, and dependent on local machine, so the output may differ"
+  echo "accordingly."
+}
+
+# process arguments including basic sanitization and respond if needed
+if [ $# -gt 2 -o $# -eq 0 ]; then
+  usage
+  exit 1
+elif [ "$1" = '-h' ] || [ "$1" = '--help' ]; then
+  usage
+  exit
+else
+  user="`echo "$1" | tr -cd '[:alnum:]'`"
+  if [ -n "$2" ]; then
+    login_count="`echo "$2" | tr -cd '[:digit:]'`"
+    if [ -z $login_count ]; then
+      echo 'Error: Invalid login_count' >&2
+      echo
+      usage
+      exit 1
+    fi
+  fi
+fi
+
+# check user entry in passwd database
+getent="`getent passwd $user`"
+if [ -n "$getent" ]; then
+  echo "$getent"
+else
+  echo $user not found >&2
+  exit 2
+fi
+
+# check if sorried
+shell=`ldapsearch -x -LLL uid=$user loginshell | grep ^loginShell | cut -d' ' -f2`
+if [ $shell = /opt/ocf/bin/sorry ]; then
+  echo "WARNING: Account is disabled" >&2
+fi
+
+# check if Kerberos principal exists
+kerberos="`echo TESTIFEXIST | kinit --password-file=STDIN $user 2>&1`"
+if [ -n "$kerberos" ]; then
+  if [ -n "`echo "$kerberos" | grep unknown$`" ]; then
+    echo "WARNING: Kerberos principal does not exist" >&2
+  elif [ "$kerberos" != "kinit: Password incorrect" ]; then
+   echo "$kerberos"
+  fi
+fi
+
+# check if home directory exists
+letter=`echo $user | cut -c1`
+letter2=`echo $user | cut -c1-2`
+homedir=/home/$letter/$letter2/$user
+if [ ! -d $homedir ]; then
+  echo "WARNING: Home directory does not exist (banished?)" >&2
+else
+  # if home directory exists, check if web directory exists
+  webdir=/services/http/users/$letter/$user
+  if [ ! -d $webdir ]; then
+  echo "WARNING: Web directory does not exist" >&2
+  echo "  You can create web directory by running:"
+  echo "    sudo mkdir $webdir"
+  echo "    sudo chown $user:ocf $webdir" >&2
+  fi
+fi
+
+# check if in over quota file
+quota="`grep -Fx $user $quota_file`"
+if [ -n "$quota" ]; then
+  echo "WARNING: Account inbox is over quota; cannot send or receive mail" >&2
+fi
+
+# check if member of groups other than ocf
+groups="`groups $user | cut -d " " -f3- | grep -v "^ocf$"`"
+if [ -n "$groups" ]; then
+   echo "Member of group(s): $groups"
+fi
+
+# check output of finger for mail forwarding, if permissions allow
+finger="`finger -m $user | grep "^Mail forwarded"`"
+if [ -n "$finger" ]; then
+   echo "$finger"
+fi
+
+# check if OSL group ID number exists in LDAP
+oslgid="`ldapsearch -x -LLL uid=$user oslgid | grep -i ^oslgid | cut -d' ' -f2`"
+if [ -n "$oslgid" ]; then
+   echo "OSL group ID number: $oslgid"
+fi
+
+# check if CalNet UID number exists in LDAP
+calnetuid="`ldapsearch -x -LLL uid=$user calnetuid | grep -i ^calnetuid | cut -d' ' -f2`"
+if [ -n "$calnetuid" ]; then
+   calnetemail="`ldapsearch -x -LLL -H ldap://nds.berkeley.edu -b dc=berkeley,dc=edu uid=$calnetuid  mail | grep ^mail | cut -d' ' -f2`"
+   calnetaffiliations="`ldapsearch -x -LLL -H ldap://nds.berkeley.edu -b dc=berkeley,dc=edu uid=$calnetuid berkeleyEduAffiliations | grep ^berkeleyEduAffiliations | cut -d' ' -f2- | sed -r 's/(^|$)/\"/g' | sort | tr '\n' ' ' | sed 's/ $//g'`"
+   echo "CalNet UID number: $calnetuid"
+   if [ -n "$calnetemail" ]; then
+     echo "CalNet email address: $calnetemail"
+   fi
+   if [ -n "$calnetaffiliations" ]; then
+     echo "CalNet affilations: $calnetaffiliations"
+   fi
+fi
+
+# check virtual hosting config
+if vhost="`grep -E "^[#[:space:]]*$user[![:space:]]" /home/s/st/staff/vhost/vhost.conf`"  > /dev/null; then
+  echo
+  echo "Virtual hosts:"
+  echo "-------------------------------------------------------------------------------"
+  echo "$vhost"
+  echo "-------------------------------------------------------------------------------"
+fi
+
+# check print quota, requires PyKota privileges
+pkusers="`groups | grep -Fwq ocfstaff && pkusers --list "$user" 2> /dev/null | grep -F 'Account balance' | cut -d':' -f2 | cut -d'.' -f1 | tr -d -c '[:digit:]'`"
+#pkusers="`pkusers --list "$user" 2> /dev/null | sed -e '1d' -e 's/^[ ]*//g'`"
+if [ -n "$pkusers" ]; then
+  echo
+  echo "Pages remaining: $pkusers"
+fi
+
+# check User_Info entries
+User_Info="`grep ^$user: "$User_Info_file" | cut -d: -f2-`"
+#User_Info="`grep ^$user: "$User_Info_file" | awk '{$1=""; print $0}' | sed 's/^[ ]*//g'`"
+# awk and sed for double the fun
+if [ -n "$User_Info" ]; then
+  echo
+  echo "User_Info entr(y|ies):"
+  echo "-------------------------------------------------------------------------------"
+  echo "$User_Info"
+  echo "-------------------------------------------------------------------------------"
+fi
+
+# check user crontab, probably requires root privileges
+crontab="`crontab -lu $user 2> /dev/null | sed '/^[ ]*$/d'`"
+if [ -n "$crontab" ]; then
+  echo
+  echo "Crontab on local machine:"
+  echo "-------------------------------------------------------------------------------"
+  echo "$crontab"
+  echo "-------------------------------------------------------------------------------"
+fi
+
+
+# check currently running processes in tree format
+ps="`ps Sfw -u $user 2> /dev/null | grep -Fv "PID TTY"`"
+fingerl="`finger -m $user | grep "^On since"`"
+if [ -n "$fingerl" ] || [ -n "$ps" ]; then
+  echo
+  echo "Currently running processes on local machine:"
+  echo "-------------------------------------------------------------------------------"
+  if [ -n "$ps" ]; then
+    echo "$ps"
+  fi
+  if [ -n "$fingerl" ]; then
+    echo "$fingerl"
+  fi
+  echo "-------------------------------------------------------------------------------"
+fi
+
+# check most recent login history
+last="`(for wtmp_file in $wtmp_files; do last -a $user -f $wtmp_file; done) | egrep -v ' begins|^$' | head -n $login_count | awk '{$1=""; print $0}' | sed 's/^[ ]*//g'`"
+#last="`(last -a $user && last -a $user -f /var/log/wtmp.1) | egrep -v "^wtmp begins|^wtmp.1 begins|^$" | head -n $login_count | awk '{$1=""; print $0}' | sed 's/^[ ]*//g'`"
+# awk and sed for double the fun
+if [ -n "$last" ]; then
+  echo
+  echo "Recent login history on local machine:"
+  echo "-------------------------------------------------------------------------------"
+    echo "$last"
+  echo "-------------------------------------------------------------------------------"
+fi

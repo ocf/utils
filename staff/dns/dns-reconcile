@@ -1,0 +1,77 @@
+#!/usr/bin/env python
+"""Reconcile differences between OCF and CNS reverse DNS for OCF subnet
+
+Provide CNS with a list of PTR record changes to make to match the PTR records
+in the OCF subnet returned by the OCF nameserver.
+
+Requires these packages in Debian:
+    python-ipaddr, python-dnspython
+
+"""
+
+from ipaddr import IPv4Address, IPv4Network
+from dns import name, reversename, resolver
+
+# Define subnet and list of nameservers
+net = IPv4Network('169.229.10.0/24')
+nameservers_ocf = ['169.229.10.22']
+nameservers_cns = ['128.32.136.3', '128.32.136.14']
+
+def ptr_records(nameservers=False):
+    '''Generate dict of PTR records in subnet from specified nameservers'''
+    my_resolver = resolver.Resolver()
+    if nameservers:
+        my_resolver.nameservers = nameservers
+    records = {}
+    for ipaddress in net:
+        record = reversename.from_address(str(ipaddress))
+        try:
+            records[str(record)] = str(my_resolver.query(record, 'PTR')[0])
+        except resolver.NXDOMAIN:
+            # Ignore records that are not found
+            pass
+    return records
+
+records_ocf = ptr_records(nameservers_ocf)
+records_cns = ptr_records(nameservers_cns)
+
+delete = []
+add = []
+# Compare OCF and CNS PTR records
+for key in records_cns.keys():
+    try:
+        if records_cns[key].lower() != records_ocf[key].lower():
+            # Modify (delete and add) inconsistent PTR records
+            delete.append(key + ' IN PTR ' + records_cns[key])
+            add.append(key + ' IN PTR ' + records_ocf[key])
+    except KeyError:
+        # Delete CNS PTR records not in OCF DNS
+        delete.append(key + ' IN PTR ' + records_cns[key])
+
+# Add OCF PTR records not in CNS DNS
+for key in set(records_ocf).difference(set(records_cns)):
+    add.append(key + ' IN PTR ' + records_ocf[key])
+
+def ptr_to_ipv4(record):
+    """Convert a PTR record to an IPv4 address"""
+    domain = name.from_text(record.split()[0])
+    ipaddress = IPv4Address(reversename.to_address(domain))
+    return ipaddress
+
+if delete:
+    # Print records to delete in sorted order
+    print("Please delete the following {0} DNS record(s):".format(len(delete)))
+    for record in sorted(delete, key=ptr_to_ipv4):
+        print record
+if delete and add:
+    # Separate deletions and additions
+    print("")
+if add:
+    # Print records to add in sorted order
+    print("Please add the following {0} DNS record(s):".format(len(add)))
+    for record in sorted(add, key=ptr_to_ipv4):
+        print record
+if delete or add:
+    print("\nThank you!")
+else:
+    print("No changes needed")

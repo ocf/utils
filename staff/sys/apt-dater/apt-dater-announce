@@ -4,5 +4,5 @@ MYDIR="$(dirname "$(which "$0")")"
 
 ssh -t puppet sudo apt-dater -nr |
 	python -c 'import sys; _ = sys.stdin.read(); print _[_.index("<?"):-9]' |
-	$MYDIR/parse_apt_dater.py |
+	python $MYDIR/parse_apt_dater.py |
 	mail -E -s "Package updates" sm@ocf.berkeley.edu

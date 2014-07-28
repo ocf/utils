@@ -1,0 +1,36 @@
+#!/usr/bin/env python3
+# Print messages stored in /var/mail/nomail sent by the given user
+#
+# example usage: extract-messages ckuehl
+
+import glob
+import mailbox
+import os.path
+import pwd
+import sys
+
+NOMAIL_GLOB = "/var/mail/nomail/*"
+
+def get_messages(mbox, uid):
+	search = "from userid {}".format(uid)
+	for _, message in mbox.iteritems():
+		received = message.get_all("Received")
+		if any(search in r for r in received):
+			yield message
+
+if __name__ == "__main__":
+	if len(sys.argv) != 2:
+		print("usage: {} username".format(sys.argv[0]), file=sys.stderr)
+		sys.exit(1)
+
+	user = sys.argv[1]
+	try:
+		uid = pwd.getpwnam(user).pw_uid
+	except KeyError:
+		print("user {} not found".format(user), file=sys.stderr)
+		sys.exit(2)
+
+	for path in sorted(glob.glob(NOMAIL_GLOB), key=os.path.getmtime):
+		mbox = mailbox.mbox(path)
+		for message in get_messages(mbox, uid):
+			print(message)

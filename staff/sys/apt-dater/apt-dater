@@ -1,0 +1,2 @@
+#!/bin/bash
+ssh -t lightning sudo /opt/puppet/scripts/apt-dater.sh

@@ -1,0 +1,22 @@
+#!/bin/bash -e
+PRODUCTION="/opt/puppet/env/production"
+REMOTE="git://github.com/ocf/puppet.git"
+
+if [ ! -d "$PRODUCTION" ]; then
+	git init "$PRODUCTION"
+fi
+
+cd "$PRODUCTION"
+
+# update origin url
+if ! git remote | grep origin > /dev/null; then
+	git remote add origin "$REMOTE"
+else
+	git remote set-url origin "$REMOTE"
+fi
+
+# update from remote
+git fetch origin
+git reset --hard origin/master
+git submodule sync -q
+git submodule update --init --recursive

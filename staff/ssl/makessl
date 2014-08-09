@@ -1,0 +1,15 @@
+#!/bin/bash -e
+
+if [ "$#" -ne 1 ]; then
+	echo "usage: $0 fqdn"
+	exit 1
+fi
+
+FQDN="$1"
+KEYSIZE=4096
+KEY_PATH="$FQDN.key"
+
+echo "Creating key $KEY_PATH..."
+openssl genrsa -out "$KEY_PATH" "$KEYSIZE"
+
+openssl req -new -key "$KEY_PATH" -subj "/CN=$FQDN"

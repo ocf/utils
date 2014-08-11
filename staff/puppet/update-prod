@@ -1,6 +1,6 @@
 #!/bin/bash -e
 PRODUCTION="/opt/puppet/env/production"
-REMOTE="git://github.com/ocf/puppet.git"
+REMOTE="https://github.com/ocf/puppet.git"
 
 if [ ! -d "$PRODUCTION" ]; then
 	git init "$PRODUCTION"

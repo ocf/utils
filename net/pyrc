@@ -190,7 +190,7 @@ IRC_NETWORKS = {
     "ocf": {
         # hostname, port, use_ssl, verify_ssl
         "servers": [("irc.ocf.berkeley.edu", 6697, True, False)],
-        "channels": ["#ocf"],
+        "channels": ["#rebuild", "#ocf"],
         },
     }
 

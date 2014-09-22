@@ -1,0 +1,202 @@
+#!/usr/bin/env python
+# pyrc - Wrapper to make it easier for ocf users to use irc
+# Author: Nader Morshed
+# Version: 0.0.8
+# Requires python >= 2.4 (2.6?)
+
+import os
+import sys
+import optparse
+import shutil
+from subprocess import call, Popen, PIPE
+import time
+
+def screen_defaults():
+    """Copies over the system default screen configuration and enables UTF-8."""
+
+    screenrc = os.path.join(os.environ["HOME"], ".screenrc")
+
+    if not os.path.isfile(screenrc):
+        try:
+            shutil.copy("/usr/share/doc/screen/examples/screenrc", screenrc)
+            f = open(screenrc, "a")
+            f.write("\n"
+                    "defutf8 on\n"
+                    "defnonblock on\n")
+            f.close()
+        except OSError as e:
+            print(e)
+
+def irssi_defaults():
+    """Creates the default configuration for irssi with the ocf server included."""
+
+    irssi_config = os.path.join(os.environ["HOME"], ".irssi", "config")
+
+    if not os.path.isfile(irssi_config):
+        try:
+            etc = open(os.path.join(os.sep, "etc", "irssi.conf"))
+
+            try:
+                os.mkdir(os.path.split(irssi_config)[0])
+            except OSError:
+                pass
+
+            out = open(irssi_config, "w")
+            core = False
+
+            for line in etc:
+                out.write(line)
+
+                if "servers = (" in line:
+                    for name, network in IRC_NETWORKS.items():
+                        for hostname, port, ssl, verify in network["servers"]:
+                            out.write("  {{\n"
+                                      "    address = \"{0}\";\n"
+                                      "    chatnet = \"{1}\";\n"
+                                      "    port = \"{2}\";\n"
+                                      "    use_ssl = \"{3}\"\n;"
+                                      "    ssl_verify = \"{4}\";\n"
+                                      "    autoconnect = \"yes\";\n"
+                                      "  }}\n"
+                                      .format(hostname, name, port,
+                                              "yes" if ssl else "no",
+                                              "yes" if verify else "no"))
+
+                if "chatnets = {" in line:
+                    for name, network in IRC_NETWORKS.items():
+                        out.write("  {0} = {{ type = \"IRC\"; }};\n"
+                                  .format(name))
+
+                if "channels = (" in line:
+                    for name, network in IRC_NETWORKS.items():
+                        for channel in network["channels"]:
+                            out.write("  {{ name = \"{0}\"; chatnet = \"{1}\"; autojoin = \"Yes\"; }},\n"
+                                      .format(channel, name))
+
+                if "  core = {" in line:
+                    core = True
+                    out.write("    log_create_mode = \"600\";\n"
+                              "    log_timestamp = \"%H:%M:%S \";\n"
+                              "    timestamp_format = \"%H:%M:%S\";\n")
+
+                if "  };" in line and core:
+                    out.write("  \"fe-common/core\" = {\n"
+                              "    term_charset = \"utf-8\";\n"
+                              "    AUTOLOG_PATH = \"~/irclogs/$tag/${0}/%Y/%m/%d.log\";\n")
+
+                    if LOG_BY_DEFAULT:
+                        out.write("    autolog = \"yes\";\n")
+
+                    out.write("    bell_beeps = \"yes\";\n"
+                              "    beep_msg_level = \"MSGS NOTICES DCC DCCMSGS HILIGHT\";\n"
+                              "  };\n")
+
+            etc.close()
+            out.close()
+        except IOError as e:
+            print(e)
+
+def install_defaults(emu, irc):
+    """Sets up the default configuration for the terminal emulator and the irc client."""
+
+    if "defaults" in emu:
+        emu["defaults"]()
+
+    if "defaults" in irc:
+        irc["defaults"]()
+
+def start_irc(emu, session, irc):
+    """Start a new irc client on a virtual terminal."""
+
+    found = find_emu_sessions(emu, session)
+
+    if not found:
+        install_defaults(emu, irc)
+        call(emu["start"] + [session, irc["process"]])
+
+        # Sleep to avoid weird screen resize issues
+        time.sleep(1)
+
+def find_emu_sessions(emu, session):
+    """Checks if the terminal emulator session is already open."""
+
+    out = Popen(emu["list"], stdout=PIPE, stderr=PIPE).stdout
+
+    if sys.version_info[0] >= 3:
+        out = [str(i, encoding=sys.getdefaultencoding()) for i in out]
+
+    return [line for line in out if session in line]
+
+def connect_irc(emu, session):
+    """Connect to an existing virtual terminal session."""
+
+    if find_emu_sessions(emu, session):
+        call(emu["connect"] + [session])
+    else:
+        raise Exception("irc session does not exist")
+
+def main(args):
+    # Should be replaced with argparse, but this gives us a lower version requirement
+    parser = optparse.OptionParser()
+    parser.add_option("-s", "--start", action="store_true", default=False,
+                      help="Just start the irc client, don\"t connect to it")
+    parser.add_option("-c", "--connect", action="store_true", default=False,
+                      help="Don\"t start the irc client, only connect to it if possible")
+    parser.add_option("-e", "--emu", default=DEFAULT_TERM_EMU,
+                      help="terminal emulator to use: " + ", ".join(TERM_EMUS.keys()) +
+                      " [default: %default]")
+    parser.add_option("-i", "--irc", default=DEFAULT_IRC_CLIENT,
+                      help="irc client to use: " + ", ".join(IRC_CLIENTS.keys()) +
+                      " [default: %default]")
+    parser.add_option("-n", "--session", default="irc",
+                       help="name to give to terminal emulator session")
+
+    (options, args) = parser.parse_args(args = args)
+
+    if options.emu not in TERM_EMUS.keys():
+        raise Exception("Unknown terminal emulator: " + options.emu)
+
+    if options.irc not in IRC_CLIENTS.keys():
+        raise Exception("Unknown irc client: " + options.irc)
+
+    if options.start or not options.connect:
+        start_irc(TERM_EMUS[options.emu], options.session, IRC_CLIENTS[options.irc])
+
+    if options.connect or not options.start:
+        connect_irc(TERM_EMUS[options.emu], options.session)
+TERM_EMUS = {
+    "screen": {
+        "start": ["screen", "-dmaUT", "xterm", "-ln", "-fn", "-S"],
+        "connect": ["screen", "-raADU"],
+        "list": ["screen", "-ls"],
+        "defaults": screen_defaults,
+        },
+    "tmux": {
+        "start": ["tmux", "-u", "new", "-ds"],
+        "connect": ["tmux", "-u", "attach", "-t"],
+        "list": ["tmux", "ls"],
+        },
+    }
+
+IRC_CLIENTS = {
+    "irssi": {
+        "start": ["irssi"],
+        "defaults": irssi_defaults,
+        "process": "irssi"
+        },
+    }
+
+IRC_NETWORKS = {
+    "ocf": {
+        # hostname, port, use_ssl, verify_ssl
+        "servers": [("irc.ocf.berkeley.edu", 6697, True, False)],
+        "channels": ["#ocf"],
+        },
+    }
+
+DEFAULT_TERM_EMU = "tmux"
+DEFAULT_IRC_CLIENT = "irssi"
+LOG_BY_DEFAULT = True
+
+if __name__ == "__main__":
+    main(sys.argv[1:])

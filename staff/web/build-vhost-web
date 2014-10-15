@@ -61,8 +61,9 @@ sub fullvirtual{
     DocumentRoot $rootdir
     SuexecUserGroup $login ocf
     suPHP_Engine off
-    AddHandler fcgid-script .php
-    FcgidWrapper /opt/suexec/$login/php5-fcgi-wrapper .php
+    AddHandler php5-fcgi .php
+    Action php5-fcgi /php5-fcgi
+    Alias /php5-fcgi /opt/suexec/$login/php5-fcgi-wrapper
 EOF
     if ( $vhostaliases ne "-" ) {
         print VHOSTOUT "    ServerAlias";

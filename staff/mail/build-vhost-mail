@@ -1,0 +1,42 @@
+#!/bin/sh -e
+
+INPUT_FILE="/home/s/st/staff/vhost/vhost-mail.conf"
+DOMAINS_FILE="/etc/postfix/ocfconfig/vhost-domains"
+LOGINS_FILE="/etc/postfix/ocfconfig/vhost-logins.pcre"
+MAPS_FILE="/etc/postfix/ocfconfig/vhost-maps.pcre"
+
+trap "echo Error" EXIT
+
+uncomment() {
+  egrep -v '^[[:space:]]*(#|$)' "$1"
+}
+
+vhost_users="`uncomment "$INPUT_FILE" | cut -d' ' -f1`"
+
+# exit if invalid users
+if ! getent passwd $vhost_users > /dev/null; then
+  echo "Error: Invalid vhost users." && \
+  echo "Please fix $INPUT_FILE and try again." && \
+  exit 1
+fi
+
+# print and exit if sorried users
+if getent passwd $vhost_users | grep sorry; then
+  echo "Error: Above vhost users are sorried."
+  echo "Please fix $INPUT_FILE and try again."
+  exit 1
+fi
+
+# print and exit if vhost users over quota
+if echo $vhost_users | grep -Fx -f - /var/mail/etc/quota; then
+  echo "Error: Above vhost users are over quota."
+  echo "Please fix $INPUT_FILE and try again."
+  exit 1
+fi
+
+# generate DOMAINS_FILE, LOGINS_FILE, and MAPS_FILE
+uncomment "$INPUT_FILE" | cut -d' ' -f2 > "$DOMAINS_FILE"
+uncomment "$INPUT_FILE" | sed -E -e 's/\./\\./g' \
+-e 's/([^ ]+) ([^ ]+)/\/\^\(\.\*\)\@\2\$\/ \1/' | column -t > "$LOGINS_FILE"
+sed 's/$/+${1}/g' "$LOGINS_FILE" > "$MAPS_FILE"
+trap - EXIT

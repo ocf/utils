@@ -92,13 +92,17 @@ def get_ip(mac):
         except subprocess.CalledProcessError:
             time.sleep(1)
 
-def get_ssh_connection(ip, user, password):
+def get_ssh_connection(mac, user, password):
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
     # wait for the VM to be live
     while True:
         try:
+            print("Determining IP for VM...")
+            ip = get_ip(mac)
+            print("Trying IP: {}".format(ip))
+
             client.connect(ip, username=user, password=password, timeout=1)
         except (socket.timeout, socket.error):
             continue
@@ -233,12 +237,8 @@ def _main(args):
     print("Installation successful, starting VM...")
     start_vm(args.hostname)
 
-    print("Determining IP for VM...")
-    ip = get_ip(mac)
-
-    print("IP: {}".format(ip))
     print("Connecting to VM via SSH...")
-    client = get_ssh_connection(ip, args.preseed_user, args.preseed_password)
+    client = get_ssh_connection(mac, args.preseed_user, args.preseed_password)
 
     print("Setting hostname to {}...".format(args.hostname))
     client.exec_command("echo {} > /etc/hostname".format(args.hostname))
@@ -257,5 +257,3 @@ def _main(args):
 
 if __name__ == "__main__":
     _main(sys.argv[1:])
-
-# vim: set expandtab:ts=4:sw=4

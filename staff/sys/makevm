@@ -5,6 +5,7 @@
 # Dependencies (Debian packages):
 #  - python-colorama
 #  - python-paramiko
+#  - nmap
 from __future__ import print_function
 
 import argparse

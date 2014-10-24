@@ -52,7 +52,7 @@ def generate_mac_addr():
         return random.randint(0, 255)
     return ":".join('{:02x}'.format(random_byte(i)) for i in range(MAC_BYTES))
 
-def create_vm(name, memory, os_type, os_variant, network, mac):
+def create_vm(name, memory, vcpus, os_type, os_variant, network, mac):
     """Creates a new VM."""
 
     # try to print info about the domain to see if it already exists
@@ -65,9 +65,9 @@ def create_vm(name, memory, os_type, os_variant, network, mac):
         pass # all good
 
     cmd = "virt-install -r {} --pxe --os-type={} --os-variant={} " + \
-        "--disk {},cache=none --network {},mac={} --graphics vnc --serial pty --name {}"
+        "--disk {},cache=none --vcpus={} --network {},mac={} --graphics vnc --serial pty --name {}"
     cmd = cmd.format(memory, os_type, os_variant, "/dev/vg/" + name,
-        network, mac, name)
+        vcpus, network, mac, name)
 
     exec_cmd(cmd)
 
@@ -152,7 +152,9 @@ def _main(args):
 
     parser.add_argument("-m", "--memory", type=int, default=4096,
         help="amount of memory (in MB)")
-    parser.add_argument("-s", "--storage", type=int, default=15,
+    parser.add_argument("-c", "--vcpus", type=int, default=2,
+        help="number of vCPUs")
+    parser.add_argument("-s", "--storage", type=int, default=10,
         help="amount of disk storage (in GB)")
     parser.add_argument("--os-type", type=str, default="linux",
         help="os type")
@@ -216,6 +218,7 @@ def _main(args):
     print("\tOS Variant: {}".format(args.os_variant))
     print("\tDisk Space: {} GB".format(args.storage))
     print("\tMemory: {} MB".format(args.memory))
+    print("\tvCPUs: {}".format(args.vcpus))
     print("\tNetwork: {}".format(args.network))
 
     if not confirm():
@@ -225,7 +228,7 @@ def _main(args):
     mac = generate_mac_addr()
 
     create_disk(args.hostname, args.storage)
-    create_vm(args.hostname, args.memory, args.os_type, args.os_variant,
+    create_vm(args.hostname, args.memory, args.vcpus, args.os_type, args.os_variant,
         args.network, mac)
 
     if args.skip_config:

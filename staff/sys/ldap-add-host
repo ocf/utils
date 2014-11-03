@@ -1,0 +1,27 @@
+#!/bin/bash -e
+if [ "$#" -ne 2 ]; then
+	echo "usage: $0 fqdn ipv4"
+	exit 1
+fi
+
+HOST="$1"
+IP="$2"
+
+record="dn: cn=$HOST,ou=Hosts,dc=OCF,dc=Berkeley,dc=EDU
+objectClass: device
+objectClass: ocfDevice
+cn: $HOST
+ipHostNumber: $IP
+type: server
+environment: production"
+
+echo "$record"
+echo "======================"
+read -p "Add new record? [yN] " choice
+
+if [ "$choice" != "y" ] && [ "$choice" != "yes" ]; then
+	echo "Aborted."
+	exit 0
+fi
+
+ldapadd <<< "$record"

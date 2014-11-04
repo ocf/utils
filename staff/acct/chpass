@@ -1,0 +1,149 @@
+#!/usr/bin/perl
+
+use Expect;
+use MIME::Base64;
+use Unicode::Map8;
+use POSIX qw/strftime/;
+use Sys::Syslog qw( :DEFAULT setlogsock);
+
+if($#ARGV + 1 != 1)
+{
+print("Usage: '$0 USERNAME'\n");
+exit;
+}
+chomp(my $euid = `/usr/bin/whoami`);
+
+$clean = $ARGV[0];
+$clean =~ s/[^\w\s-]//g;
+chomp($clean = `echo $clean | cut -d' ' -f1`);
+
+chomp(my $passwd_file = `getent passwd $clean`);
+if(length($passwd_file) == 0)
+{
+    print("User not found in database\n");
+    exit;
+}
+print("OCF Change Password Program\n");
+print("\n");
+print("WARNING: If you are resetting/changing a password for an OCF staff member,
+you acknowledge that you may potentially modify some of the privileges that the staff 
+member may have.\n");
+print("\n");
+print("Changing password for: $passwd_file\n");
+
+my $pw_count = 0;
+my $newpass = "";
+while($pw_count < 5)
+{
+print "Enter New Password: ";
+system("stty -echo");
+chomp(my $try = <STDIN>);
+system("stty echo");
+print "\n";
+
+if(length($try) < 8)
+{
+    print("Password must be at least 8 characters long\n");\
+	$pw_count ++;
+    if($pw_count == 5)
+    {
+        print "Too Many Failures, exiting in case this is a bug in the program\n";
+        exit;
+    }
+}
+else{
+print("Verify password: ");
+system("stty -echo");
+chomp(my $verify = <STDIN>);
+system("stty echo");
+print "\n";
+if($try ne $verify)
+{
+    print("Verify Failure\n");
+        $pw_count ++;
+    if($pw_count == 5)
+    {
+	print "Too Many Failures, exiting in case this is a bug in the program\n";
+	exit;
+    }
+}
+else
+{
+    $pw_count = 5;
+    $newpass = $try;
+}
+}
+}
+
+
+
+print("Connecting to kerberos.ocf.berkeley.edu...\n");
+#print("Principal to use [$euid/root]: ");
+#chomp(my $staff_member = <STDIN>);
+if(length($staff_member) == 0)
+{
+    $staff_member = "$euid/root";
+}
+system("stty -echo");
+print("Please enter the password for principal $staff_member: ");
+chomp(my $kticket = <STDIN>);
+system("stty echo");
+print("\n");
+system("stty echo");
+
+my $exp = new Expect;
+$exp->raw_pty(1);
+#$exp->log_stdout(0);
+my $timeout = 30;
+$exp->spawn("/usr/sbin/kadmin -p $staff_member cpw $clean");
+    $exp->expect($timeout,
+                 [ qr/Password:/ => sub { my $exp = shift;
+                                           if($count == 0)
+                                           {
+                                               $exp->send("$newpass\n");
+                                               $count = $count + 1;
+                                               exp_continue;
+                                           }
+                                           else
+                                           {
+                                               if($count == 1)
+                                               {
+                                                   $exp->send("$newpass\n");
+                                                   $count = $count + 1;
+                                                   exp_continue;
+                                               }
+                                               else {
+                                                   $exp->send("$kticket\n");
+						   exp_continue;
+                                               }
+                                           }
+		   } ],
+                 [ qr/kadmin:/ => sub { print "Heimdal Error, to prevent desynchronization chpass.pl is quitting.\n";
+					print "Possible causes include: bad staff principal, missing user Kerberos principal, or poor network connectivity\n";
+                                         exit;}]
+                                         
+    );
+
+$exp->soft_close();
+print "Successfully changed heimdal kerberos principal\n";
+
+chomp($realname = `getent passwd $username | cut -d':' -f5 | cut -d',' -f1`);
+chomp($staffer = `getent passwd $euid | cut -d':' -f5 | cut -d',' -f1`);
+#my $datetime = strftime('on %m/%d/%Y at %I:%M%P %z',localtime);
+my $datetime = strftime('on %c',localtime);
+#use Email::MIME;
+#use Email::Sender::Simple qw(sendmail);
+#my $message = Email::MIME->create(
+#  header_str => [
+#    From    => 'OCF staff <staff@ocf.berkeley.edu>',
+#    To      => "$realname <$username\@ocf.berkeley.edu>",
+#    Subject => "OCF password for $username changed",
+#  ],
+#  attributes => {
+#    encoding => 'quoted-printable',
+#    charset  => 'ISO-8859-1',
+#  },
+#  body_str => "OCF password for account $username changed by\nstaff member $staffer <$euid\@ocf.berkeley.edu>\n$datetime.",
+#);
+#sendmail($message);
+system("echo 'OCF password for account $username changed\nby staff member $staffer <$euid\@ocf.berkeley.edu>\n$datetime.' | mail -s 'OCF password for $username changed' -a 'From: OCF staff <help\@ocf.berkeley.edu>' '$realname <$username\@ocf.berkeley.edu>'");

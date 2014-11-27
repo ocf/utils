@@ -1,0 +1,5 @@
+WordPress, the blog software used on your site, was allowing comments
+without CAPTCHAs or other forms of anti-spam protection, and therefore
+being abused by spambots. Spam has been increasing on those pages and
+this would otherwise also result in many unnecessary email
+spam-filled messages to be sent from our server.

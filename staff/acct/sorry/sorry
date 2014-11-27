@@ -1,7 +1,5 @@
 #!/bin/bash
-
-# Script for sorrying OCF user accounts, adapted for LDAP/Kerberos
-# 3-23-2008, gfs
+# Script for sorrying OCF user accounts
 
 LDAPSEARCH=`which ldapsearch`
 LDAPMODIFY=`which ldapmodify`
@@ -31,14 +29,9 @@ fi
 sorryFile=$2
 userdir=`ldapsearch -x uid=$sorriedUser | grep homeDirectory | cut -d' ' -f2`
 
-#stealing luns's sed madness from makehttp wrapper
 httpdir=`echo $sorriedUser | sed -e 's%\(\(.\)\)%/services/http/users/\2/\1%'`
-#ftpdir=`echo $sorriedUser | sed -e 's%\(\(.\)\)%/services/ftp/users/\2/\1%'`
-#mysqldir=/services/mysql/data/$sorriedUser
 
-#this will mitigate bunches of 'root' in the sorry log
-
-rootstaffer=`/usr/bin/whoami | /usr/bin/cut -d" " -f1`
+rootstaffer="$SUDO_USER"
 
 if [ x"$rootstaffer" = x"root" -o -z $rootstaffer ] 
 then
@@ -47,33 +40,25 @@ then
 	read rootstaffer
 fi
 
-#if [ -z $SORRY_KRB5CCNAME ]; then
+if [ -z $SORRY_KRB5CCNAME ]; then
 	echo You are $rootstaffer
 	$KINIT ${rootstaffer}/admin
 	if [ $? -ne 0 ]; then
 		echo "kinit failed, bailing out!"
 		exit 1
 	fi
-#else
-#	echo "SORRY_KRB5CCNAME set in environment."
-#	echo "Assuming this file contains current admin credentials."
-#	KRB5CCNAME=$SORRY_KRB5CCNAME
-#	export KRB5CCNAME
-#fi
-
-#changes shell to sorry shell
-#the new path should be /opt/adm/shell/sorry or /opt/ocf/bin/sorry
-#sluo needs to change this
-#AND it has been changed by waf
+else
+	echo "SORRY_KRB5CCNAME set in environment."
+	echo "Assuming this file contains current admin credentials."
+	KRB5CCNAME=$SORRY_KRB5CCNAME
+	export KRB5CCNAME
+fi
 
 sorryshell=/opt/ocf/bin/sorry
 
 echo ""
 echo "Copying sorry file and making .oldshell file"
 
-#not sure how to go about surpressing all output here
-# doesn't work because they can't log in here!
-#oldshell=`getent passwd $sorriedUser | cut -d: -f7`
 oldshell=`$LDAPSEARCH -x "(uid=$sorriedUser)" loginShell | grep "^loginShell:" | cut -d" " -f2`
 
 if [[ ! -f .oldshell ]]
@@ -87,17 +72,6 @@ chown $sorriedUser:ocf $userdir/.sorry
 echo ""
 echo "Changing user's shell to a sorry shell"
 
-# currently using Domain Controller not Samba
-#echo ""
-#echo "Disabling SMB account"
-
-#echo ""
-#echo "Changing passwd entry ownership"
-
-#replace: sambaAcctFlags
-#sambaAcctFlags: [DU         ]
-#-
-
 $LDAPMODIFY -H ldaps://ldap.ocf.berkeley.edu <<EOF
 dn: uid=$sorriedUser,ou=People,dc=OCF,dc=Berkeley,dc=EDU
 changetype: modify
@@ -108,25 +82,10 @@ replace: gidNumber
 gidNumber: 2390
 EOF
 
-#it's important that there be exactly 11 characters between the brackets associated with "sambaAcctFlags" regardless of whether there's a flag or a space in them
-
-#echo "Disabling mail for user"
-#echo $sorriedUser >> /var/mail/etc/sorry
-
-#echo ""
-#echo "Changing permissions on httpdir, ftpdir, mysqldir to 000"
 echo "Changing permissions on httpdir to 000"
 if [[ -d $httpdir ]]
 then chmod 000 $httpdir
 fi
-
-#if [[ -d $ftpdir ]]
-#then chmod 000 $ftpdir
-#fi
-
-#if [[ -d $mysqldir ]]
-#then chown root $mysqldir
-#fi
 
 echo ""
 echo "Changing permissions on home directory to 500"
@@ -141,13 +100,6 @@ ldapsearch -x cn=sorry | tail
 finger -m $sorriedUser
 ls -la $userdir
 ls -ld $httpdir
-#ls -ld $ftpdir 
-#ls -ld $mysqldir
-
-echo ""
-echo ""
-echo "For immediate mail disabling log into sandstorm and run"
-echo "  sudo nscd -i passwd && sudo /etc/postfix/ocfconfig/cronjob.sh"
 
 #logging
 echo `/bin/date` - $rootstaffer $sorriedUser >> /opt/acct/sorry.log
@@ -158,6 +110,3 @@ fi
 
 # Huge notice
 echo "NOW RUN note -u $sorriedUser reason. NOW"
-
-exit 0
- 

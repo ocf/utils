@@ -38,5 +38,5 @@ fi
 uncomment "$INPUT_FILE" | cut -d' ' -f2 > "$DOMAINS_FILE"
 uncomment "$INPUT_FILE" | sed -E -e 's/\./\\./g' \
 -e 's/([^ ]+) ([^ ]+)/\/\^\(\.\*\)\@\2\$\/ \1/' | column -t > "$LOGINS_FILE"
-sed 's/$/+${1}/g' "$LOGINS_FILE" > "$MAPS_FILE"
+sed 's/$/+${1}@vhost.ocf.berkeley.edu/g' "$LOGINS_FILE" > "$MAPS_FILE"
 trap - EXIT

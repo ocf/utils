@@ -1,11 +1,16 @@
 #!/bin/bash -e
 if [ "$#" -ne 2 ]; then
-	echo "usage: $0 fqdn ipv4"
+	echo "usage: $0 hostname ipv4"
 	exit 1
 fi
 
 HOST="$1"
 IP="$2"
+
+if grep '\.' <<< "$HOST" > /dev/null; then
+	echo "hostname should not contain dots"
+	exit 1
+fi
 
 record="dn: cn=$HOST,ou=Hosts,dc=OCF,dc=Berkeley,dc=EDU
 objectClass: device

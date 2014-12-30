@@ -16,7 +16,7 @@ collected = defaultdict(list)
 
 for u in updates:
     collected[u.xpath("../..")[0].attrib["hostname"]].append(
-        "{name}: {old} --> {new}".format(name = u.attrib["name"], old = u.attrib["version"], new = u.attrib["data"]))
+        "{name}: {old} --> {new}".format(name = u.attrib["name"], old = u.attrib["version"], new = u.attrib.get("data")))
 
 for host in sorted(collected.keys()):
     print host

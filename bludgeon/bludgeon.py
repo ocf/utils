@@ -61,9 +61,6 @@ class MySQL(object):
 
 
 class Wordpress(object):
-    script_name = "wp-cli.phar"
-    download_path = "https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar"
-
     class Module(object):
         def __init__(self, parent, name):
             self.parent = parent
@@ -79,8 +76,7 @@ class Wordpress(object):
 
 
     def __init__(self, wp_path):
-        self.wpcli_bin = os.path.join(script_basename, "wp-cli.phar")
-        self.download()
+        self.wpcli_bin = '/usr/local/bin/wp'
 
         self.wp_path = expandvars(expanduser(wp_path))
         logger.info("Wordpress install at {}".format(self.wp_path))
@@ -125,17 +121,6 @@ class Wordpress(object):
         """Create a callable which proxies through to WP-CLI.
         """
         return Wordpress.Module(self, name)
-
-    def download(self):
-        """Downloads the wp-cli script if necessary"""
-        script_full_path = join(script_basename, self.script_name)
-
-        if not exists(script_full_path):
-            logger.info("Downloading wp-cli script...")
-            with closing(urlopen(self.download_path)) as remote:
-                with open(os.path.join(script_basename, self.script_name), 'wb') as local:
-                    local.write(remote.read())
-            os.chmod(script_full_path, 0755)
 
 
 def main():

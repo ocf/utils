@@ -1,2 +1,0 @@
-#!/bin/bash
-ssh -t puppet /opt/ocf/puppet/scripts/apt-dated.py

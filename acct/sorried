@@ -1,0 +1,11 @@
+#!/bin/sh
+echo "Unfortunately, your account has been disabled."
+
+if [ -r ~/.sorry ]; then
+	echo "The reason your account has been disabled is:"
+	cat ~/.sorry
+fi
+
+echo
+echo "Please contact OCF staff:"
+echo "https://wiki.ocf.berkeley.edu/contact/"

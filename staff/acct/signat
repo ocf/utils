@@ -1,0 +1,104 @@
+#!/usr/bin/env python
+"""Returns active student group information for a signatory.
+OCF username or CalNet UID is the first and only argument.
+
+Required packages: python-ldap, python-yaml
+"""
+
+import ldap
+import sys
+from urllib import urlencode
+from urllib2 import urlopen, URLError
+from xml.etree import ElementTree as etree
+from yaml import safe_dump as dump
+
+service = 'SignatoriesActiveStudentGroups'
+url_base = 'https://studentservices.berkeley.edu/WebServices/StudentGroupServiceV2/Service.asmx'
+ldap_uri = 'ldaps://ldap.ocf.berkeley.edu'
+ldap_basedn = 'ou=People,dc=ocf,dc=berkeley,dc=edu'
+ldap_filter = 'uid'
+ldap_attribute = 'calnetUid'
+
+def get_osl(id, service, key='UID'):
+    """Query web service for student group information in XML format"""
+    if not isinstance(id, int):
+        raise ValueError(("ID must be an integer: " + str(id)))
+    if not service.isalpha():
+        raise ValueError(("Service is not alphabetic: " + str(service)))
+    parameters = {key: id}
+    url = url_base + '/' + service + '?' + urlencode(parameters)
+    try:
+        response = urlopen(url)
+    except URLError as e:
+        raise Exception("Could not connect to student group web service: "
+                        + str(e) + " at " + url)
+    return etree.parse(response)
+
+def parse_osl(root):
+    """Assemble Python dictionaries of groups from XML document"""
+    if root.findtext('Succeeded') == 'false':
+        try:
+            error_reason = root.findtext('Reason')
+        except:
+            error_reason = 'unknown reason'
+        raise Exception(("Lookup failed: " + error_reason))
+    groups = {}
+    xml_groups = root.findall('StudentGroupData/StudentGroupDatum')
+    for xml_group in xml_groups:
+        group_id = int(xml_group.findtext('groupId'))
+        group_name = xml_group.findtext('groupName').strip()
+        groups[group_id] = group_name
+    return groups
+
+def print_groups(groups):
+    """Output Python dictionary of groups as YAML"""
+    if groups:
+        dump(groups, sys.stdout, default_flow_style=False)
+    else:
+        print("No student groups found")
+
+def get_calnetuid(username):
+    """Find CalNet UID of an OCF user in LDAP"""
+    try:
+        directory = ldap.initialize(ldap_uri)
+        entry = directory.search_s(
+                                    ldap_basedn,
+                                    ldap.SCOPE_SUBTREE,
+                                    (ldap_filter+'='+username),
+                                    [ldap_attribute]
+                                  )
+    except ldap.SERVER_DOWN:
+        raise Exception(("Could not connect to LDAP server :" + ldap_uri))
+    except (ldap.INVALID_DN_SYNTAX, ldap.NO_SUCH_OBJECT):
+        raise ValueError(("Invalid DN: " + ldap_basedn))
+    if entry:
+        try:
+            return int(entry[0][1][ldap_attribute][0])
+        except KeyError:
+            raise KeyError(("Account does not have a CalNet UID: " + username))
+    else:
+        raise ValueError(("Account not found in LDAP: " + username))
+
+def main():
+    if len(sys.argv) == 2:
+        if sys.argv[1].isdigit():
+            # integer argument is student group ID
+            id = int(sys.argv[1])
+        elif sys.argv[1].isalpha() and sys.argv[1].islower():
+            # alphabetic argument is OCF username
+            username = sys.argv[1]
+            id = get_calnetuid(username)
+        else:
+            print(__doc__.strip())
+            sys.exit(2)
+        root = get_osl(id, service)
+        groups = parse_osl(root)
+        print_groups(groups)
+        #sys.stderr.write("\nvia\n" + url_base + "\n")
+    else:
+        print(__doc__.strip())
+        if len(sys.argv) > 2:
+            sys.exit(2)
+
+if __name__ == '__main__':
+    main()

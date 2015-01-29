@@ -1,0 +1,2 @@
+#!/bin/bash
+sudo -u mysql /opt/share/utils/makeservices/makemysql-real

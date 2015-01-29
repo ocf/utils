@@ -30,7 +30,7 @@ import sys
 RANDOM_PW_CMD = 'pwgen -n1 -y -s 20'
 
 
-WELCOME_TEMPLATE = "/opt/ocf/packages/makeservices/etc/makemysql.template"
+WELCOME_TEMPLATE = "/opt/ocf/etc/makemysql.template"
 WELCOME_SUBJECT = "MySQL account information"
 WELCOME_SENDER = "staff@OCF.Berkeley.EDU"
 
@@ -43,7 +43,7 @@ GRANT_QUERY = "GRANT ALL PRIVILEGES ON %s.* TO %s@'%%' IDENTIFIED BY '%s'";
 
 CREATE_QUERY = "CREATE DATABASE %s";
 
-CONF_FILE = "/opt/ocf/packages/makeservices/etc/makemysql.conf"
+CONF_FILE = "/opt/ocf/etc/makemysql.conf"
 MYSQL_HOST = 'maelstrom.int.ocf.berkeley.edu'
 MYSQL_ROOT_PW = None # No default; this must be read from the config file.
 

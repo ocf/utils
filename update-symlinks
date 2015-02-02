@@ -1,0 +1,15 @@
+#!/bin/bash -ex
+# Update symlinks inside bin and sbin directories.
+
+find bin -type l -delete
+find sbin -type l -delete
+
+find . -type f -executable -not -path './staff/*' -not -path './.git/*' | \
+	while read p; do
+		ln -s "../${p:2}" "bin/$(basename "$p")"
+	done
+
+find staff -type f -executable | \
+	while read p; do
+		ln -s "../$p" "sbin/$(basename "$p")"
+	done

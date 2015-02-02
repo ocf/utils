@@ -1,0 +1,1 @@
+../staff/puppet/gen-keytab.sh

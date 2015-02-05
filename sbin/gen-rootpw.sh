@@ -1,1 +1,0 @@
-../staff/puppet/gen-rootpw.sh

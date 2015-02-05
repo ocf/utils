@@ -1,1 +1,0 @@
-../staff/acct/search/list-individuals.sh

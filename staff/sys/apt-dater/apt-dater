@@ -1,2 +1,0 @@
-#!/bin/bash
-ssh -t puppet sudo /opt/puppet/scripts/apt-dater.sh

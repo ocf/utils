@@ -1,1 +1,0 @@
-../web/webhook/github.cgi

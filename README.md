@@ -9,7 +9,7 @@ at the University of California, Berkeley.
 
 In general, scripts which will might be executed by a person should go here.
 System scripts (things that go primarily in cronjobs or similar) should go in
-the [ocf/puppet][puppet] repo instead.
+the [ocf/puppet][ocf/puppet] repo instead.
 
 Scripts of all languages are welcome, and should be organized into appropriate
 directories. Use `staff/` for anything that will typically only be executed by

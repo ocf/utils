@@ -2,45 +2,33 @@
 """
 Force the Disable Comments plugin onto an existing Wordpress install.
 
-This needs to be run as root; try
+This should be run as the appropriate user. Try:
 
-    sudo `which bludgeon.py` /path/to/user/wp
+    sudo -u someuser bludgeon /path/to/user/wp
 
-This also needs a MySQL root password; you can provide it on the
-command line or use a standard MySQL configuration file
-(default ~/.my.cnf)
+The user's MySQL password will be read out of wp-config.php.
 """
 
-from ConfigParser import ConfigParser
-from contextlib import closing
-from contextlib import contextmanager
 from subprocess import CalledProcessError
 from subprocess import check_output
 from subprocess import STDOUT
-from os.path import exists
 from os.path import expanduser
 from os.path import expandvars
 from os.path import join
 from pwd import getpwuid
-from urllib2 import urlopen
 import argparse
 import getpass
 import logging
 import os
-import re
-import sys
 
 # Load it in main
-update = None
-
 logger = logging.getLogger(__name__)
 
 class MySQL(object):
-    user = "root"
     magic = "UkVQTEFDRSBJTlRPIGB3cF9vcHRpb25zYCAoYG9wdGlvbl9uYW1lYCwgYG9wdGlvbl92YWx1ZWAsIGBhdXRvbG9hZGApIFZBTFVFUyAoJ2Rpc2FibGVfY29tbWVudHNfb3B0aW9ucycsJ2E6NDp7czoxOTpcImRpc2FibGVkX3Bvc3RfdHlwZXNcIjthOjM6e2k6MDtzOjQ6XCJwb3N0XCI7aToxO3M6NDpcInBhZ2VcIjtpOjI7czoxMDpcImF0dGFjaG1lbnRcIjt9czoxNzpcInJlbW92ZV9ldmVyeXdoZXJlXCI7YjoxO3M6OTpcInBlcm1hbmVudFwiO2I6MDtzOjEwOlwiZGJfdmVyc2lvblwiO2k6NTt9JywneWVzJyk7"
 
-    def __init__(self, target_user, password):
-        self.target_user = target_user
+    def __init__(self, user, password):
+        self.user = user
         self.password = password
 
     def disable_comments(self):
@@ -51,10 +39,10 @@ class MySQL(object):
         but I can't deal with the escaping.
         """
         check_output(
-            "echo {magic} | base64 -d | mysql -uroot -p{password} {user}".format(
+            "echo {magic} | base64 -d | mysql -u{user} -p{password} {user}".format(
                 magic=self.magic,
                 password=self.password,
-                user=self.target_user,
+                user=self.user,
             ),
             shell=True,
         )
@@ -102,7 +90,7 @@ class Wordpress(object):
         if any(args):
             args = " " + args
 
-        cmd = "{bin} --allow-root {module} {action}{kwargs}{args}".format(
+        cmd = "{bin} {module} {action}{kwargs}{args}".format(
             bin=self.wpcli_bin,
             module=mod_name,
             action=action_name,
@@ -123,37 +111,32 @@ class Wordpress(object):
         return Wordpress.Module(self, name)
 
 
+def get_mysql_password(path):
+    """Naively attempt to read MySQL password from wp-config.php"""
+
+    config_path = join(path, 'wp-config.php')
+    if not os.path.isfile(config_path):
+        raise Exception("Can't find WordPress installation.")
+
+    with open(config_path) as f:
+        for line in filter(lambda line: 'DB_PASSWORD' in line, f):
+            return line.split("'")[3]
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("path", help="Filesystem path to a Wordpress installation")
-    parser.add_argument("--mysql-password", help="MySQL root password")
-    parser.add_argument("--mysql-config", default="~/.my.cnf", help="MySQL user configuration file")
 
     args = parser.parse_args()
 
-    if os.geteuid() != 0:
-        parser.error("This utility should be run as root.")
+    if os.geteuid() == 0:
+        parser.error("This utility should *not* be run as root.")
 
-    mysql_password = None
+    mysql_user = getpass.getuser()
+    logger.info("Using current user {} as MySQL user".format(mysql_user))
 
-    if args.mysql_password:
-        logger.info("Using MySQL root password from command line")
-        mysql_password = args.mysql_password
-
-    real_path = expandvars(expanduser(args.mysql_config))
-    if exists(real_path):
-        logger.info("Using MySQL config file from {}".format(real_path))
-        mysql_config = ConfigParser()
-        mysql_config.read(real_path)
-        mysql_password = mysql_config.get("mysql", "password")
-
-    if not mysql_password:
-        parser.error("No MySQL root password could be loaded.")
-
-    stat = os.stat(args.path)
-    mysql_user = getpwuid(stat.st_uid).pw_name
-
-    logger.info("Using directory owner {} as MySQL user".format(mysql_user))
+    mysql_password = get_mysql_password(args.path)
+    logger.info("Read MySQL password from wp-config.php")
 
     wp = Wordpress(args.path)
     mysql = MySQL(mysql_user, mysql_password)
@@ -180,7 +163,4 @@ def main():
 
 if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG, format='[%(levelname)s] %(message)s')
-    script_basename = os.path.dirname(os.path.realpath(__file__))
-    logging.info("Script directory is {}".format(script_basename))
-
     main()

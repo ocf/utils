@@ -112,15 +112,15 @@ class Wordpress(object):
 
 
 def get_mysql_password(path):
-    """Naively attempt to read MySQL password from wp-config.php"""
+    """Attempt to read MySQL password from wp-config.php. Possibly dangerous
+    against a malicious WordPress install, but so is wp-cli."""
 
     config_path = join(path, 'wp-config.php')
     if not os.path.isfile(config_path):
         raise Exception("Can't find WordPress installation.")
 
-    with open(config_path) as f:
-        for line in filter(lambda line: 'DB_PASSWORD' in line, f):
-            return line.split("'")[3]
+    code = "require('" + config_path + "'); echo DB_PASSWORD;"
+    return check_output(['php', '-r', code])
 
 
 def main():

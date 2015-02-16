@@ -111,7 +111,7 @@ replace: loginShell
 loginShell: $newshell
 -
 replace: gidNumber
-gidNumber: 20
+gidNumber: 1000
 EOF
 
 #-

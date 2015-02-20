@@ -1,20 +1,8 @@
 #!/bin/sh
-
-# look up user for relevant account information
-# quick and simple, daradib@OCF 2011-05-13
-# merged contributions from sanjayk@OCF, daradib@OCF 2011-08-29
-# rewritten, daradib@OCF 2011-10-07
-# revised, daradib@OCF 2011-10-13
-# added print history support, daradib@OCF 2011-10-26
-# added file quota support, daradib@OCF 2011-10-29
-# revised, daradib@OCF 2011-11-01
-# added basic CalNet support, daradib@OCF 2012-03-12
-# added vhost, webdir, sorry shell checks daradib@OCF 2012-10-16
+# Look up user for relevant account information.
 
 # specify location of User_Info file
 User_Info_file='/home/s/st/staff/User_Info'
-# specify location of over quota file
-quota_file='/var/mail/etc/quota'
 # specify location of wtmp files
 wtmp_files='/var/log/wtmp /var/log/wtmp.1'
 # default number of logins to display from wtmp files
@@ -93,28 +81,17 @@ else
   fi
 fi
 
-# check if in over quota file
-quota="`grep -Fx $user $quota_file`"
-if [ -n "$quota" ]; then
-  echo "WARNING: Account inbox is over quota; cannot send or receive mail" >&2
-fi
-
 # check if member of groups other than ocf
 groups="`groups $user | cut -d " " -f3- | grep -v "^ocf$"`"
 if [ -n "$groups" ]; then
    echo "Member of group(s): $groups"
 fi
 
-# check output of finger for mail forwarding, if permissions allow
-finger="`finger -m $user | grep "^Mail forwarded"`"
-if [ -n "$finger" ]; then
-   echo "$finger"
-fi
-
-# check if OSL group ID number exists in LDAP
-oslgid="`ldapsearch -x -LLL uid=$user oslgid | grep -i ^oslgid | cut -d' ' -f2`"
-if [ -n "$oslgid" ]; then
-   echo "OSL group ID number: $oslgid"
+# check if CalLink OID number exists in LDAP
+callinkOid="`ldapsearch -x -LLL uid=$user callinkOid | grep -i ^callinkOid | cut -d' ' -f2`"
+if [ -n "$callinkOid" ]; then
+   echo "CalLink OID number: $callinkOid"
+   echo "https://ocf.io/oslapi?status=&category=&type=&name=&OrganizationID=$callinkOid"
 fi
 
 # check if CalNet UID number exists in LDAP
@@ -189,8 +166,6 @@ fi
 
 # check most recent login history
 last="`(for wtmp_file in $wtmp_files; do last -a $user -f $wtmp_file; done) | egrep -v ' begins|^$' | head -n $login_count | awk '{$1=""; print $0}' | sed 's/^[ ]*//g'`"
-#last="`(last -a $user && last -a $user -f /var/log/wtmp.1) | egrep -v "^wtmp begins|^wtmp.1 begins|^$" | head -n $login_count | awk '{$1=""; print $0}' | sed 's/^[ ]*//g'`"
-# awk and sed for double the fun
 if [ -n "$last" ]; then
   echo
   echo "Recent login history on local machine:"

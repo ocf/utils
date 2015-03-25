@@ -252,7 +252,7 @@ def _main(args):
     configure_network(client, args.ip)
 
     print("Turning on puppet...")
-    client.exec_command("sed -i 's/START=no/START=yes/' /etc/default/puppet")
+    client.exec_command("puppet agent --enable")
 
     print("Restarting VM...")
     client.exec_command("shutdown -r now")

@@ -1,6 +1,26 @@
-#!/bin/sh
+#!/bin/bash -e
 # Update the OCF root password. We use a ridiculous number of hash iterations
 # to make cracking the hashes way over-the-top impossible.
-mkpasswd -m sha-512 -R 65536 | tr -d '\n' > /opt/puppet/shares/private/rootpw
+
+echo "########################################################"
+echo "This will update the root password for ALL OCF MACHINES."
+echo "    YOU PROBABLY SHOULD NOT BE RUNNING THIS COMMAND."
+echo "########################################################"
+echo
+read -p "Are you sure you want to do this? [yN] " answer
+
+if [ "$answer" != "y" ]; then
+	echo "Wise choice."
+	exit 1
+fi
+
+HASH=$(mkpasswd -m sha-512 -R 65536 | tr -d '\n')
+
+if [ -z "$HASH" ]; then
+	echo "Didn't get a password?"
+	exit 1
+fi
+
+echo -n "$HASH" > /opt/puppet/shares/private/rootpw
 chown puppet:puppet /opt/puppet/shares/private/rootpw
 chmod 600 /opt/puppet/shares/private/rootpw

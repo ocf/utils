@@ -91,7 +91,9 @@ fi
 callinkOid="`ldapsearch -x -LLL uid=$user callinkOid | grep -i ^callinkOid | cut -d' ' -f2`"
 if [ -n "$callinkOid" ]; then
    echo "CalLink OID number: $callinkOid"
-   echo "https://ocf.io/callinkapi?status=&category=&type=&name=&OrganizationID=$callinkOid"
+   if [ "$callinkOid" != 0 ]; then
+       echo "https://ocf.io/callinkapi?status=&category=&type=&name=&OrganizationID=$callinkOid"
+   fi
 fi
 
 # check if CalNet UID number exists in LDAP

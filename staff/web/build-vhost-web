@@ -3,7 +3,7 @@
 import os.path
 import ocflib.account.utils as utils
 
-TEMPLATE_VHOST = """<VirtualHost *:80>
+TEMPLATE_VHOST = """<VirtualHost *:{port}>
     ServerName {domain}
     ServerAdmin {user}@ocf.berkeley.edu
     DocumentRoot {docroot}
@@ -11,7 +11,17 @@ TEMPLATE_VHOST = """<VirtualHost *:80>
 {config}
 </VirtualHost>"""
 
-TEMPLATE_VHOST_MAIN = """
+FRAGMENT_SSL = """
+    SSLEngine on
+    SSLCertificateFile /etc/ssl/private/vhosts/{domain}.crt
+    SSLCertificateKeyFile /etc/ssl/private/vhosts/{domain}.key
+    SSLCertificateChainFile /etc/ssl/private/vhosts/{domain}.chain
+    Include ssl-common.conf"""
+
+FRAGMENT_HSTS = """
+    Header set Strict-Transport-Security 'max-age=31536000'"""
+
+FRAGMENT_MAIN = """
     SuexecUserGroup {user} ocf
     suPHP_Engine off
     AddHandler php5-fcgi .php
@@ -46,27 +56,39 @@ def get_config(domain, config):
     aliases which redirect to the primary host.
     """
     docroot = os.path.join(utils.web_dir(config['username']), config['docroot'][1:])
+    primary_ssl = 'ssl' in config['flags']
+    primary_port = 443 if primary_ssl else 80
+    primary_url = "{proto}://{domain}/".format(
+        proto='https' if primary_ssl else 'http',
+        domain=domain)
 
-    def wrap_vhost(domain, text):
+    def wrap_vhost(domain, port, text):
         """Wraps the given config text inside a <VirtualHost> block, with
         appropriate settings for server name, admin, etc."""
 
         return TEMPLATE_VHOST.format(
             domain=domain,
+            port=port,
             user=config['username'],
             docroot=docroot,
             config=text)
 
 
-    def gen_redirect_config(host, redirect):
-        return wrap_vhost(host, "Redirect " + redirect)
+    def gen_redirect_config(host, port, redirect):
+        return wrap_vhost(host, port, "    Redirect " + redirect)
 
 
     def gen_main_config(host):
-        return wrap_vhost(
-            host,
-            TEMPLATE_VHOST_MAIN.format(user=config['username'],
-                                       docroot=docroot))
+        conf = FRAGMENT_MAIN.format(user=config['username'],
+                                    docroot=docroot)
+
+        if primary_ssl:
+            conf += FRAGMENT_SSL.format(domain=domain)
+
+            if 'hsts' in config['flags']:
+                conf += FRAGMENT_HSTS
+
+        return wrap_vhost(host, primary_port, conf)
 
 
     def get_fragments():
@@ -75,11 +97,16 @@ def get_config(domain, config):
         if not config['redirect']:
             yield gen_main_config(domain)
         else:
-            yield gen_redirect_config(domain, config['redirect'])
+            yield gen_redirect_config(domain, primary_port, config['redirect'])
+
+        # add redirects (aliases and non-ssl)
+        redirect_path = 'permanent / ' + primary_url
 
         for alias in config['aliases']:
-            url = "http://{domain}/".format(domain=domain)
-            yield gen_redirect_config(alias, 'permanent / ' + url)
+            yield gen_redirect_config(alias, 80, redirect_path)
+
+        if primary_ssl:
+            yield gen_redirect_config(domain, 80, redirect_path)
 
     return "\n".join(get_fragments())
 

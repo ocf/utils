@@ -24,9 +24,16 @@ FRAGMENT_HSTS = """
 FRAGMENT_MAIN = """
     SuexecUserGroup {user} ocf
     suPHP_Engine off
-    AddHandler php5-fcgi .php
     Action php5-fcgi /php5-fcgi
     Alias /php5-fcgi /opt/suexec/{user}/php5-fcgi-wrapper
+
+    <FilesMatch "\.ph(p3?|tml)$">
+        SetHandler php5-fcgi
+    </FilesMatch>
+
+    <Directory /opt/suexec/{user}/>
+        SetHandler fastcgi-script
+    </Directory>
 
     <Directory {docroot}>
         AllowOverride All
@@ -56,6 +63,9 @@ def get_config(domain, config):
     aliases which redirect to the primary host.
     """
     docroot = os.path.join(utils.web_dir(config['username']), config['docroot'][1:])
+    if not docroot.endswith('/'):
+        docroot += '/'
+
     primary_ssl = 'ssl' in config['flags']
     primary_port = 443 if primary_ssl else 80
     primary_url = "{proto}://{domain}/".format(

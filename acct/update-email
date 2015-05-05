@@ -128,7 +128,9 @@ if __name__ == "__main__":
 
 	new_email = None
 	while not valid_email(new_email):
-		new_email = raw_input(Q_NEW_EMAIL)
+		if new_email is not None:
+			print("The email you entered was invalid; please try again.")
+		new_email = raw_input(Q_NEW_EMAIL).strip()
 
 	set_email(l, dn, email, new_email)
 	print("Updated email to {}".format(new_email))

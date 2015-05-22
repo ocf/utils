@@ -6,6 +6,8 @@
 #  - python-colorama
 #  - python-paramiko
 #  - nmap
+#
+# TODO: replace shell=True subprocess invocations
 from __future__ import print_function
 
 import argparse
@@ -72,11 +74,12 @@ def create_vm(name, memory, vcpus, os_type, os_variant, network, mac):
 
     exec_cmd(cmd)
 
-def wait_for_shutdown(name):
-    output = name
+def get_running_vms():
+    output = subprocess.check_output("virsh list", shell=True).decode("utf-8")
+    return [line.split()[1] for line in output.splitlines()[2:-1]]
 
-    while name in output:
-        output = subprocess.check_output("virsh list", shell=True).decode("utf-8")
+def wait_for_shutdown(name):
+    while name in get_running_vms():
         time.sleep(1)
 
 def start_vm(name):
@@ -172,6 +175,7 @@ def _main(args):
         help="amount of disk storage (in GB)")
     parser.add_argument("--os-type", type=str, default="linux",
         help="os type")
+    # strangely, there is no debianjessie :(
     parser.add_argument("--os-variant", type=str, default="debianwheezy",
         help="os variant")
     parser.add_argument("--network", type=str, default="bridge=br0",
@@ -264,6 +268,8 @@ def _main(args):
     print("Configuring static IP {}...".format(args.ip))
     configure_network(client, args.ip)
 
+    # TODO: for some reason this doesn't have any effect
+    # (it's still necessary to log in and run the command manually)
     print("Turning on puppet...")
     client.exec_command("puppet agent --enable")
 

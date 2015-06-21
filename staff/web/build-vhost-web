@@ -37,7 +37,7 @@ FRAGMENT_MAIN = """
 
     <Directory {docroot}>
         AllowOverride All
-        Options MultiViews SymLinksIfOwnerMatch IncludesNoExec ExecCGI
+        Options MultiViews Indexes SymLinksIfOwnerMatch IncludesNoExec ExecCGI
 
         AddHandler cgi-script cgi pl cgi-debug py
 

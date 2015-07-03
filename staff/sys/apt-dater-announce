@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+from collections import defaultdict
+from subprocess import check_output
+import sys
+from lxml import etree
+
+from ocflib.constants import MAIL_ROOT
+from ocflib.misc.mail import send_mail
+from ocflib.misc.whoami import current_user_formatted_email
+
+
+def main():
+    devnull = open('/dev/null', 'w')
+    output = check_output(['sudo', 'apt-dater', '-nr'], stderr=devnull).decode("utf8")
+    t = etree.fromstring(output)
+    updates = t.xpath("//pkg[@hasupdate='1']")
+
+    collected = defaultdict(list)
+
+    for u in updates:
+        collected[u.xpath("../..")[0].attrib["hostname"]].append(
+            "{name}: {old} --> {new}".format(name = u.attrib["name"], old = u.attrib["version"], new = u.attrib.get("data")))
+
+    body = ""
+
+    for host in sorted(collected.keys()):
+        body += host + "\n"
+        updates = collected[host]
+        for update in updates:
+            body += "\t" + update + "\n"
+
+    send_mail(
+        MAIL_ROOT,
+        "[apt-dater] package updates ({packages} pkgs / {hosts} hosts)".format(
+            packages=sum(map(len, collected.values())),
+            hosts=len(collected.keys()),
+        ),
+        body,
+        sender=current_user_formatted_email(),
+    )
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

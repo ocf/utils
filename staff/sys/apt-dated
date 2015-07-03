@@ -1,6 +1,21 @@
 #!/usr/bin/env python
 # encoding: utf8
 
+"""
+<nattofriends> lightning:/root-history.py
+<nattofriends> written by yours truly and left there to rot
+<waf> heh, i have never heard of root-history before
+<waf> never knew that existed actually
+<nattofriends> i wrote it in secret
+<nattofriends> by candlelight
+<waf> no wonder
+<nattofriends> this is an amazing script
+<nattofriends> >print "Don't lie to me."
+<nattofriends> >histories = [time.asctime(time.localtime(int(d.split("-")[0]))) for d in m_hist_entries]
+<waf> how does one run it?
+<nattofriends> with bash
+"""
+
 import os, sys, time, subprocess
 
 # root has no $PAGER

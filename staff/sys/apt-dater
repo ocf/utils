@@ -1,6 +1,15 @@
-#!/bin/sh
+#!/bin/bash -e
+if [ "$(whoami)" != "root" ]; then
+	echo "You are not root."
+	exit 1
+fi
 
-set -e
+mkdir -p /root/.config/apt-dater
+conf="/root/.config/apt-dater/apt-dater.conf"
+
+if [ ! -e "$conf" ]; then
+	cp -v /usr/share/doc/apt-dater/examples/apt-dater.conf.example "$conf"
+fi
 
 subnet='169.229.10.0/24'
 exclude_hosts='169.229.10.1,169.229.10.253'

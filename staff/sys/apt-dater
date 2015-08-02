@@ -1,4 +1,4 @@
-#!/bin/bash -e
+#!/bin/bash -eu
 if [ "$(whoami)" != "root" ]; then
 	echo "You are not root."
 	exit 1
@@ -13,21 +13,15 @@ for f in apt-dater.conf screenrc; do
 	fi
 done
 
-subnet='169.229.10.0/24'
-exclude_hosts='169.229.10.1,169.229.10.253'
-keytab='/root/apt-dater.keytab'
-config='/root/.config/apt-dater/hosts.conf'
+# update hosts
+(
+	echo '[ocf]'
+	echo -n 'Hosts='
+	ldapsearch -x -b 'ou=Hosts,dc=OCF,dc=Berkeley,dc=EDU' |
+		grep '^cn: ' | cut -d' ' -f2 | sed 's/^/apt-dater@/' | paste -sd';'
+) > /root/.config/apt-dater/hosts.conf
 
-kinit -t "$keytab" apt-dater
-
-cat /dev/null > "$config"
-
-hosts="`nmap -sn -oG - --system-dns --exclude $exclude_hosts $subnet \
-| grep ^Host | cut -d' ' -f3 | cut -f1 | tr -d '()' | sed 's/.ocf.berkeley.edu//gI'`"
-echo '[ocf]' >> "$config"; echo -n 'Hosts=' >> "$config"
-for host in $hosts; do
-  echo -n "apt-dater@$host;"
-done >> "$config"
-
+# and finally call apt-dater
+kinit -t /root/apt-dater.keytab apt-dater
 apt-dater -r > /dev/null
 apt-dater

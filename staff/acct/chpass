@@ -3,29 +3,14 @@
 
 import getpass
 import os
-import subprocess
 import sys
 
-import colorama
-import ocflib.account.manage as manage
-import ocflib.account.validators as validators
-from colorama import Fore, Style # pretty colors
-
-
-PROMPT_ERRORS = "{}[ERROR]{} ".format(Fore.RED, Fore.RESET) + \
-    "Password failed some requirements:"
-PROMPT_CONFIRM = "{}[OK]{} Confirm password: ".format(Fore.GREEN, Fore.RESET)
-PROMPT_TRYAGAIN = "{}[ERROR]{} ".format(Fore.RED, Fore.RESET) + \
-    "Passwords didn't match, try again?"
-PROMPT_SAVING = "{}[OK]{} Changing password...".format(Fore.GREEN, Fore.RESET)
-PROMPT_SAVED = "{}[OK]{} Password changed.".format(Fore.GREEN, Fore.RESET)
-PROMPT_KADMINFAIL = "{}[ERROR]{} ".format(Fore.RED, Fore.RESET) + \
-    "chpass failure:"
-
-
-def get_password(prompt="Enter password: "):
-    # TODO: make this echo asterisks as the user types to avoid user confusion
-    return getpass.getpass(prompt)
+from ocflib.account.manage import change_password_with_staffer
+from ocflib.account.search import user_exists
+from ocflib.account.validators import validate_password
+from ocflib.misc.shell import green
+from ocflib.misc.shell import prompt_for_new_password
+from ocflib.misc.shell import red
 
 
 def change_password(user, password):
@@ -37,8 +22,8 @@ def change_password(user, password):
         try:
             root_password = getpass.getpass(
                 "Enter admin password: ".format(root_principal))
-            print(PROMPT_SAVING)
-            manage.change_password_with_staffer(
+            print(green('[OK]') + ' Changing password...')
+            change_password_with_staffer(
                 user,
                 password,
                 root_principal,
@@ -46,11 +31,12 @@ def change_password(user, password):
         except ValueError as ex:
             # this usually means the staffer entered their password wrong,
             # so we let them try again, if they want
-            print("{} {}".format(PROMPT_KADMINFAIL, ex))
+            print(red('[ERROR]') + ' chpass failure: ' + str(ex))
         else:
             break
 
-    print(PROMPT_SAVED)
+    print(green('[OK]') + ' Password changed.')
+
 
 def main():
     if os.geteuid() == 0:
@@ -62,31 +48,16 @@ def main():
         sys.exit(1)
 
     user = sys.argv[1]
-    try:
-        passwd = subprocess.check_output(['getent', 'passwd', '--', user])
-    except subprocess.CalledProcessError:
+
+    if not user_exists(user):
         print("user '{}' does not exist".format(user), file=sys.stderr)
         sys.exit(1)
 
-    while True: # ask until verified password
-        while True: # ask until password valid
-            new_password = get_password()
-
-            try:
-                validators.validate_password(user, new_password)
-            except ValueError as ex:
-                print(PROMPT_ERRORS)
-                print("- {}".format(ex))
-            else:
-                break
-
-        if new_password == get_password(prompt=PROMPT_CONFIRM):
-            break
-
-        print(PROMPT_TRYAGAIN)
-    print(PROMPT_SAVING)
-
+    new_password = prompt_for_new_password(
+        validator=lambda password: validate_password(user, password),
+    )
     change_password(user, new_password)
+
 
 if __name__ == '__main__':
 	main()

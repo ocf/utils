@@ -1,0 +1,178 @@
+#!/usr/bin/env python3
+# Migrate a VM from one KVM host to another over SSH.
+#
+# This should be run on the new host, e.g. moving supernova from jaws to the
+# current host:
+#
+#     $ sudo migrate-vm jaws:supernova
+#
+# It performs the steps:
+#
+#   1) Stops the VM on the old host.
+#   2) Creates an LVM volume on the new host with appropriate size.
+#   3) Securely copies the entire disk from the old to new host.
+#   4) Checksums the entire disk on old and new to ensure a match.
+#   5) Imports the domain definition from old to new.
+#   6) Undefines the domain on the old host, but does not remove the LVM
+#      volume.
+#
+# It makes a couple assumptions:
+#   - We use the volume group /dev/vg on both the old and new host.
+#   - VMs are at /dev/vg/${hostname} on both old and new host.
+
+import argparse
+import os
+import paramiko
+import re
+import socket
+import sys
+import time
+from collections import namedtuple
+from getpass import getpass
+from subprocess import check_call
+from subprocess import Popen
+from subprocess import PIPE
+from tempfile import NamedTemporaryFile
+
+from ocflib.misc.shell import bold
+from ocflib.misc.shell import green
+from ocflib.misc.shell import red
+from ocflib.misc.shell import yellow
+
+
+HostAndVm = namedtuple('HostAndVm', ['host', 'vm'])
+
+
+def exec_command(cmd, ignore_status_code=False):
+    print(bold(cmd))
+    stdin, stdout, stderr = client.exec_command(cmd)
+
+    exit_status = stdout.channel.recv_exit_status()
+    if exit_status != 0 and not ignore_status_code:
+        raise RuntimeError(bold(red('Command exited nonzero ({}): {}'.format(exit_status, cmd))))
+
+    return stdin, stdout, stderr
+
+
+def copy_disk_image(vm, num_bytes):
+    _, stdout, _ = client.exec_command('sh -c "dd if=/dev/vg/' + vm + ' bs=32M | pigz"')
+
+    proc = Popen(
+        'gunzip | pv -s ' + str(num_bytes) + ' | dd of=/dev/vg/' + vm + ' bs=32M',
+        stdin=PIPE,
+        shell=True,
+    )
+
+    while True:
+        chunk = stdout.read(32 * 2**10)
+        if len(chunk) == 0:
+            break
+        proc.stdin.write(chunk)
+
+    proc.stdin.close()
+    proc.wait()
+
+
+def verify_disks(vm):
+    proc = Popen(['openssl', 'sha1', '/dev/vg/' + vm], stdout=PIPE)
+    _, stdout, _ = client.exec_command('openssl sha1 /dev/vg/' + vm)
+
+    original = stdout.read().decode('ascii').strip()
+    print(bold('Original SHA1 (on remote server): ') + original)
+
+    copied = proc.stdout.read().decode('ascii').strip()
+    print(bold('New SHA1 (on this server): ') + copied)
+
+    if original != copied:
+        print(bold(red('Hashes do not match, something went wrong!')))
+        sys.exit(1)
+    else:
+        print(bold(green('Hashes match!')))
+
+
+
+def shut_down_vm(vm):
+
+    while True:
+        _, _, _ = exec_command('virsh shutdown ' + vm, ignore_status_code=True)
+        _, stdout, _ = exec_command('virsh list')
+
+        # strip both header lines
+        stdout.readline()
+        stdout.readline()
+
+        if not any(re.match(r'^\s*[0-9]+\s+' + vm + '\s+.*', line) for line in stdout.readlines()):
+            break
+
+        print('waiting for shutdown...')
+        time.sleep(1)
+
+
+def get_lv_size(vm):
+    _, stdout, _ = exec_command('blockdev --getsize64 /dev/vg/' + vm)
+    return int(stdout.read().strip())
+
+
+def get_definition(vm):
+    _, stdout, _ = exec_command('virsh dumpxml ' + vm)
+    return stdout.read()
+
+
+if __name__ == '__main__':
+    def host_and_vm(host_and_vm):
+        m = re.match(r'^([a-z0-9\-]+):([a-z0-9\-]+)$', host_and_vm)
+        if not m:
+            raise argparse.ArgumentTypeError(
+                'argument should of the form host:vm (e.g. jaws:supernova)',
+            )
+        return HostAndVm(host=m.group(1), vm=m.group(2))
+
+
+    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser.add_argument('host_and_vm', metavar='host:vm', type=host_and_vm, help='Host and VM name to transfer.')
+
+    args = parser.parse_args()
+    host = args.host_and_vm.host
+    vm = args.host_and_vm.vm
+
+    if os.geteuid() != 0:
+        print(bold(red('You are not root.')))
+        exit(1)
+
+    resp = input(bold('We will copy {vm} from {host} to {here}. Continue? [yN] '.format(
+        vm=vm,
+        host=host,
+        here=socket.gethostname(),
+    )))
+    if resp != 'y':
+        print(red('Cancelled.'))
+        exit(0)
+
+    password = getpass(bold('Enter password for root: '))
+
+    client = paramiko.SSHClient()
+    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    client.connect(host, username='root', password=password)
+
+    print(bold('Shutting down VM on the host...'))
+    shut_down_vm(vm)
+
+    num_bytes = get_lv_size(vm)
+
+    print(bold('Creating logical volume here...'))
+    check_call(['lvcreate', '-L', str(num_bytes) + 'B', '-n', vm, '/dev/vg'])
+
+    print(bold('Copying virsh definition...'))
+    f = NamedTemporaryFile(mode='wb', delete=False)
+    f.write(get_definition(vm))
+    f.close()
+    check_call(['virsh', 'define', f.name])
+
+    print(bold('Copying disk image...'))
+    copy_disk_image(vm, num_bytes)
+
+    print(bold('Verifying disk copied...'))
+    verify_disks(vm)
+
+    print(bold(green('All done!')))
+    print(bold('After verifying, you should undefine the host and delete the LV on the old host.'))

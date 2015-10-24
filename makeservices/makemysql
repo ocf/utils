@@ -1,2 +1,6 @@
-#!/bin/bash
+#!/bin/bash -eu
+if [[ "$(hostname)" != "tsunami" ]]; then
+    echo -e '\033[1m\033[31mYou must run this command on tsunami.'
+    exit 1
+fi
 sudo -u mysql /opt/share/utils/makeservices/makemysql-real

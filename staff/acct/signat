@@ -1,104 +1,177 @@
-#!/usr/bin/env python
-"""Returns active student group information for a signatory.
-OCF username or CalNet UID is the first and only argument.
-
-Required packages: python-ldap, python-yaml
+#!/usr/bin/env python3
+"""Returns active student group information about a signatory or
+student group.
 """
-
-import ldap
+import argparse
 import sys
-from urllib import urlencode
-from urllib2 import urlopen, URLError
-from xml.etree import ElementTree as etree
-from yaml import safe_dump as dump
 
-service = 'SignatoriesActiveStudentGroups'
-url_base = 'https://studentservices.berkeley.edu/WebServices/StudentGroupServiceV2/Service.asmx'
-ldap_uri = 'ldaps://ldap.ocf.berkeley.edu'
-ldap_basedn = 'ou=People,dc=ocf,dc=berkeley,dc=edu'
-ldap_filter = 'uid'
-ldap_attribute = 'calnetUid'
+import ocflib.account.search as search
+import ocflib.constants as constants
+import ocflib.infra.ldap as ldap
+import ocflib.ucb.directory as directory
+from ocflib.ucb.groups import (
+    list_groups,
+    group_by_oid,
+    signatories_for_group,
+    groups_by_student_signat,
+)
+from ocflib.misc.shell import red
+from tabulate import tabulate
 
-def get_osl(id, service, key='UID'):
-    """Query web service for student group information in XML format"""
-    if not isinstance(id, int):
-        raise ValueError(("ID must be an integer: " + str(id)))
-    if not service.isalpha():
-        raise ValueError(("Service is not alphabetic: " + str(service)))
-    parameters = {key: id}
-    url = url_base + '/' + service + '?' + urlencode(parameters)
-    try:
-        response = urlopen(url)
-    except URLError as e:
-        raise Exception("Could not connect to student group web service: "
-                        + str(e) + " at " + url)
-    return etree.parse(response)
 
-def parse_osl(root):
-    """Assemble Python dictionaries of groups from XML document"""
-    if root.findtext('Succeeded') == 'false':
-        try:
-            error_reason = root.findtext('Reason')
-        except:
-            error_reason = 'unknown reason'
-        raise Exception(("Lookup failed: " + error_reason))
-    groups = {}
-    xml_groups = root.findall('StudentGroupData/StudentGroupDatum')
-    for xml_group in xml_groups:
-        group_id = int(xml_group.findtext('groupId'))
-        group_name = xml_group.findtext('groupName').strip()
-        groups[group_id] = group_name
-    return groups
+def print_table(title, columns, headers):
+    """Pretty print a table of groups or signatories."""
+    bar = '=' * len(title)
+    print(title)
+    print(bar)
+    print(tabulate(columns, headers=headers))
 
-def print_groups(groups):
-    """Output Python dictionary of groups as YAML"""
-    if groups:
-        dump(groups, sys.stdout, default_flow_style=False)
-    else:
-        print("No student groups found")
 
-def get_calnetuid(username):
-    """Find CalNet UID of an OCF user in LDAP"""
-    try:
-        directory = ldap.initialize(ldap_uri)
-        entry = directory.search_s(
-                                    ldap_basedn,
-                                    ldap.SCOPE_SUBTREE,
-                                    (ldap_filter+'='+username),
-                                    [ldap_attribute]
-                                  )
-    except ldap.SERVER_DOWN:
-        raise Exception(("Could not connect to LDAP server :" + ldap_uri))
-    except (ldap.INVALID_DN_SYNTAX, ldap.NO_SUCH_OBJECT):
-        raise ValueError(("Invalid DN: " + ldap_basedn))
-    if entry:
-        try:
-            return int(entry[0][1][ldap_attribute][0])
-        except KeyError:
-            raise KeyError(("Account does not have a CalNet UID: " + username))
-    else:
-        raise ValueError(("Account not found in LDAP: " + username))
+def show_groups_by_signat_username(username):
+    """Show group signatory status of an OCF user."""
+    attrs = search.user_attrs(username)
+    if attrs is None:
+        print(red("Username not found."))
+        return
+    elif 'calnetUid' not in attrs:
+        print(red("CalNet UID not found."))
+        return
+
+    show_groups_by_student_signat(int(attrs['calnetUid'][0]))
+
+def show_signatories_for_group(oid, signatories=None):
+    """Show all signatories for a group."""
+    if signatories is None:
+        signatories = signatories_for_group(oid)
+
+    if not signatories:
+        print(red("No signatories found."))
+        return
+
+    name = group_by_oid(oid)['name']
+    title = "{} ({})".format(name, oid)
+    columns = [(attrs['name'], uid) for (uid, attrs) in signatories.items()]
+    headers = ('Signatory', 'UID')
+
+    print_table(title, columns, headers)
+
+
+def show_groups_by_student_signat(uid, groups=None):
+    """Show signatory status of a person on CalLink."""
+    if groups is None:
+        groups = groups_by_student_signat(uid)
+
+    if not groups:
+        print(red("No active student groups found."))
+        return
+
+    name = directory.name_by_calnet_uid(uid)
+    title = "{} ({})".format(name, uid)
+    columns = [(attrs['name'], uid) for (uid, attrs) in groups.items()]
+    headers = ('Group', 'OID')
+
+    print_table(title, columns, headers)
+
+
+def show_signatories_by_group_name(name):
+    """Show signatories of groups matching a name."""
+    print("Searching for groups... ", end="", flush=True)
+
+    groups = list_groups(name=name)
+
+    if not groups:
+        print(red("No student groups found."))
+        return
+
+    print("Found {} entries.".format(len(groups)))
+
+    print("Searching for signatories...")
+
+    found = False
+
+    for (oid, attrs) in groups.items():
+        signatories = signatories_for_group(oid)
+        if signatories:
+            found = True
+            show_signatories_for_group(oid, signatories=signatories)
+            print()
+
+    if not found:
+        print(red("No groups had signatories."))
+
+
+def show_groups_by_signat_name(name):
+    """Show signatory status of people matching a name."""
+    print("Searching for people... ", end="", flush=True)
+
+    uids = directory.calnet_uids_by_name(name)
+
+    if not uids:
+        print()
+        print(red("CalNet UID not found."))
+        return
+
+    print("Found {} entries.".format(len(uids)))
+
+    print("Searching for signatories...")
+
+    found = False
+
+    for uid in uids:
+        groups = groups_by_student_signat(uid)
+        if groups:
+            found = True
+            show_groups_by_student_signat(uid, groups=groups)
+            print()
+
+    if not found:
+        print(red("No signatories found."))
+
 
 def main():
-    if len(sys.argv) == 2:
-        if sys.argv[1].isdigit():
-            # integer argument is student group ID
-            id = int(sys.argv[1])
-        elif sys.argv[1].isalpha() and sys.argv[1].islower():
-            # alphabetic argument is OCF username
-            username = sys.argv[1]
-            id = get_calnetuid(username)
-        else:
-            print(__doc__.strip())
-            sys.exit(2)
-        root = get_osl(id, service)
-        groups = parse_osl(root)
-        print_groups(groups)
-        #sys.stderr.write("\nvia\n" + url_base + "\n")
-    else:
-        print(__doc__.strip())
-        if len(sys.argv) > 2:
-            sys.exit(2)
+    parser = argparse.ArgumentParser(
+        description="Find active student groups and signatories")
+    subparsers = parser.add_subparsers(dest="subparser_name", description="")
+
+    UID_DESC = "Look up the signatory status of a person by CalNet UID"
+    uid_parser = subparsers.add_parser('uid', description=UID_DESC,
+            help=UID_DESC)
+    uid_parser.add_argument('uid', type=int)
+
+    OID_DESC = "Look up the signatories of a group by CalLink OID"
+    oid_parser = subparsers.add_parser('oid', description=OID_DESC,
+        help=OID_DESC)
+    oid_parser.add_argument('oid', type=int)
+
+    USER_DESC = "Look up the signatory status of an OCF user"
+    user_parser = subparsers.add_parser('user', description=USER_DESC,
+        help=USER_DESC)
+    user_parser.add_argument('username', type=str)
+
+    NAME_DESC = "Look up the signatory status of a person by name"
+    name_parser = subparsers.add_parser('name', description=NAME_DESC,
+        help=NAME_DESC)
+    name_parser.add_argument('name', type=str, nargs='+',
+        help="List of full or partial names or keywords. Technically, each " +
+        "name must be matched by the LDAP 'cn' attribute.")
+
+    GROUP_DESC = "Look up the signatories of a group by group name"
+    group_parser = subparsers.add_parser('group', description=GROUP_DESC,
+        help=GROUP_DESC)
+    group_parser.add_argument('name', type=str, nargs='+',
+        help="List of keywords to search for on the CalLink API")
+
+    args = parser.parse_args(sys.argv[1:])
+    if args.subparser_name == 'uid':
+        show_groups_by_student_signat(args.uid)
+    elif args.subparser_name == 'oid':
+        show_signatories_for_group(args.oid)
+    elif args.subparser_name == 'user':
+        show_groups_by_signat_username(args.username)
+    elif args.subparser_name == 'name':
+        show_groups_by_signat_name(' '.join(args.name))
+    elif args.subparser_name == 'group':
+        show_signatories_by_group_name(' '.join(args.name))
 
 if __name__ == '__main__':
     main()

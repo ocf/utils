@@ -62,21 +62,25 @@ def show_signatories_for_group(oid, signatories=None):
     group = group_by_oid(oid)
 
     if not signatories and not group:
-        print(red("Student group not found."))
+        print(red("CalLink OID {} not found.".format(oid)))
         return
     elif not signatories:
-        print(red("This group currently has no signatories."))
+        print(red("CalLink OID {} currently has no signatories.".format(oid)))
         return
     elif not group:
-        print(red("This group has signatories but is not active on CalLink."))
-        return
+        print(yellow(("CalLink OID {} has signatories but is currently not " +
+            "active on CalLink.").format(oid)))
 
-    if group['accounts']:
-        subtitle = "Group accounts: {}".format(', '.join(group['accounts']))
+    if group:
+        if group['accounts']:
+            subtitle = "Group accounts: {}".format(', '.join(group['accounts']))
+        else:
+            subtitle = None
+        title = '{} ({})'.format(group['name'], oid)
     else:
         subtitle = None
+        title = "Unkown group ({})".format(oid)
 
-    title = "{} ({})".format(group['name'], oid)
     columns = [(attrs['name'], uid) for uid, attrs in signatories.items()]
     headers = ('Signatory', 'UID')
 
@@ -88,17 +92,18 @@ def show_groups_by_student_signat(uid, groups=None):
     name = directory.name_by_calnet_uid(uid)
 
     if not name:
-        print(red("CalNet UID not found."))
+        print(red("CalNet UID {} not found.").format(uid))
         return
 
     if groups is None:
         groups = groups_by_student_signat(uid)
 
     if not groups:
-        print(red("Not a signatory of any active student groups."))
+        print(red("CalNet UID {} not a signatory of any active student " +
+            "groups.").format(uid))
         return
 
-    title = "{} ({})".format(name, uid)
+    title = '{} ({})'.format(name, uid)
     columns = [(attrs['name'], ', '.join(attrs['accounts']) or 'n/a', oid) for
             oid, attrs in groups.items()]
     headers = ('Group', 'Accounts', 'OID')

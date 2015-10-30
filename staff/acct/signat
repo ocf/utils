@@ -15,7 +15,7 @@ from ocflib.ucb.groups import (
     signatories_for_group,
     groups_by_student_signat,
 )
-from ocflib.misc.shell import red
+from ocflib.misc.shell import red, yellow
 from tabulate import tabulate
 
 
@@ -32,17 +32,28 @@ def print_table(title, columns, headers, subtitle=None):
     print(tabulate(columns, headers=headers))
 
 
-def show_groups_by_signat_username(username):
-    """Show group signatory status of an OCF user."""
+def show_by_username(username):
+    """Show signatory info about an individual or group account."""
     attrs = search.user_attrs(username)
     if attrs is None:
         print(red("User not found."))
         return
-    elif 'calnetUid' not in attrs:
-        print(red("This user has no CalNet UID."))
-        return
 
-    show_groups_by_student_signat(int(attrs['calnetUid'][0]))
+    uid = attrs.get('calnetUid', [None])[0]
+    oid = attrs.get('callinkOid', [None])[0]
+
+    if uid and oid:
+        print(yellow("Both CalNet UID and CalLink OID are defined for " +
+            "this account."))
+        show_groups_by_student_signat(int(uid))
+        print()
+        show_signatories_for_group(int(oid))
+    elif uid:
+        show_groups_by_student_signat(int(uid))
+    elif oid:
+        show_signatories_for_group(int(oid))
+    else:
+        print(red("This account has no CalNet UID or CalLink OID."))
 
 def show_signatories_for_group(oid, signatories=None):
     """Show all signatories for a group."""
@@ -189,7 +200,7 @@ def main():
     elif args.command == 'oid':
         show_signatories_for_group(args.oid)
     elif args.command == 'user':
-        show_groups_by_signat_username(args.username)
+        show_by_username(args.username)
     elif args.command == 'name':
         show_groups_by_signat_name(' '.join(args.name))
     elif args.command == 'group':

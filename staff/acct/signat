@@ -19,10 +19,15 @@ from ocflib.misc.shell import red
 from tabulate import tabulate
 
 
-def print_table(title, columns, headers):
+def print_table(title, columns, headers, subtitle=None):
     """Pretty print a table of groups or signatories."""
-    bar = '=' * len(title)
     print(title)
+    if subtitle:
+        print(subtitle)
+        bar_len = max(len(title), len(subtitle))
+    else:
+        bar_len = len(title)
+    bar = '=' * bar_len
     print(bar)
     print(tabulate(columns, headers=headers))
 
@@ -55,11 +60,16 @@ def show_signatories_for_group(oid, signatories=None):
         print(red("This group has signatories but is not active on CalLink."))
         return
 
-    title = "{} ({})".format(name, oid)
-    columns = [(attrs['name'], uid) for (uid, attrs) in signatories.items()]
+    if group['accounts']:
+        subtitle = "Group accounts: {}".format(', '.join(group['accounts']))
+    else:
+        subtitle = None
+
+    title = "{} ({})".format(group['name'], oid)
+    columns = [(attrs['name'], uid) for uid, attrs in signatories.items()]
     headers = ('Signatory', 'UID')
 
-    print_table(title, columns, headers)
+    print_table(title, columns, headers, subtitle=subtitle)
 
 
 def show_groups_by_student_signat(uid, groups=None):
@@ -78,8 +88,9 @@ def show_groups_by_student_signat(uid, groups=None):
         return
 
     title = "{} ({})".format(name, uid)
-    columns = [(attrs['name'], uid) for (uid, attrs) in groups.items()]
-    headers = ('Group', 'OID')
+    columns = [(attrs['name'], ', '.join(attrs['accounts']) or 'n/a', oid) for
+            oid, attrs in groups.items()]
+    headers = ('Group', 'Accounts', 'OID')
 
     print_table(title, columns, headers)
 

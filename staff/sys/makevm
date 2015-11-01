@@ -1,59 +1,61 @@
-#!/usr/bin/env python2.7
+#!/usr/bin/env python3
 # Creates and configures a new vm
-# python2.7 because stable version of paramiko isn't yet compatible with python3
 #
 # Dependencies (Debian packages):
-#  - python-colorama
-#  - python-paramiko
+#  - python3-colorama
+#  - python3-paramiko
 #  - nmap
 #
 # TODO: replace shell=True subprocess invocations
-from __future__ import print_function
-
+# TODO: use ocflib instead of colorama
 import argparse
 import os.path
 import random
 import re
 import socket
+import struct
 import subprocess
 import sys
 import time
-import struct
 
-import colorama
-from colorama import Fore, Style # pretty colors
 import paramiko
+from colorama import Fore
+from colorama import Style
 
 MAC_KVM_PREFIX = (0x52, 0x54, 0x00)
 MAC_BYTES = 6
 
-devnull = open(os.devnull, "w")
+devnull = open(os.devnull, 'w')
+
 
 def exec_cmd(cmd):
     """Executes the given shell command with some pretty colors. Script
     exits if the command exits with a non-zero status code."""
 
-    print("{}$ {}{}".format(Fore.GREEN, cmd, Fore.RED))
+    print('{}$ {}{}'.format(Fore.GREEN, cmd, Fore.RED))
     subprocess.check_call(cmd, shell=True, stdout=sys.stdout)
-    print(Style.RESET_ALL, end="")
+    print(Style.RESET_ALL, end='')
+
 
 def create_disk(name, size):
     """Creates a logical volume."""
 
-    if os.path.exists("/dev/vg/" + name):
+    if os.path.exists('/dev/vg/' + name):
         print("Can't create new lv, /dev/vg/{} already exists.".format(name))
         print("Use 'lvremove /dev/vg/{}' if you want to destroy it.".format(name))
         sys.exit(2)
 
-    cmd = "lvcreate -L {}GB --name {} vg".format(size, name)
+    cmd = 'lvcreate -L {}GB --name {} vg'.format(size, name)
     exec_cmd(cmd)
+
 
 def generate_mac_addr():
     def random_byte(idx):
         if idx < len(MAC_KVM_PREFIX):
             return MAC_KVM_PREFIX[idx]
         return random.randint(0, 255)
-    return ":".join('{:02x}'.format(random_byte(i)) for i in range(MAC_BYTES))
+    return ':'.join('{:02x}'.format(random_byte(i)) for i in range(MAC_BYTES))
+
 
 def create_vm(name, memory, vcpus, os_type, os_variant, network, mac):
     """Creates a new VM."""
@@ -61,41 +63,46 @@ def create_vm(name, memory, vcpus, os_type, os_variant, network, mac):
     # try to print info about the domain to see if it already exists
     # we expect this command to fail
     try:
-        subprocess.check_call("virsh dominfo {}".format(name), shell=True, stderr=devnull)
+        subprocess.check_call('virsh dominfo {}'.format(name), shell=True, stderr=devnull)
         print("Can't create new vm, domain {} already exists.".format(name))
         sys.exit(2)
     except subprocess.CalledProcessError:
-        pass # all good
+        pass  # all good
 
-    cmd = "virt-install -r {} --pxe --os-type={} --os-variant={} " + \
-        "--disk {},cache=none --vcpus={} --network {},mac={} --graphics vnc --serial pty --name {}"
-    cmd = cmd.format(memory, os_type, os_variant, "/dev/vg/" + name,
-        vcpus, network, mac, name)
+    cmd = 'virt-install -r {} --pxe --os-type={} --os-variant={} ' + \
+        '--disk {},cache=none --vcpus={} --network {},mac={} --graphics vnc --serial pty --name {}'
+    cmd = cmd.format(memory, os_type, os_variant, '/dev/vg/' + name,
+                     vcpus, network, mac, name)
 
     exec_cmd(cmd)
 
+
 def get_running_vms():
-    output = subprocess.check_output("virsh list", shell=True).decode("utf-8")
+    output = subprocess.check_output('virsh list', shell=True).decode('utf-8')
     return [line.split()[1] for line in output.splitlines()[2:-1]]
+
 
 def wait_for_shutdown(name):
     while name in get_running_vms():
         time.sleep(1)
 
+
 def start_vm(name):
-    exec_cmd("virsh start {}".format(name))
+    exec_cmd('virsh start {}'.format(name))
+
 
 def get_ip(mac):
     """Get IP address for the given MAC address. This needs some work."""
     while True:
         try:
-            subprocess.check_call("nmap -sn 169.229.10.0/24",
-                stdout=devnull, shell=True)
+            subprocess.check_call('nmap -sn 169.229.10.0/24',
+                                  stdout=devnull, shell=True)
             cmd = "arp -an | grep '{}'".format(mac)
             result = subprocess.check_output(cmd, shell=True).strip()
-            return result.split(" ")[1][1:-1]
+            return result.split(' ')[1][1:-1]
         except subprocess.CalledProcessError:
             time.sleep(1)
+
 
 def get_ssh_connection(mac, user, password):
     client = paramiko.SSHClient()
@@ -104,9 +111,9 @@ def get_ssh_connection(mac, user, password):
     # wait for the VM to be live
     while True:
         try:
-            print("Determining IP for VM...")
+            print('Determining IP for VM...')
             ip = get_ip(mac)
-            print("Trying IP: {}".format(ip))
+            print('Trying IP: {}'.format(ip))
 
             client.connect(ip, username=user, password=password, timeout=1)
         except (socket.timeout, socket.error):
@@ -118,18 +125,19 @@ def get_ssh_connection(mac, user, password):
         sys.stdout.flush()
         time.sleep(1)
 
+
 def configure_network(ssh, ip):
     lines = [
-        "auto lo",
-        "iface lo inet loopback",
-        "",
-        "auto eth0",
-        "iface eth0 inet static",
-        "\taddress {}".format(ip),
+        'auto lo',
+        'iface lo inet loopback',
+        '',
+        'auto eth0',
+        'iface eth0 inet static',
+        '\taddress {}'.format(ip),
 
         # TODO: argparse these
-        "\tnetmask 255.255.255.0",
-        "\tgateway 169.229.10.1"
+        '\tnetmask 255.255.255.0',
+        '\tgateway 169.229.10.1'
     ]
 
     ssh.exec_command("echo -n \"\" > /etc/network/interfaces")
@@ -137,146 +145,149 @@ def configure_network(ssh, ip):
     for line in lines:
         ssh.exec_command("echo \"{}\" >> /etc/network/interfaces".format(line))
 
+
 def validate_ip(ip, subnet):
     """Tests whether \"ip\" is an address in the subnet.
 
-	\"ip\" should take the standard form \"x.x.x.x\" in decimal digits, while
-	subnet should be like \"x.x.x.x/xx\"."""
+        \"ip\" should take the standard form \"x.x.x.x\" in decimal digits, while
+        subnet should be like \"x.x.x.x/xx\"."""
 
     subnetaddr, mask = subnet.split('/')
     ipbits = struct.unpack('>L', socket.inet_aton(ip))[0]
-    subnetbits = struct.unpack(">L", socket.inet_aton(subnetaddr))[0]
+    subnetbits = struct.unpack('>L', socket.inet_aton(subnetaddr))[0]
     maskbits = 0xFFFFFFFF << (32 - int(mask))
     ipmask = ipbits & maskbits
     return ipmask == subnetbits
 
-def confirm(prompt="Continue?", default=False):
-    choices = "Yn" if default else "yN"
-    response = raw_input("{} [{}] ".format(prompt, choices)).lower()
 
-    if response in ("y", "yes"):
+def confirm(prompt='Continue?', default=False):
+    choices = 'Yn' if default else 'yN'
+    response = input('{} [{}] '.format(prompt, choices)).lower()
+
+    if response in ('y', 'yes'):
         return True
 
-    if response in ("n", "no"):
+    if response in ('n', 'no'):
         return False
 
     return default
 
+
 def _main(args):
     parser = argparse.ArgumentParser(
-        description="Create and configure new VMs using libvirt CLI tools",
+        description='Create and configure new VMs using libvirt CLI tools',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
-    parser.add_argument("-m", "--memory", type=int, default=4096,
-        help="amount of memory (in MB)")
-    parser.add_argument("-c", "--vcpus", type=int, default=2,
-        help="number of vCPUs")
-    parser.add_argument("-s", "--storage", type=int, default=10,
-        help="amount of disk storage (in GB)")
-    parser.add_argument("--os-type", type=str, default="linux",
-        help="os type")
+    parser.add_argument('-m', '--memory', type=int, default=4096,
+                        help='amount of memory (in MB)')
+    parser.add_argument('-c', '--vcpus', type=int, default=2,
+                        help='number of vCPUs')
+    parser.add_argument('-s', '--storage', type=int, default=10,
+                        help='amount of disk storage (in GB)')
+    parser.add_argument('--os-type', type=str, default='linux',
+                        help='os type')
     # strangely, there is no debianjessie :(
-    parser.add_argument("--os-variant", type=str, default="debianwheezy",
-        help="os variant")
-    parser.add_argument("--network", type=str, default="bridge=br0",
-        help="network configuration")
-    parser.add_argument("--preseed-user", type=str, default="root",
-        help="user created in preseed")
-    parser.add_argument("--preseed-password", type=str, default="r00tme",
-        help="password for user created in preseed")
-    parser.add_argument("--skip-config", action="store_true", default=False,
-        help="don't configure the new VM")
-    parser.add_argument("hostname", type=str,
-        help="hostname for the new VM")
-    parser.add_argument("ip", type=str,
-        help="static ip address for the new VM")
+    parser.add_argument('--os-variant', type=str, default='debianwheezy',
+                        help='os variant')
+    parser.add_argument('--network', type=str, default='bridge=br0',
+                        help='network configuration')
+    parser.add_argument('--preseed-user', type=str, default='root',
+                        help='user created in preseed')
+    parser.add_argument('--preseed-password', type=str, default='r00tme',
+                        help='password for user created in preseed')
+    parser.add_argument('--skip-config', action='store_true', default=False,
+                        help="don't configure the new VM")
+    parser.add_argument('hostname', type=str,
+                        help='hostname for the new VM')
+    parser.add_argument('ip', type=str,
+                        help='static ip address for the new VM')
 
     args = parser.parse_args()
 
     # sanity checks
     if not 512 <= args.memory <= 16384:
-        print("Warning: You want {} *MB* of memory.".format(args.memory))
+        print('Warning: You want {} *MB* of memory.'.format(args.memory))
 
         if not confirm():
-            print("Cancelled.")
+            print('Cancelled.')
             sys.exit(2)
 
     if not 5 <= args.storage <= 50:
-        print("Warning: You want {} *GB* of storage.".format(args.storage))
+        print('Warning: You want {} *GB* of storage.'.format(args.storage))
 
         if not confirm():
-            print("Cancelled.")
+            print('Cancelled.')
             sys.exit(2)
 
-    if not re.match("^[(a-z\-0-9]{1,20}$", args.hostname):
+    if not re.match('^[(a-z\-0-9]{1,20}$', args.hostname):
         print("Warning: Your hostname is '{}'.".format(args.hostname))
-        print("You probably should NOT include the domain name.")
+        print('You probably should NOT include the domain name.')
 
         if not confirm():
-            print("Cancelled.")
+            print('Cancelled.')
             sys.exit(2)
 
-    if not validate_ip(args.ip, "169.229.10.0/24"):
+    if not validate_ip(args.ip, '169.229.10.0/24'):
         print("Warning: Your IP is '{}'.".format(args.ip))
-        print("It should probably be in 169.229.10.0/24.")
+        print('It should probably be in 169.229.10.0/24.')
 
         if not confirm():
-            print("Cancelled.")
+            print('Cancelled.')
             sys.exit(2)
 
     if os.geteuid() != 0:
-        print("You are not root.")
+        print('You are not root.')
         sys.exit(1)
 
-    print("Creating new VM with the following details:")
-    print("\tHostname: {}".format(args.hostname))
-    print("\tIP Address: {}".format(args.ip))
-    print("\tOS Type: {}".format(args.os_type))
-    print("\tOS Variant: {}".format(args.os_variant))
-    print("\tDisk Space: {} GB".format(args.storage))
-    print("\tMemory: {} MB".format(args.memory))
-    print("\tvCPUs: {}".format(args.vcpus))
-    print("\tNetwork: {}".format(args.network))
+    print('Creating new VM with the following details:')
+    print('\tHostname: {}'.format(args.hostname))
+    print('\tIP Address: {}'.format(args.ip))
+    print('\tOS Type: {}'.format(args.os_type))
+    print('\tOS Variant: {}'.format(args.os_variant))
+    print('\tDisk Space: {} GB'.format(args.storage))
+    print('\tMemory: {} MB'.format(args.memory))
+    print('\tvCPUs: {}'.format(args.vcpus))
+    print('\tNetwork: {}'.format(args.network))
 
     if not confirm():
-        print("Cancelled.")
+        print('Cancelled.')
         sys.exit(2)
 
     mac = generate_mac_addr()
 
     create_disk(args.hostname, args.storage)
     create_vm(args.hostname, args.memory, args.vcpus, args.os_type, args.os_variant,
-        args.network, mac)
+              args.network, mac)
 
     if args.skip_config:
-        print("VM created, skipping configuration. Have fun!")
+        print('VM created, skipping configuration. Have fun!')
         sys.exit(0)
 
-    print("VM created, waiting for it to finish installing and shut down...")
+    print('VM created, waiting for it to finish installing and shut down...')
     wait_for_shutdown(args.hostname)
 
-    print("Installation successful, starting VM...")
+    print('Installation successful, starting VM...')
     start_vm(args.hostname)
 
-    print("Connecting to VM via SSH...")
+    print('Connecting to VM via SSH...')
     client = get_ssh_connection(mac, args.preseed_user, args.preseed_password)
 
-    print("Setting hostname to {}...".format(args.hostname))
-    client.exec_command("echo {} > /etc/hostname".format(args.hostname))
-    client.exec_command("hostname -F /etc/hostname")
+    print('Setting hostname to {}...'.format(args.hostname))
+    client.exec_command('echo {} > /etc/hostname'.format(args.hostname))
+    client.exec_command('hostname -F /etc/hostname')
 
-    print("Configuring static IP {}...".format(args.ip))
+    print('Configuring static IP {}...'.format(args.ip))
     configure_network(client, args.ip)
 
     # TODO: for some reason this doesn't have any effect
     # (it's still necessary to log in and run the command manually)
-    print("Turning on puppet...")
-    client.exec_command("puppet agent --enable")
+    print('Turning on puppet...')
+    client.exec_command('puppet agent --enable')
 
-    print("Restarting VM...")
-    client.exec_command("shutdown -r now")
+    print('Restarting VM...')
+    client.exec_command('shutdown -r now')
 
-    print("{} is now minimally configured. You should now sign the puppet cert.".format(args.hostname))
+    print('{} is now minimally configured. You should now sign the puppet cert.'.format(args.hostname))
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     _main(sys.argv[1:])

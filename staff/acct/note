@@ -1,44 +1,45 @@
 #!/usr/bin/env python
-import sys
-import pwd
-import getpass
-import shutil
+from __future__ import print_function
 
+import getpass
+import pwd
+import shutil
+import sys
 from datetime import date
 
 USER_INFO = '/home/s/st/staff/User_Info'
 USER_INFO_BAK = '/tmp/User_Info.bak.' + getpass.getuser()
 
 if len(sys.argv) < 3:
-	print 'Usage: note -u username [note]'
-	exit(1)
+    print('Usage: note -u username [note]')
+    exit(1)
 
 if len(sys.argv) == 3:
-	print 'No user_info note was provided'
-        exit(2)
+    print('No user_info note was provided')
+    exit(2)
 
 user = sys.argv[2].strip()
 
 try:
-	pwd.getpwnam(user)
+    pwd.getpwnam(user)
 except KeyError:
-	print 'User does not exist in LDAP'
-	exit(3)
+    print('User does not exist in LDAP')
+    exit(3)
 
 try:
-	file = open(USER_INFO,'r')
+    file = open(USER_INFO, 'r')
 except IOError:
-	print 'Could not open User_Info file for reading'
-	exit(4)
+    print('Could not open User_Info file for reading')
+    exit(4)
 
-#clean lines up
+# clean lines up
 lines = file.readlines()
 linescpy = []
 for l in lines:
-	pieces = l.split(":")
-	if len(pieces[1]) == 0:
-		pieces[1] = '0000-00-00'
-	linescpy.append(':'.join(pieces))
+    pieces = l.split(':')
+    if len(pieces[1]) == 0:
+        pieces[1] = '0000-00-00'
+    linescpy.append(':'.join(pieces))
 
 lines = linescpy
 
@@ -46,39 +47,39 @@ next_line = ' '.join(sys.argv[3:])
 
 type = ''
 if 'quota' in next_line.lower():
-	type = 'quota'
+    type = 'quota'
 elif 'squis' in next_line.lower() or 'sorr' in next_line.lower():
-	type = 'sorry'
+    type = 'sorry'
 elif 'passw' in next_line.lower() or 'pw' in next_line.lower():
-	type = 'password'
+    type = 'password'
 elif 'mail' in next_line.lower() or 'spam' in next_line.lower():
-	type = 'mail'
+    type = 'mail'
 elif 'sharing' in next_line.lower():
-	type = 'sharing'
-elif 'redir' in next_line.lower() or 'website' in next_line.lower() or 'wordpress' in next_line.lower() or 'public_html' in next_line.lower() or 'htaccess' in next_line.lower():
-	type = 'website'
+    type = 'sharing'
+elif 'redir' in next_line.lower() or 'website' in next_line.lower() or 'wordpress' in next_line.lower() or 'public_html' in next_line.lower() or 'htaccess' in next_line.lower():  # noqa
+    type = 'website'
 elif 'running' in next_line.lower():
-	type = 'h0zer'
+    type = 'h0zer'
 
 staff = getpass.getuser()
-today = date.today().strftime("%Y-%m-%d")
+today = date.today().strftime('%Y-%m-%d')
 
-lines.append(user + ":" + today + ":" + staff + ":" + type + ":" + next_line+"\n")
+lines.append(user + ':' + today + ':' + staff + ':' + type + ':' + next_line + '\n')
 lines.sort()
 
 try:
-	shutil.copy(USER_INFO,USER_INFO_BAK)
+    shutil.copy(USER_INFO, USER_INFO_BAK)
 except shutil.Error:
-	print 'Could not open backup for writing'
-	exit(6)
+    print('Could not open backup for writing')
+    exit(6)
 
 try:
-        tmpfile = open(USER_INFO,'w')
+    tmpfile = open(USER_INFO, 'w')
 except IOError:
-        print 'Could not open file for writing'
-        exit(5)
+    print('Could not open file for writing')
+    exit(5)
 
 for l in lines:
-        tmpfile.write(l.replace('0000-00-00',''))
+    tmpfile.write(l.replace('0000-00-00', ''))
 
-print 'Note saved, a backup was saved in', USER_INFO_BAK
+print('Note saved, a backup was saved in ' + USER_INFO_BAK)

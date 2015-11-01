@@ -3,7 +3,6 @@
 #
 # Can be used in "auto-mode" to ask users without emails to set an email
 # address, and do nothing if an email is set. Intended to be run on login.
-
 from __future__ import print_function
 
 import argparse
@@ -14,17 +13,18 @@ import sys
 import ldap
 import ldap.modlist
 import ldap.sasl
+from six.moves import input
 
 
-MAIL_ATTR = "mail"
-LDAP_SERVER = "ldaps://ldap.ocf.berkeley.edu/"
-LDAP_BASE = "ou=People,dc=OCF,dc=Berkeley,dc=EDU"
+MAIL_ATTR = 'mail'
+LDAP_SERVER = 'ldaps://ldap.ocf.berkeley.edu/'
+LDAP_BASE = 'ou=People,dc=OCF,dc=Berkeley,dc=EDU'
 
-EMAIL_REGEX = re.compile("^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$", \
-        re.IGNORECASE)
+EMAIL_REGEX = re.compile('^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$',
+                         re.IGNORECASE)
 
-Q_UPDATE_EMAIL = "Would you like to update your email? [yN] "
-Q_NEW_EMAIL = "New Email Address: "
+Q_UPDATE_EMAIL = 'Would you like to update your email? [yN] '
+Q_NEW_EMAIL = 'New Email Address: '
 AUTO_MESSAGE = """
 ================================================================================
 The Open Computing Facility requires all members to provide a valid email
@@ -54,8 +54,8 @@ def valid_email(maybe_email):
     #
     # This can be subverted by modifying LDAP directly, but it's a reasonable
     # sanity check.
-    if maybe_email.lower().endswith("@ocf.berkeley.edu"):
-        print("You may not use an @ocf.berkeley.edu email address.")
+    if maybe_email.lower().endswith('@ocf.berkeley.edu'):
+        print('You may not use an @ocf.berkeley.edu email address.')
         return False
 
     return True
@@ -64,9 +64,9 @@ def valid_email(maybe_email):
 def get_ldap():
     """Returns LDAP connection, or None."""
     try:
-        auth = ldap.sasl.gssapi("")
+        auth = ldap.sasl.gssapi('')
         l = ldap.initialize(LDAP_SERVER)
-        l.sasl_interactive_bind_s("", auth)
+        l.sasl_interactive_bind_s('', auth)
         return l
     except ldap.LOCAL_ERROR:
         return None
@@ -83,7 +83,7 @@ def get_email(dn):
 
 def set_email(l, dn, old_email, new_email):
     """Updates email attribute in LDAP."""
-    old = {MAIL_ATTR: "*"}
+    old = {MAIL_ATTR: '*'}
     new = {MAIL_ATTR: new_email}
 
     # we either need to provide old as {} or {'mail': '*'}; it will do
@@ -104,20 +104,20 @@ def set_email(l, dn, old_email, new_email):
 
 
 def get_dn():
-    return "uid={},{}".format(getpass.getuser(), LDAP_BASE)
+    return 'uid={},{}'.format(getpass.getuser(), LDAP_BASE)
 
 
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Update OCF email")
-    parser.add_argument("--auto", action="store_true",
-            help="only prompt if email is missing, suppress errors")
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Update OCF email')
+    parser.add_argument('--auto', action='store_true',
+                        help='only prompt if email is missing, suppress errors')
     args = parser.parse_args()
 
     l = get_ldap()
 
     if not l:
         if not args.auto:
-            print("Unable to load LDAP, try running kinit", file=sys.stderr)
+            print('Unable to load LDAP, try running kinit', file=sys.stderr)
         sys.exit(1)
 
     dn = get_dn()
@@ -129,16 +129,16 @@ if __name__ == "__main__":
         else:
             print(AUTO_MESSAGE)
 
-    print("Current Email Address: {}".format(email or "(unset)"))
+    print('Current Email Address: {}'.format(email or '(unset)'))
 
-    if valid_email(email) and raw_input(Q_UPDATE_EMAIL) not in ("y", "yes"):
+    if valid_email(email) and input(Q_UPDATE_EMAIL) not in ('y', 'yes'):
         sys.exit(0)
 
     new_email = None
     while not valid_email(new_email):
         if new_email is not None:
-            print("The email you entered was invalid; please try again.")
-        new_email = raw_input(Q_NEW_EMAIL).strip()
+            print('The email you entered was invalid; please try again.')
+        new_email = input(Q_NEW_EMAIL).strip()
 
     set_email(l, dn, email, new_email)
-    print("Updated email to {}".format(new_email))
+    print('Updated email to {}'.format(new_email))

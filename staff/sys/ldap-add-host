@@ -1,15 +1,15 @@
 #!/bin/bash -e
 if [ "$#" -ne 2 ]; then
-	echo "usage: $0 hostname ipv4"
-	exit 1
+    echo "usage: $0 hostname ipv4"
+    exit 1
 fi
 
 HOST="$1"
 IP="$2"
 
 if grep '\.' <<< "$HOST" > /dev/null; then
-	echo "hostname should not contain dots"
-	exit 1
+    echo "hostname should not contain dots"
+    exit 1
 fi
 
 record="dn: cn=$HOST,ou=Hosts,dc=OCF,dc=Berkeley,dc=EDU
@@ -25,8 +25,8 @@ echo "======================"
 read -p "Add new record? [yN] " choice
 
 if [ "$choice" != "y" ] && [ "$choice" != "yes" ]; then
-	echo "Aborted."
-	exit 0
+    echo "Aborted."
+    exit 0
 fi
 
 ldapadd <<< "$record"

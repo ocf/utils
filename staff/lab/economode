@@ -1,14 +1,15 @@
 #!/usr/bin/env python
+import sys
 from getpass import getpass
 from ssl import SSLError
 from urllib import urlencode
-import sys
+
 import urllib2
 
-#printers = ['deforestation', 'logjam']
 printers = ['deforestation', 'logjam']
 username = 'admin'
-password = getpass("Printer password: ")
+password = getpass('Printer password: ')
+
 
 def set_economode(setting, hostname, username, password):
     """
@@ -23,8 +24,8 @@ def set_economode(setting, hostname, username, password):
     data = {'33-ee4c-11d4-96-4e-0-10-83-cf-45-99': int(setting)}
 
     # build opener to handle HTTP basic authentication with user/pass
-    url = ('https://' + hostname + 
-          '/hp/device/this.LCDispatcher?nav=hp.ConfigDevice&menu=6.2')
+    url = ('https://' + hostname +
+           '/hp/device/this.LCDispatcher?nav=hp.ConfigDevice&menu=6.2')
     password_mgr = urllib2.HTTPPasswordMgrWithDefaultRealm()
     password_mgr.add_password(None, url, username, password)
     handler = urllib2.HTTPBasicAuthHandler(password_mgr)
@@ -32,7 +33,7 @@ def set_economode(setting, hostname, username, password):
 
     # attempt up to 3 times to POST data to printer
     max_attempts = 3
-    for attempt in range(1, max_attempts+1):
+    for attempt in range(1, max_attempts + 1):
         try:
             # POST data using opener
             f = opener.open(url, data=urlencode(data), timeout=3)
@@ -42,13 +43,13 @@ def set_economode(setting, hostname, username, password):
             sys.stderr.write(str(e))
             if isinstance(e, urllib2.HTTPError) and e.code == 401:
                 # has HTTP error code and error code is 401 Unauthorized
-                sys.stderr.write("\n")
-                raise ValueError("Incorrect password")
+                sys.stderr.write('\n')
+                raise ValueError('Incorrect password')
             elif attempt < max_attempts:
-                sys.stderr.write("...retrying...")
+                sys.stderr.write('...retrying...')
             else:
                 # attempts exhausted, raise exception
-                sys.stderr.write("\n")
+                sys.stderr.write('\n')
                 raise
 
 if __name__ == '__main__':
@@ -65,7 +66,7 @@ if __name__ == '__main__':
         setting = True
 
     for printer in printers:
-        sys.stderr.write("Connecting to %s..." % printer)
+        sys.stderr.write('Connecting to %s...' % printer)
         set_economode(setting, hostname=printer, username=username,
                       password=password)
-        sys.stderr.write("done.\n")
+        sys.stderr.write('done.\n')

@@ -1,8 +1,8 @@
 #!/bin/bash -e
 
 if [ "$#" -ne 1 ]; then
-	echo "usage: $0 fqdn"
-	exit 1
+    echo "usage: $0 fqdn"
+    exit 1
 fi
 
 FQDN="$1"

@@ -1,24 +1,24 @@
 #!/bin/bash -eu
 if [ "$(whoami)" != "root" ]; then
-	echo "You are not root."
-	exit 1
+    echo "You are not root."
+    exit 1
 fi
 
 # copy default config files
 mkdir -p /root/.config/apt-dater
 for f in apt-dater.conf screenrc; do
-	path="/root/.config/apt-dater/$f"
-	if [ ! -e "$path" ]; then
-		cp -v "/usr/share/doc/apt-dater/examples/${f}.example" "$path"
-	fi
+    path="/root/.config/apt-dater/$f"
+    if [ ! -e "$path" ]; then
+        cp -v "/usr/share/doc/apt-dater/examples/${f}.example" "$path"
+    fi
 done
 
 # update hosts
 (
-	echo '[ocf]'
-	echo -n 'Hosts='
-	ldapsearch -x -b 'ou=Hosts,dc=OCF,dc=Berkeley,dc=EDU' |
-		grep '^cn: ' | cut -d' ' -f2 | sed 's/^/apt-dater@/' | paste -sd';'
+    echo '[ocf]'
+    echo -n 'Hosts='
+    ldapsearch -x -b 'ou=Hosts,dc=OCF,dc=Berkeley,dc=EDU' |
+        grep '^cn: ' | cut -d' ' -f2 | sed 's/^/apt-dater@/' | paste -sd';'
 ) > /root/.config/apt-dater/hosts.conf
 
 # and finally call apt-dater

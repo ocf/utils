@@ -33,7 +33,7 @@ fi
 userdir=`ldapsearch -x uid=$sorriedUser | grep homeDirectory | cut -d' ' -f2`
 
 #nohome directory case
-if [[ $userdir == "" ]] 
+if [[ $userdir == "" ]]
 then echo "Could not find the home directory for user $sorriedUser"
 exit 2
 fi
@@ -61,8 +61,8 @@ echo You are $rootstaffer
 
 $KINIT ${rootstaffer}/admin
 if [ $? -ne 0 ]; then
-	echo "kinit failed, bailing out!"
-	exit 1
+    echo "kinit failed, bailing out!"
+    exit 1
 fi
 
 #stealing luns's sed madness from makehttp wrapper
@@ -74,25 +74,25 @@ echo ""
 echo "Changing user's shell back to normal"
 if [[ -e $userdir/.oldshell ]]
 then
-	shell=`cat $userdir/.oldshell | rev | cut -d/ -f1 | rev`
-	if [[ "$shell" == "tcsh" ]]
-	then
-		newshell="/bin/tcsh"
-	elif [[ "$shell" == "zsh" ]]
-	then
-		newshell="/bin/zsh"
-	elif [[ "$shell" == "csh" ]]
-	then
-		newshell="/bin/tcsh"
-	elif [[ "$shell" == "ksh" ]]
-	then
-		newshell="/bin/bash"
-	elif [[ "$shell" == "bash" ]]
-	then
-		newshell="/bin/bash"
-	else
-		newshell=$defaultshell
-	fi
+    shell=`cat $userdir/.oldshell | rev | cut -d/ -f1 | rev`
+    if [[ "$shell" == "tcsh" ]]
+    then
+        newshell="/bin/tcsh"
+    elif [[ "$shell" == "zsh" ]]
+    then
+        newshell="/bin/zsh"
+    elif [[ "$shell" == "csh" ]]
+    then
+        newshell="/bin/tcsh"
+    elif [[ "$shell" == "ksh" ]]
+    then
+        newshell="/bin/bash"
+    elif [[ "$shell" == "bash" ]]
+    then
+        newshell="/bin/bash"
+    else
+        newshell=$defaultshell
+    fi
 else
 echo ".oldshell file not found, setting shell to $defaultshell"
 newshell=$defaultshell
@@ -126,7 +126,7 @@ echo ""
 echo "Restoring services directory permissions:"
 
 if [[ -d $httpdir ]]
-then chmod 755 $httpdir 
+then chmod 755 $httpdir
 fi
 
 #if [[ -d $ftpdir ]]
@@ -155,7 +155,7 @@ finger -m $sorriedUser
 ldapsearch -x uid=$sorriedUser
 ls -la $userdir
 ls -ld $httpdir
-#ls -ld $ftpdir 
+#ls -ld $ftpdir
 #ls -ld $mysqldir
 
 #echo ""

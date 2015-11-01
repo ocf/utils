@@ -1,34 +1,37 @@
 #!/usr/bin/env python
+import getpass
+import os
+import sys
+
 import ldap
 import ldap.modlist as modlist
 import ldap.sasl as sasl
-import sys
-import getpass
-import os
 
 if len(sys.argv) < 2:
-  print("Usage: chsh shell")
-  exit()
+    print('Usage: chsh shell')
+    exit()
 
 shell = sys.argv[1]
 etcshells = open('/etc/shells', 'r')
 line = etcshells.readline()
 while line != '':
-  validshell = line.strip()
-  if shell == validshell:
-    print "Changing shell to %s" % (validshell)
-    kinit = '/usr/bin/klist -t || /usr/bin/kinit'
-    os.system(kinit)
-    l = ldap.initialize("ldaps://ldap.ocf.berkeley.edu:636/")
-    auth = sasl.gssapi("")
-    l.sasl_interactive_bind_s("",auth)
-    dn="uid=%s,ou=people,dc=ocf,dc=berkeley,dc=edu" % (getpass.getuser())
-    old = {'loginShell': '*'}
-    new = {'loginShell': '%s' % (validshell)}
-    ldif = modlist.modifyModlist(old,new)
-    l.modify_s(dn,ldif)
-    l.unbind_s()
-    print "Shell successfully changed, typically it takes a while for the changes to propagate to all our machines"
-    exit()
-  line = etcshells.readline()
-print "The shell you chose is not valid, please chose another shell"
+    validshell = line.strip()
+    if shell == validshell:
+        print('Changing shell to %s' % (validshell))
+        kinit = '/usr/bin/klist -t || /usr/bin/kinit'
+        os.system(kinit)
+        l = ldap.initialize('ldaps://ldap.ocf.berkeley.edu:636/')
+        auth = sasl.gssapi('')
+        l.sasl_interactive_bind_s('', auth)
+        dn = 'uid=%s,ou=people,dc=ocf,dc=berkeley,dc=edu' % (getpass.getuser())
+        old = {'loginShell': '*'}
+        new = {'loginShell': '%s' % (validshell)}
+        ldif = modlist.modifyModlist(old, new)
+        l.modify_s(dn, ldif)
+        l.unbind_s()
+        print(
+            'Shell successfully changed, typically it takes a while for the changes to propagate to all our machines',  # noqa
+        )
+        exit()
+    line = etcshells.readline()
+print('The shell you chose is not valid, please chose another shell')

@@ -10,11 +10,11 @@ create_symlink() {
   /bin/chmod -v 755 /services/http/users/${USER:0:1}/$USER
   if [ $? -eq 0 ]
   then
-	/bin/echo
-	/bin/echo "public_html folder has been created successfully."
+    /bin/echo
+    /bin/echo "public_html folder has been created successfully."
   else
-	/bin/echo
-	/bin/echo "public_html folder was NOT created successfully."
+    /bin/echo
+    /bin/echo "public_html folder was NOT created successfully."
   fi
 }
 
@@ -22,37 +22,37 @@ ext=`/bin/date "+%s"`
 
 if [[ -e $HOME/public_html ]]
 then
-	if [[ -h $HOME/public_html ]]
-	then
-		symlink_path=`readlink $HOME/public_html`
+    if [[ -h $HOME/public_html ]]
+    then
+        symlink_path=`readlink $HOME/public_html`
 
-		if [[ $symlink_path !=  "/services/http/users/${USER:0:1}/$USER" ]]
-		then
-			/bin/echo "Your symbolic link public_html is incorrect"
-			/bin/echo "Creating a new link and moving the old link to public_html.$ext"
-			/bin/mv public_html public_html.$ext
+        if [[ $symlink_path !=  "/services/http/users/${USER:0:1}/$USER" ]]
+        then
+            /bin/echo "Your symbolic link public_html is incorrect"
+            /bin/echo "Creating a new link and moving the old link to public_html.$ext"
+            /bin/mv public_html public_html.$ext
 
-			create_symlink
+            create_symlink
 
-			exit 2
-		else
-			/bin/echo "public_html already exists"
-			/bin/echo "Not creating symlink"
-			exit 3
-		fi
+            exit 2
+        else
+            /bin/echo "public_html already exists"
+            /bin/echo "Not creating symlink"
+            exit 3
+        fi
 
-	else
-		/bin/echo "A folder with data exists in $HOME/public_html"
-		/bin/echo "Moving the old folder to public_html.$ext"
-		/bin/mv public_html public_html.$ext
+    else
+        /bin/echo "A folder with data exists in $HOME/public_html"
+        /bin/echo "Moving the old folder to public_html.$ext"
+        /bin/mv public_html public_html.$ext
 
-		create_symlink
+        create_symlink
 
                 exit 4
-	fi
+    fi
 else
 
-	create_symlink
+    create_symlink
 
         exit 0
 fi

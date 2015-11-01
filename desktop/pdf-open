@@ -10,9 +10,9 @@ echo 'Rasterizing PDF...'
 tmp=$(mktemp --suffix='.pdf')
 
 if ! convert -density 250 "$1" "$tmp"; then
-	rm "$tmp"
-	echo 'Convert failed, trying evince...'
-	exec evince $@
+    rm "$tmp"
+    echo 'Convert failed, trying evince...'
+    exec evince $@
 fi
 
 echo 'Done rasterizing, now opening with evince...'

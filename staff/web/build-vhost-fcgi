@@ -8,7 +8,7 @@ sort -u`"
 
 cat > $suexecdir/$wrapper.c <<EOF
 #include <stdio.h>
-// php5-cgi wrapper that passes environment variable 
+// php5-cgi wrapper that passes environment variable
 void main(){
   char *filename = "/usr/bin/php5-cgi";
   char *argv[] = { NULL };

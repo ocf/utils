@@ -2,7 +2,7 @@
 
 [ "$#" -eq 1 ]  || (echo "usage: $0 [account]" >&2; exit 1)
 [ "$(hostname)" == "supernova" ] || [ "$(hostname)" == "pandemic" ] || \
-	(echo "This isn't supernova or pandemic!" >&2; exit 1)
+    (echo "This isn't supernova or pandemic!" >&2; exit 1)
 [ "$(whoami)" == "root" ]  || (echo "You're not root." >&2; exit 1)
 
 [ "$(hostname)" == "supernova" ] && echo "This would be much faster on pandemic..."
@@ -25,6 +25,6 @@ tar cfz - "$homedir" "$webdir" | pv | pigz > "$tmp/backup.tar.gz"
 
 echo "Making SQL backup..."
 /usr/local/bin/mysqldump-5.6 --defaults-file="/root/.my.cnf" --databases "$user" --single-transaction | \
-	pv | pigz > "$tmp/backup.sql.gz"
+    pv | pigz > "$tmp/backup.sql.gz"
 
 echo "Done!"

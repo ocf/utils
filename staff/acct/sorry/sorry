@@ -33,25 +33,25 @@ httpdir=`echo $sorriedUser | sed -e 's%\(\(.\)\)%/services/http/users/\2/\1%'`
 
 rootstaffer="$SUDO_USER"
 
-if [ x"$rootstaffer" = x"root" -o -z $rootstaffer ] 
+if [ x"$rootstaffer" = x"root" -o -z $rootstaffer ]
 then
-	echo "The sorry.log is much more useful when it logs who you are"
-	echo "rather than simply 'root'. Please enter your username:"
-	read rootstaffer
+    echo "The sorry.log is much more useful when it logs who you are"
+    echo "rather than simply 'root'. Please enter your username:"
+    read rootstaffer
 fi
 
 if [ -z $SORRY_KRB5CCNAME ]; then
-	echo You are $rootstaffer
-	$KINIT ${rootstaffer}/admin
-	if [ $? -ne 0 ]; then
-		echo "kinit failed, bailing out!"
-		exit 1
-	fi
+    echo You are $rootstaffer
+    $KINIT ${rootstaffer}/admin
+    if [ $? -ne 0 ]; then
+        echo "kinit failed, bailing out!"
+        exit 1
+    fi
 else
-	echo "SORRY_KRB5CCNAME set in environment."
-	echo "Assuming this file contains current admin credentials."
-	KRB5CCNAME=$SORRY_KRB5CCNAME
-	export KRB5CCNAME
+    echo "SORRY_KRB5CCNAME set in environment."
+    echo "Assuming this file contains current admin credentials."
+    KRB5CCNAME=$SORRY_KRB5CCNAME
+    export KRB5CCNAME
 fi
 
 sorryshell=/opt/ocf/bin/sorried
@@ -105,7 +105,7 @@ ls -ld $httpdir
 echo `/bin/date` - $rootstaffer $sorriedUser >> /opt/acct/sorry.log
 
 if [ -z $SORRY_KRB5CCNAME ]; then
-	$KDESTROY
+    $KDESTROY
 fi
 
 # Huge notice

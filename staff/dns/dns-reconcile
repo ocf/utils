@@ -6,14 +6,18 @@ in the OCF subnet returned by the OCF nameserver.
 
 Requires python3-dnspython
 """
+from ipaddress import ip_address
+from ipaddress import ip_network
 
-from ipaddress import ip_address, ip_network
-from dns import name, reversename, resolver
+from dns import name
+from dns import resolver
+from dns import reversename
 
 # Define subnet and list of nameservers
 net = ip_network('169.229.10.0/24')
 nameservers_ocf = ['169.229.10.22']
 nameservers_cns = ['128.32.136.3', '128.32.136.14']
+
 
 def ptr_records(nameservers=False):
     '''Generate dict of PTR records in subnet from specified nameservers'''
@@ -50,6 +54,7 @@ for key in records_cns.keys():
 for key in set(records_ocf).difference(set(records_cns)):
     add.append(key + ' IN PTR ' + records_ocf[key])
 
+
 def ptr_to_ipv4(record):
     """Convert a PTR record to an IPv4 address"""
     domain = name.from_text(record.split()[0])
@@ -58,18 +63,18 @@ def ptr_to_ipv4(record):
 
 if delete:
     # Print records to delete in sorted order
-    print("Please delete the following {0} DNS record(s):".format(len(delete)))
+    print('Please delete the following {0} DNS record(s):'.format(len(delete)))
     for record in sorted(delete, key=ptr_to_ipv4):
         print(record)
 if delete and add:
     # Separate deletions and additions
-    print("")
+    print('')
 if add:
     # Print records to add in sorted order
-    print("Please add the following {0} DNS record(s):".format(len(add)))
+    print('Please add the following {0} DNS record(s):'.format(len(add)))
     for record in sorted(add, key=ptr_to_ipv4):
         print(record)
 if delete or add:
-    print("\nThank you!")
+    print('\nThank you!')
 else:
-    print("No changes needed")
+    print('No changes needed')

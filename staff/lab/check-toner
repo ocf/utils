@@ -1,26 +1,11 @@
 #!/usr/bin/env python3
-import requests, re
-from threading import Thread
+from ocflib.printing.printers import get_toner
+from ocflib.printing.printers import PRINTERS
 
-REGEX_PRINTED = '<div class="hpDataItemTitle" id="msg-9079">Pages printed with this supply:</div><div class="hpDataItemValue">(.*?)</div>'
-REGEX_REMAINING = '<div class="hpDataItemTitle" id="msg-9429">Approximate Pages Remaining:</div><div class="hpDataItemValue">(.*?)</div>'
-REGEX_PERCENT = '<td class="hpConsumableBlockHeaderPctRemaining"><span class="hpConsumableBlockHeaderText">(.*?)%</span>'
+if __name__ == '__main__':
+    for printer in PRINTERS:
+        cur, max = get_toner(printer)
 
-PRINTERS = ['deforestation', 'logjam']
-
-def get_toner(printer):
-	url = "https://" + printer + "/hp/device/this.LCDispatcher?nav=hp.Supplies"
-	r = requests.get(url, verify=False)
-
-	def match(regex, content):
-		return re.search(regex, content).group(1)
-
-	return (match(regex, r.content.decode("utf-8")) for regex in (REGEX_PRINTED, REGEX_REMAINING, REGEX_PERCENT))
-
-def print_stats(printer):
-	printed, remaining, percent = get_toner(printer)
-	print("{}: printed={}, remaining={} ({}%)".format(printer, printed, remaining, percent))
-
-if __name__ == "__main__":
-	for printer in PRINTERS:
-		Thread(target=print_stats, args=(printer,)).start()
+        # these are secretly some stupid wrapped integers that don't behave to python3 division
+        percent = (float(cur) / float(max)) * 100
+        print('{}: printed={}, remaining={} ({}%)'.format(printer, cur, max - cur, percent))

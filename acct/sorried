@@ -2,8 +2,8 @@
 echo "Unfortunately, your account has been disabled."
 
 if [ -r ~/.sorry ]; then
-	echo "The reason your account has been disabled is:"
-	cat ~/.sorry
+    echo "The reason your account has been disabled is:"
+    cat ~/.sorry
 fi
 
 echo

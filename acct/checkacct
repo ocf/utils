@@ -2,15 +2,15 @@
 # checkacct: OCF account lookup tool
 
 if [ $# -eq 0 ]; then
-	echo "Usage:  'checkacct FRAGMENT...'"
-	exit
+    echo "Usage:  'checkacct FRAGMENT...'"
+    exit
 fi
 
 # list users whose user or real names contain the specified text
 while [ $# -ne 0 ]; do
-	SEARCHQUERY="$SEARCHQUERY (|(uid=*$1*)(cn=*$1*))"
-	shift
+    SEARCHQUERY="$SEARCHQUERY (|(uid=*$1*)(cn=*$1*))"
+    shift
 done
 for username in `ldapsearch -LLL -x "(&$SEARCHQUERY)" uid | grep '^uid' | cut -f2 -d' '`; do
-	finger -m $username | head -1
+    finger -m $username | head -1
 done

@@ -6,16 +6,13 @@ import argparse
 import sys
 
 import ocflib.account.search as search
-import ocflib.constants as constants
-import ocflib.infra.ldap as ldap
 import ocflib.ucb.directory as directory
-from ocflib.ucb.groups import (
-    list_groups,
-    group_by_oid,
-    signatories_for_group,
-    groups_by_student_signat,
-)
-from ocflib.misc.shell import red, yellow
+from ocflib.misc.shell import red
+from ocflib.misc.shell import yellow
+from ocflib.ucb.groups import group_by_oid
+from ocflib.ucb.groups import groups_by_student_signat
+from ocflib.ucb.groups import list_groups
+from ocflib.ucb.groups import signatories_for_group
 from tabulate import tabulate
 
 
@@ -36,15 +33,15 @@ def show_by_username(username):
     """Show signatory info about an individual or group account."""
     attrs = search.user_attrs(username)
     if attrs is None:
-        print(red("User not found."))
+        print(red('User not found.'))
         return
 
     uid = attrs.get('calnetUid', [None])[0]
     oid = attrs.get('callinkOid', [None])[0]
 
     if uid and oid:
-        print(yellow("Both CalNet UID and CalLink OID are defined for " +
-            "this account."))
+        print(yellow('Both CalNet UID and CalLink OID are defined for ' +
+                     'this account.'))
         show_groups_by_student_signat(int(uid))
         print()
         show_signatories_for_group(int(oid))
@@ -53,7 +50,8 @@ def show_by_username(username):
     elif oid:
         show_signatories_for_group(int(oid))
     else:
-        print(red("This account has no CalNet UID or CalLink OID."))
+        print(red('This account has no CalNet UID or CalLink OID.'))
+
 
 def show_signatories_for_group(oid, signatories=None):
     """Show all signatories for a group."""
@@ -62,24 +60,24 @@ def show_signatories_for_group(oid, signatories=None):
     group = group_by_oid(oid)
 
     if not signatories and not group:
-        print(red("CalLink OID {} not found.".format(oid)))
+        print(red('CalLink OID {} not found.'.format(oid)))
         return
     elif not signatories:
-        print(red("CalLink OID {} currently has no signatories.".format(oid)))
+        print(red('CalLink OID {} currently has no signatories.'.format(oid)))
         return
     elif not group:
-        print(yellow(("CalLink OID {} has signatories but is currently not " +
-            "active on CalLink.").format(oid)))
+        print(yellow(('CalLink OID {} has signatories but is currently not ' +
+                      'active on CalLink.').format(oid)))
 
     if group:
         if group['accounts']:
-            subtitle = "Group accounts: {}".format(', '.join(group['accounts']))
+            subtitle = 'Group accounts: {}'.format(', '.join(group['accounts']))
         else:
             subtitle = None
         title = '{} ({})'.format(group['name'], oid)
     else:
         subtitle = None
-        title = "Unkown group ({})".format(oid)
+        title = 'Unkown group ({})'.format(oid)
 
     columns = [(attrs['name'], uid) for uid, attrs in signatories.items()]
     headers = ('Signatory', 'UID')
@@ -92,20 +90,20 @@ def show_groups_by_student_signat(uid, groups=None):
     name = directory.name_by_calnet_uid(uid)
 
     if not name:
-        print(red("CalNet UID {} not found.").format(uid))
+        print(red('CalNet UID {} not found.').format(uid))
         return
 
     if groups is None:
         groups = groups_by_student_signat(uid)
 
     if not groups:
-        print(red("CalNet UID {} not a signatory of any active student " +
-            "groups.").format(uid))
+        print(red('CalNet UID {} not a signatory of any active student ' +
+                  'groups.').format(uid))
         return
 
     title = '{} ({})'.format(name, uid)
     columns = [(attrs['name'], ', '.join(attrs['accounts']) or 'n/a', oid) for
-            oid, attrs in groups.items()]
+               oid, attrs in groups.items()]
     headers = ('Group', 'Accounts', 'OID')
 
     print_table(title, columns, headers)
@@ -113,17 +111,17 @@ def show_groups_by_student_signat(uid, groups=None):
 
 def show_signatories_by_group_name(name):
     """Show signatories of groups matching a name."""
-    print("Searching for groups... ", end="", flush=True)
+    print('Searching for groups... ', end='', flush=True)
 
     groups = list_groups(name=name)
 
     if not groups:
-        print(red("No student groups found."))
+        print(red('No student groups found.'))
         return
 
-    print("Found {} entries.".format(len(groups)))
+    print('Found {} entries.'.format(len(groups)))
 
-    print("Searching for signatories...")
+    print('Searching for signatories...')
 
     found = False
 
@@ -135,23 +133,23 @@ def show_signatories_by_group_name(name):
             print()
 
     if not found:
-        print(red("No groups had signatories."))
+        print(red('No groups had signatories.'))
 
 
 def show_groups_by_signat_name(name):
     """Show signatory status of people matching a name."""
-    print("Searching for people... ", end="", flush=True)
+    print('Searching for people... ', end='', flush=True)
 
     uids = directory.calnet_uids_by_name(name)
 
     if not uids:
         print()
-        print(red("CalNet UID not found."))
+        print(red('CalNet UID not found.'))
         return
 
-    print("Found {} entries.".format(len(uids)))
+    print('Found {} entries.'.format(len(uids)))
 
-    print("Searching for signatories...")
+    print('Searching for signatories...')
 
     found = False
 
@@ -163,41 +161,42 @@ def show_groups_by_signat_name(name):
             print()
 
     if not found:
-        print(red("No signatories found."))
+        print(red('No signatories found.'))
+
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Find active student groups and signatories")
-    subparsers = parser.add_subparsers(dest="command", description="")
+        description='Find active student groups and signatories')
+    subparsers = parser.add_subparsers(dest='command', description='')
     subparsers.required = True
 
-    UID_DESC = "Look up the signatory status of a person by CalNet UID"
+    UID_DESC = 'Look up the signatory status of a person by CalNet UID'
     uid_parser = subparsers.add_parser('uid', description=UID_DESC,
-            help=UID_DESC)
+                                       help=UID_DESC)
     uid_parser.add_argument('uid', type=int)
 
-    OID_DESC = "Look up the signatories of a group by CalLink OID"
+    OID_DESC = 'Look up the signatories of a group by CalLink OID'
     oid_parser = subparsers.add_parser('oid', description=OID_DESC,
-        help=OID_DESC)
+                                       help=OID_DESC)
     oid_parser.add_argument('oid', type=int)
 
-    USER_DESC = "Look up the signatory status of an OCF user"
+    USER_DESC = 'Look up the signatory status of an OCF user'
     user_parser = subparsers.add_parser('user', description=USER_DESC,
-        help=USER_DESC)
+                                        help=USER_DESC)
     user_parser.add_argument('username', type=str)
 
-    NAME_DESC = "Look up the signatory status of a person by name"
+    NAME_DESC = 'Look up the signatory status of a person by name'
     name_parser = subparsers.add_parser('name', description=NAME_DESC,
-        help=NAME_DESC)
+                                        help=NAME_DESC)
     name_parser.add_argument('name', type=str, nargs='+',
-        help="List of full or partial names or keywords. Technically, each " +
-        "name must be matched by the LDAP 'cn' attribute.")
+                             help='List of full or partial names or keywords. Technically, each ' +
+                             "name must be matched by the LDAP 'cn' attribute.")
 
-    GROUP_DESC = "Look up the signatories of a group by group name"
+    GROUP_DESC = 'Look up the signatories of a group by group name'
     group_parser = subparsers.add_parser('group', description=GROUP_DESC,
-        help=GROUP_DESC)
+                                         help=GROUP_DESC)
     group_parser.add_argument('name', type=str, nargs='+',
-        help="List of keywords to search for on the CalLink API")
+                              help='List of keywords to search for on the CalLink API')
 
     args = parser.parse_args(sys.argv[1:])
     if args.command == 'uid':

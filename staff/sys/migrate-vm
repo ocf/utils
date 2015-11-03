@@ -19,10 +19,8 @@
 # It makes a couple assumptions:
 #   - We use the volume group /dev/vg on both the old and new host.
 #   - VMs are at /dev/vg/${hostname} on both old and new host.
-
 import argparse
 import os
-import paramiko
 import re
 import socket
 import sys
@@ -30,14 +28,14 @@ import time
 from collections import namedtuple
 from getpass import getpass
 from subprocess import check_call
-from subprocess import Popen
 from subprocess import PIPE
+from subprocess import Popen
 from tempfile import NamedTemporaryFile
 
+import paramiko
 from ocflib.misc.shell import bold
 from ocflib.misc.shell import green
 from ocflib.misc.shell import red
-from ocflib.misc.shell import yellow
 
 
 HostAndVm = namedtuple('HostAndVm', ['host', 'vm'])
@@ -64,7 +62,7 @@ def copy_disk_image(vm, num_bytes):
     )
 
     while True:
-        chunk = stdout.read(32 * 2**10)
+        chunk = stdout.read(32 * 2 ** 10)
         if len(chunk) == 0:
             break
         proc.stdin.write(chunk)
@@ -88,7 +86,6 @@ def verify_disks(vm):
         sys.exit(1)
     else:
         print(bold(green('Hashes match!')))
-
 
 
 def shut_down_vm(vm):
@@ -126,7 +123,6 @@ if __name__ == '__main__':
                 'argument should of the form host:vm (e.g. jaws:supernova)',
             )
         return HostAndVm(host=m.group(1), vm=m.group(2))
-
 
     parser = argparse.ArgumentParser(description='Process some integers.')
     parser.add_argument('host_and_vm', metavar='host:vm', type=host_and_vm, help='Host and VM name to transfer.')

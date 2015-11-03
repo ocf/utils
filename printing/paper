@@ -20,7 +20,7 @@ use POSIX qw (ceil);
 #             (tweaked sanjayk's message -- mailing staff.berkeley.edu is
 #              not going to work very well :)
 # Modified by waf for error message to be more user friendly 16-Sept-2010
-# Modified by benortiz to add incorrect message even when balance 
+# Modified by benortiz to add incorrect message even when balance
 #             exists 28-Feb-2011
 # Modified by amloessb to use the paper [-v] [username] syntax 27-Apr-2011
 
@@ -40,16 +40,16 @@ my $verbose = 0;
 my $noarg;
 
 if ( $ARGV[0] eq "-v" ) {
-	$verbose = 1;
-	$user = $ARGV[1];
+    $verbose = 1;
+    $user = $ARGV[1];
 } else {
-	$user = $ARGV[0];
+    $user = $ARGV[0];
 }
 
 #GetOptions( 'user=s' => \$user );
 if ( !$user ) {
 #    $user  = getlogin();
-    $user  = getpwuid($<); 
+    $user  = getpwuid($<);
     $noarg = 1;
 }
 
@@ -62,15 +62,15 @@ my $output = `$PKUSERS --list $user  2> /dev/null`;
 my $outputd = `$PKUSERSD --list $user  2> /dev/null`;
 
 if ( $verbose == 1 ) {
-	print `$PKUSERS -L $user`;
-	exit;
+    print `$PKUSERS -L $user`;
+    exit;
 }
 
 if(length($output)==0)
 {
-	print "$user does not appear to be in our print accounting system -- this is\n";
-	print "probably because $user has not printed anything this semester.\n";
-	exit;
+    print "$user does not appear to be in our print accounting system -- this is\n";
+    print "probably because $user has not printed anything this semester.\n";
+    exit;
 }
 
 my ( $balance, $total ) =

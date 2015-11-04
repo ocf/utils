@@ -70,10 +70,8 @@ def show_signatories_for_group(oid, signatories=None):
                       'active on CalLink.').format(oid)))
 
     if group:
-        if group['accounts']:
-            subtitle = 'Group accounts: {}'.format(', '.join(group['accounts']))
-        else:
-            subtitle = None
+        accounts = ', '.join(group['accounts']) if group['accounts'] else 'n/a'
+        subtitle = 'Group accounts: {}'.format(accounts)
         title = '{} ({})'.format(group['name'], oid)
     else:
         subtitle = None

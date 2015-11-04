@@ -114,6 +114,7 @@ def show_signatories_by_group_name(name):
     groups = list_groups(name=name)
 
     if not groups:
+        print()
         print(red('No student groups found.'))
         return
 

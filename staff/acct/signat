@@ -117,7 +117,9 @@ def show_signatories_by_group_name(name):
         print(red('No student groups found.'))
         return
 
-    print('Found {} entries.'.format(len(groups)))
+    plural_case = 'entry' if len(groups) == 1 else 'entries'
+
+    print('Found {} {}.'.format(len(groups), plural_case))
 
     print('Searching for signatories...')
 
@@ -126,9 +128,9 @@ def show_signatories_by_group_name(name):
     for (oid, attrs) in groups.items():
         signatories = signatories_for_group(oid)
         if signatories:
+            print()
             found = True
             show_signatories_for_group(oid, signatories=signatories)
-            print()
 
     if not found:
         print(red('No groups had signatories.'))
@@ -145,7 +147,9 @@ def show_groups_by_signat_name(name):
         print(red('CalNet UID not found.'))
         return
 
-    print('Found {} entries.'.format(len(uids)))
+    plural_case = 'entry' if len(uids) == 1 else 'entries'
+
+    print('Found {} {}.'.format(len(uids), plural_case))
 
     print('Searching for signatories...')
 
@@ -154,9 +158,9 @@ def show_groups_by_signat_name(name):
     for uid in uids:
         groups = groups_by_student_signat(uid)
         if groups:
+            print()
             found = True
             show_groups_by_student_signat(uid, groups=groups)
-            print()
 
     if not found:
         print(red('No signatories found.'))

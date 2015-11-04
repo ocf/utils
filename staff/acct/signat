@@ -77,7 +77,7 @@ def show_signatories_for_group(oid, signatories=None):
         title = '{} ({})'.format(group['name'], oid)
     else:
         subtitle = None
-        title = 'Unkown group ({})'.format(oid)
+        title = 'Unknown group ({})'.format(oid)
 
     columns = [(attrs['name'], uid) for uid, attrs in signatories.items()]
     headers = ('Signatory', 'UID')

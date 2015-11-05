@@ -3,7 +3,7 @@
 student group.
 """
 import argparse
-import sys
+import textwrap
 
 import ocflib.account.search as search
 import ocflib.ucb.directory as directory
@@ -168,49 +168,54 @@ def show_groups_by_signat_name(name):
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description='Find active student groups and signatories')
-    subparsers = parser.add_subparsers(dest='command', description='')
+    parser = argparse.ArgumentParser(usage='%(prog)s IDTYPE ARGS...',
+                                     description=textwrap.dedent('''\
+            Find active student groups and signatories.
+            Try %(prog)s <IDTYPE> -h for more information.'''),
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    subparsers = parser.add_subparsers(dest='idtype', metavar='IDTYPE')
     subparsers.required = True
 
     UID_DESC = 'Look up the signatory status of a person by CalNet UID'
     uid_parser = subparsers.add_parser('uid', description=UID_DESC,
                                        help=UID_DESC)
-    uid_parser.add_argument('uid', type=int)
+    uid_parser.add_argument('uid', metavar='UID', type=int)
 
     OID_DESC = 'Look up the signatories of a group by CalLink OID'
     oid_parser = subparsers.add_parser('oid', description=OID_DESC,
                                        help=OID_DESC)
-    oid_parser.add_argument('oid', type=int)
+    oid_parser.add_argument('oid', metavar='OID', type=int)
 
     USER_DESC = 'Look up the signatory status of an OCF user'
     user_parser = subparsers.add_parser('user', description=USER_DESC,
                                         help=USER_DESC)
-    user_parser.add_argument('username', type=str)
+    user_parser.add_argument('username', metavar='USERNAME', type=str)
 
     NAME_DESC = 'Look up the signatory status of a person by name'
     name_parser = subparsers.add_parser('name', description=NAME_DESC,
                                         help=NAME_DESC)
-    name_parser.add_argument('name', type=str, nargs='+',
-                             help='List of full or partial names or keywords. Technically, each ' +
-                             "name must be matched by the LDAP 'cn' attribute.")
+    name_parser.add_argument('name', metavar='WORD', type=str, nargs='+',
+                             help='List of full or partial names or keywords. '
+                                  'Technically, each name must be matched by '
+                                  "the LDAP 'cn' attribute.")
 
     GROUP_DESC = 'Look up the signatories of a group by group name'
     group_parser = subparsers.add_parser('group', description=GROUP_DESC,
                                          help=GROUP_DESC)
-    group_parser.add_argument('name', type=str, nargs='+',
-                              help='List of keywords to search for on the CalLink API')
+    group_parser.add_argument('name', metavar='WORD', type=str, nargs='+',
+                              help='List of keywords to search for on the '
+                                   'CalLink API')
 
-    args = parser.parse_args(sys.argv[1:])
-    if args.command == 'uid':
+    args = parser.parse_args()
+    if args.idtype == 'uid':
         show_groups_by_student_signat(args.uid)
-    elif args.command == 'oid':
+    elif args.idtype == 'oid':
         show_signatories_for_group(args.oid)
-    elif args.command == 'user':
+    elif args.idtype == 'user':
         show_by_username(args.username)
-    elif args.command == 'name':
+    elif args.idtype == 'name':
         show_groups_by_signat_name(' '.join(args.name))
-    elif args.command == 'group':
+    elif args.idtype == 'group':
         show_signatories_by_group_name(' '.join(args.name))
 
 if __name__ == '__main__':

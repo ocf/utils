@@ -141,7 +141,7 @@ def database_already_exists(username):
     print()
     print('You can also find the same information at:')
     print()
-    print('  http://wiki.ocf.berkeley.edu/services/mysql/')
+    print('  http://ocf.berkeley.edu/docs/services/mysql/')
     print()
 
 
@@ -217,7 +217,7 @@ def main():
             print()
             print('You can also find the same information at:')
             print()
-            print('  http://wiki.ocf.berkeley.edu/services/mysql/')
+            print('  http://ocf.berkeley.edu/docs/services/mysql/')
             print()
 
         print('>>> Your MySQL database password is: %s' % userpass)

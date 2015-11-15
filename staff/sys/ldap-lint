@@ -1,0 +1,98 @@
+#!/usr/bin/env python3
+"""Check the sanity of our LDAP database.
+
+Currently checks the Hosts OU for:
+    * Duplicate IP addresses
+    * Duplicate MAC addresses
+    * Missing IP address
+    * Existence of MAC address (should be present only on type=desktop)
+    * Invalid or missing type
+    * Host not in DNS or mismatched IP
+    * Unrecognized puppetVar (often typos)
+    * Reverse DNS for IP matches hostname
+"""
+from operator import itemgetter
+
+import dns
+from ocflib.constants import OCF_LDAP_HOSTS
+from ocflib.infra.ldap import ldap_ocf
+from ocflib.misc.shell import bold
+from ocflib.misc.shell import red
+
+
+RECOGNIZED_PUPPETVARS = {'owner', 'skipNetworking', 'staff_only'}
+
+
+def lookup_dns(host, rtype='A'):
+    """Return IP address of first record, or None."""
+    try:
+        return dns.resolver.query(host, rtype)[0]
+    except dns.resolver.NXDOMAIN:
+        return None
+
+
+def main():
+    retval = 0
+    seen_macs = {}
+    seen_ips = {}
+
+    def complain(cn, error):
+        nonlocal retval
+        retval = 1
+        print(bold(red('[{}] '.format(cn))) + error)
+
+    with ldap_ocf() as c:
+        c.search(
+            OCF_LDAP_HOSTS,
+            '(cn=*)',
+            attributes=['cn', 'type', 'macAddress', 'ipHostNumber', 'puppetVar'],
+        )
+        for attrs in map(itemgetter('attributes'), c.response):
+            cn = attrs['cn'][0]
+            type_ = attrs['type'][0]
+
+            if type_ not in {'desktop', 'server'}:
+                complain(cn, 'has unknown type ' + type_)
+
+            if 'macAddress' in attrs:
+                mac_addr = attrs['macAddress'][0].lower()
+
+                if type_ != 'desktop':
+                    complain(cn, 'has a MAC address but not a desktop')
+
+                if mac_addr in seen_macs:
+                    complain(cn, 'has same MAC address as ' + seen_macs[mac_addr])
+                else:
+                    seen_macs[mac_addr] = cn
+            elif type_ == 'desktop':
+                complain(cn, 'has no MAC address but is a desktop')
+
+            ip = attrs['ipHostNumber'][0]
+            dns_ip = lookup_dns(cn + '.ocf.berkeley.edu')
+
+            if not dns_ip:
+                complain(cn, 'has no A record in DNS')
+            else:
+                if ip in seen_ips:
+                    complain(cn, 'has same IP address as ' + seen_ips[ip])
+                else:
+                    seen_ips[ip] = cn
+
+                if dns_ip != ip:
+                    complain(cn, 'ldap ip {} doesn\'t match dns ip {}'.format(ip, dns_ip))
+
+            ptr = str(lookup_dns(dns.reversename.from_address(ip), rtype='PTR'))
+
+            if ptr.lower() != cn + '.ocf.berkeley.edu.':
+                complain(cn, 'bad reverse DNS for {}: {}'.format(ip, ptr))
+
+            for puppet_var in attrs.get('puppetVar', []):
+                var, val = puppet_var.split('=', 1)
+                if var not in RECOGNIZED_PUPPETVARS:
+                    complain(cn, 'has unrecognized puppetVar: {}'.format(puppet_var))
+
+    return retval
+
+
+if __name__ == '__main__':
+    exit(main())

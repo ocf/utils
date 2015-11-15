@@ -9,7 +9,7 @@ Currently checks the Hosts OU for:
     * Invalid or missing type
     * Host not in DNS or mismatched IP
     * Unrecognized puppetVar (often typos)
-    * Reverse DNS for IP matches hostname
+    * Reverse DNS for IP exists and matches hostname
 """
 from operator import itemgetter
 
@@ -24,9 +24,9 @@ RECOGNIZED_PUPPETVARS = {'owner', 'skipNetworking', 'staff_only'}
 
 
 def lookup_dns(host, rtype='A'):
-    """Return IP address of first record, or None."""
+    """Return string representation of first record, or None."""
     try:
-        return dns.resolver.query(host, rtype)[0]
+        return str(dns.resolver.query(host, rtype)[0]) or None
     except dns.resolver.NXDOMAIN:
         return None
 
@@ -81,10 +81,13 @@ def main():
                 if dns_ip != ip:
                     complain(cn, 'ldap ip {} doesn\'t match dns ip {}'.format(ip, dns_ip))
 
-            ptr = str(lookup_dns(dns.reversename.from_address(ip), rtype='PTR'))
+            ptr = lookup_dns(dns.reversename.from_address(ip), rtype='PTR')
 
-            if ptr.lower() != cn + '.ocf.berkeley.edu.':
-                complain(cn, 'bad reverse DNS for {}: {}'.format(ip, ptr))
+            if ptr:
+                if ptr.lower() != cn + '.ocf.berkeley.edu.':
+                    complain(cn, 'bad reverse DNS for {}: {}'.format(ip, ptr))
+            else:
+                complain(cn, 'missing reverse DNS for {}'.format(ip))
 
             for puppet_var in attrs.get('puppetVar', []):
                 var, val = puppet_var.split('=', 1)

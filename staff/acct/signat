@@ -16,8 +16,8 @@ from ocflib.ucb.groups import signatories_for_group
 from tabulate import tabulate
 
 
-def print_table(title, columns, headers, subtitle=None):
-    """Pretty print a table of groups or signatories."""
+def print_title(title, subtitle=None):
+    """Pretty print a table title for groups or individuals."""
     print(title)
     if subtitle:
         print(subtitle)
@@ -26,7 +26,6 @@ def print_table(title, columns, headers, subtitle=None):
         bar_len = len(title)
     bar = '=' * bar_len
     print(bar)
-    print(tabulate(columns, headers=headers))
 
 
 def show_by_username(username):
@@ -40,7 +39,7 @@ def show_by_username(username):
     oid = attrs.get('callinkOid', [None])[0]
 
     if uid and oid:
-        print(yellow('Both CalNet UID and CalLink OID are defined for ' +
+        print(yellow('Both CalNet UID and CalLink OID are defined for '
                      'this account.'))
         show_groups_by_student_signat(int(uid))
         print()
@@ -53,20 +52,16 @@ def show_by_username(username):
         print(red('This account has no CalNet UID or CalLink OID.'))
 
 
-def show_signatories_for_group(oid, signatories=None):
+def show_signatories_for_group(oid):
     """Show all signatories for a group."""
-    if signatories is None:
-        signatories = signatories_for_group(oid)
+    signatories = signatories_for_group(oid)
     group = group_by_oid(oid)
 
     if not signatories and not group:
         print(red('CalLink OID {} not found.'.format(oid)))
         return
-    elif not signatories:
-        print(red('CalLink OID {} currently has no signatories.'.format(oid)))
-        return
     elif not group:
-        print(yellow(('CalLink OID {} has signatories but is currently not ' +
+        print(yellow(('CalLink OID {} has signatories but is currently not '
                       'active on CalLink.').format(oid)))
 
     if group:
@@ -75,15 +70,19 @@ def show_signatories_for_group(oid, signatories=None):
         title = '{} ({})'.format(group['name'], oid)
     else:
         subtitle = None
-        title = 'Unknown group ({})'.format(oid)
+        title = '<unknown group> ({})'.format(oid)
 
-    columns = [(attrs['name'], uid) for uid, attrs in signatories.items()]
-    headers = ('Signatory', 'UID')
+    print_title(title, subtitle=subtitle)
 
-    print_table(title, columns, headers, subtitle=subtitle)
+    if signatories:
+        columns = [(attrs['name'], uid) for uid, attrs in signatories.items()]
+        headers = ('Signatory', 'UID')
+        print(tabulate(columns, headers=headers))
+    else:
+        print('No signatories found.')
 
 
-def show_groups_by_student_signat(uid, groups=None):
+def show_groups_by_student_signat(uid):
     """Show signatory status of a person on CalLink."""
     name = directory.name_by_calnet_uid(uid)
 
@@ -91,20 +90,18 @@ def show_groups_by_student_signat(uid, groups=None):
         print(red('CalNet UID {} not found.').format(uid))
         return
 
-    if groups is None:
-        groups = groups_by_student_signat(uid)
-
-    if not groups:
-        print(red('CalNet UID {} not a signatory of any active student ' +
-                  'groups.').format(uid))
-        return
-
     title = '{} ({})'.format(name, uid)
-    columns = [(attrs['name'], ', '.join(attrs['accounts']) or 'n/a', oid) for
-               oid, attrs in groups.items()]
-    headers = ('Group', 'Accounts', 'OID')
+    print_title(title)
 
-    print_table(title, columns, headers)
+    groups = groups_by_student_signat(uid)
+
+    if groups:
+        columns = [(attrs['name'], ', '.join(attrs['accounts']) or 'n/a', oid)
+                   for oid, attrs in groups.items()]
+        headers = ('Group', 'Accounts', 'OID')
+        print(tabulate(columns, headers=headers))
+    else:
+        print('Not a signatory of any student group.')
 
 
 def show_signatories_by_group_name(name):
@@ -124,17 +121,9 @@ def show_signatories_by_group_name(name):
 
     print('Searching for signatories...')
 
-    found = False
-
     for (oid, attrs) in groups.items():
-        signatories = signatories_for_group(oid)
-        if signatories:
-            print()
-            found = True
-            show_signatories_for_group(oid, signatories=signatories)
-
-    if not found:
-        print(red('No groups had signatories.'))
+        print()
+        show_signatories_for_group(oid)
 
 
 def show_groups_by_signat_name(name):
@@ -154,25 +143,18 @@ def show_groups_by_signat_name(name):
 
     print('Searching for signatories...')
 
-    found = False
-
     for uid in uids:
-        groups = groups_by_student_signat(uid)
-        if groups:
-            print()
-            found = True
-            show_groups_by_student_signat(uid, groups=groups)
-
-    if not found:
-        print(red('No signatories found.'))
+        print()
+        show_groups_by_student_signat(uid)
 
 
 def main():
-    parser = argparse.ArgumentParser(usage='%(prog)s IDTYPE ARGS...',
-                                     description=textwrap.dedent('''\
-            Find active student groups and signatories.
-            Try %(prog)s <IDTYPE> -h for more information.'''),
-                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser = argparse.ArgumentParser(
+        usage='%(prog)s IDTYPE ARGS...',
+        description=textwrap.dedent('''\
+                Find active student groups and signatories.
+                Try %(prog)s <IDTYPE> -h for more information.'''),
+        formatter_class=argparse.RawDescriptionHelpFormatter)
     subparsers = parser.add_subparsers(dest='idtype', metavar='IDTYPE')
     subparsers.required = True
 

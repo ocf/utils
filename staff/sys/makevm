@@ -2,12 +2,10 @@
 # Creates and configures a new vm
 #
 # Dependencies (Debian packages):
-#  - python3-colorama
 #  - python3-paramiko
 #  - nmap
 #
 # TODO: replace shell=True subprocess invocations
-# TODO: use ocflib instead of colorama
 import argparse
 import os.path
 import random
@@ -19,8 +17,8 @@ import sys
 import time
 
 import paramiko
-from colorama import Fore
-from colorama import Style
+from ocflib.misc.shell import bold
+from ocflib.misc.shell import green
 
 MAC_KVM_PREFIX = (0x52, 0x54, 0x00)
 MAC_BYTES = 6
@@ -32,9 +30,8 @@ def exec_cmd(cmd):
     """Executes the given shell command with some pretty colors. Script
     exits if the command exits with a non-zero status code."""
 
-    print('{}$ {}{}'.format(Fore.GREEN, cmd, Fore.RED))
+    print(bold(green('$ ' + cmd)))
     subprocess.check_call(cmd, shell=True, stdout=sys.stdout)
-    print(Style.RESET_ALL, end='')
 
 
 def create_disk(name, size):
@@ -95,10 +92,10 @@ def get_ip(mac):
     """Get IP address for the given MAC address. This needs some work."""
     while True:
         try:
-            subprocess.check_call('nmap -sn 169.229.10.0/24',
+            subprocess.check_call('sudo -u nobody nmap -sn 169.229.226.0/24',
                                   stdout=devnull, shell=True)
             cmd = "arp -an | grep '{}'".format(mac)
-            result = subprocess.check_output(cmd, shell=True).strip()
+            result = subprocess.check_output(cmd, shell=True).decode('utf-8').strip()
             return result.split(' ')[1][1:-1]
         except subprocess.CalledProcessError:
             time.sleep(1)
@@ -137,7 +134,7 @@ def configure_network(ssh, ip):
 
         # TODO: argparse these
         '\tnetmask 255.255.255.0',
-        '\tgateway 169.229.10.1'
+        '\tgateway 169.229.226.1'
     ]
 
     ssh.exec_command("echo -n \"\" > /etc/network/interfaces")
@@ -227,9 +224,9 @@ def _main(args):
             print('Cancelled.')
             sys.exit(2)
 
-    if not validate_ip(args.ip, '169.229.10.0/24'):
+    if not validate_ip(args.ip, '169.229.226.0/24'):
         print("Warning: Your IP is '{}'.".format(args.ip))
-        print('It should probably be in 169.229.10.0/24.')
+        print('It should probably be in 169.229.226.0/24.')
 
         if not confirm():
             print('Cancelled.')
@@ -279,10 +276,8 @@ def _main(args):
     print('Configuring static IP {}...'.format(args.ip))
     configure_network(client, args.ip)
 
-    # TODO: for some reason this doesn't have any effect
-    # (it's still necessary to log in and run the command manually)
     print('Turning on puppet...')
-    client.exec_command('puppet agent --enable')
+    client.exec_command('rm -f /var/lib/puppet/state/agent_disabled.lock')
 
     print('Restarting VM...')
     client.exec_command('shutdown -r now')

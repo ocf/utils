@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+import ssl
 import sys
 from getpass import getpass
 from ssl import SSLError
@@ -29,7 +30,12 @@ def set_economode(setting, hostname, username, password):
     password_mgr = urllib2.HTTPPasswordMgrWithDefaultRealm()
     password_mgr.add_password(None, url, username, password)
     handler = urllib2.HTTPBasicAuthHandler(password_mgr)
-    opener = urllib2.build_opener(handler)
+
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+
+    opener = urllib2.build_opener(handler, urllib2.HTTPSHandler(context=ctx))
 
     # attempt up to 3 times to POST data to printer
     max_attempts = 3

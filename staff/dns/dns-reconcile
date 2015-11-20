@@ -12,11 +12,20 @@ from ipaddress import ip_network
 from dns import name
 from dns import resolver
 from dns import reversename
+from ocflib.constants import OCF_SUBNET_V4
+
+
+def lookup(record, my_resolver=None, rtype='A'):
+    """Return stringified first result for the given record and record type."""
+    if not my_resolver:
+        my_resolver = resolver
+    return str(my_resolver.query(record, rtype)[0])
 
 # Define subnet and list of nameservers
-net = ip_network('169.229.10.0/24')
-nameservers_ocf = ['169.229.10.22']
-nameservers_cns = ['128.32.136.3', '128.32.136.14']
+net = ip_network(OCF_SUBNET_V4)
+
+nameservers_ocf = [lookup('ns.ocf.berkeley.edu')]
+nameservers_cns = [lookup('adns1.berkeley.edu'), lookup('adns2.berkeley.edu')]
 
 
 def ptr_records(nameservers=False):
@@ -28,7 +37,7 @@ def ptr_records(nameservers=False):
     for ipaddress in net:
         record = reversename.from_address(str(ipaddress))
         try:
-            records[str(record)] = str(my_resolver.query(record, 'PTR')[0])
+            records[str(record)] = lookup(record, my_resolver=my_resolver, rtype='PTR')
         except resolver.NXDOMAIN:
             # Ignore records that are not found
             pass

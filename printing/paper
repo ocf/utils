@@ -90,6 +90,7 @@ $balanced = ceil($balanced);
 
 }
 
-print "Printing quota remaining\n";
-print "Semester: $balance pages\n";
-print "Today: $balanced pages\n";
+print "Printing quota:\n";
+print "Semester: $balance pages remaining\n";
+print "Today: $balanced pages remaining\n";
+

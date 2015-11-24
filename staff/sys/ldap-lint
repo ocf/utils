@@ -20,7 +20,14 @@ from ocflib.misc.shell import bold
 from ocflib.misc.shell import red
 
 
-RECOGNIZED_PUPPETVARS = {'owner', 'skipNetworking', 'staff_only'}
+RECOGNIZED_PUPPETVARS = {
+    'owner',
+    'pubstaff_only',
+    'skip_kerberos',
+    'skip_ldap',
+    'skip_networking',
+    'staff_only',
+}
 
 
 def lookup_dns(host, rtype='A'):

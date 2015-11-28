@@ -1,96 +1,75 @@
-#!/usr/bin/perl
+#!/bin/bash
 
-# pykota not installed on tsunami, display a sane message in the interim
-#print "Printing quota records are temporarily unavailable";
-#exit;
+PKUSERS_SEMESTER='/opt/ocf/packages/pykota/pkusers --config /etc/pykota/pykota.semester/'
+PKUSERS_DAILY='/opt/ocf/packages/pykota/pkusers'
 
-use Getopt::Long;
-use POSIX qw (ceil);
+# Show usage information if more than 2 arguments are used
+if (( $# > 2 )); then
+  echo "Usage: paper [-v] [username]"
+  echo "       Running paper with no username present will get information on the"
+  echo "       current user."
+  echo "       Must be run on a machine with the pkusers command."
+  exit
+fi
 
-# paper:
-# wrapper for pykota commands
+# Parse command line arguments for the username and -v flag
+if [[ $1 && $1 == "-v" ]]; then
+  verbose=1
+  user=$2
+elif [[ $2 && $2 == "-v" ]]; then
+  verbose=1
+  user=$1
+else
+  verbose=0
+  user=$1
+fi
 
-# Author: Stephen Le <sle@ocf.berkeley.edu>
-# Original Version: 8-Apr-2009
-# Modified by Mike Gasidlo <mgasidlo@ocf.berkeley.edu> 25-Sep-2009
-# Modified by Jordan Salter <jordan@ocf.berkeley.edu> 9-Dec-2009
-#             (minor regexp fix -- died when user had negative paper quota)
-# Modified Sanjayk to be a little bit more user friendly
-# Modified by Jordan Salter <jordan@ocf.berkeley.edu> 25-Jan-2010
-#             (tweaked sanjayk's message -- mailing staff.berkeley.edu is
-#              not going to work very well :)
-# Modified by waf for error message to be more user friendly 16-Sept-2010
-# Modified by benortiz to add incorrect message even when balance
-#             exists 28-Feb-2011
-# Modified by amloessb to use the paper [-v] [username] syntax 27-Apr-2011
+# If no user was passed in as an argument, use the current user
+if [[ ! $user ]]; then
+  user="$(whoami)"
+fi
 
-if ( $#ARGV + 1 > 2 ) {
-    print "Usage: paper [-v] [username]\n";
-    print "       Running paper with no username present will get information on the\n";
-    print "       current user.\n";
-    print "       Must be run on a machine with the pkusers command.\n\n";
-    exit;
-}
+# Check the user has a reasonable format (e.g. all letters)
+if [[ ! "$user" =~ ^[a-z]+$ ]]; then
+  echo "Invalid user: $user"
+  exit 1
+fi
 
-my $PKUSERS = '/opt/ocf/packages/pykota/pkusers --config /etc/pykota/pykota.semester/';
-my $PKUSERSD = '/opt/ocf/packages/pykota/pkusers';
+# In verbose mode, simply output the PyKota output directly
+if [[ $verbose -eq 1 ]]; then
+  echo "$( $PKUSERS_SEMESTER -L $user )"
+  exit 0
+fi
 
-my $user;
-my $verbose = 0;
-my $noarg;
+output_semester="$( $PKUSERS_SEMESTER --list $user 2> /dev/null )"
+output_daily="$( $PKUSERS_DAILY --list $user 2> /dev/null )"
 
-if ( $ARGV[0] eq "-v" ) {
-    $verbose = 1;
-    $user = $ARGV[1];
-} else {
-    $user = $ARGV[0];
-}
+# If no output occurs, the user is likely not in the semester database
+if [[ ${#output_semester} -eq 0 ]]; then
+  echo "$user does not appear to be in our print accounting system -- this is"
+  echo "probably because $user has not printed anything this semester."
+  exit 1
+fi
 
-#GetOptions( 'user=s' => \$user );
-if ( !$user ) {
-#    $user  = getlogin();
-    $user  = getpwuid($<);
-    $noarg = 1;
-}
+# Parse the PyKota output and find the account balance amount
+output_regex='Account balance : (-?[[:digit:]]+)\.'
+[[ $output_semester =~ $output_regex ]]
+balance_semester=${BASH_REMATCH[1]}
 
-if($user !~ /^[a-z]+$/) {
-    print 'Invalid user:'. $user ."\n";
-    exit(0);
-}
+# Set the default daily balance as 15 on weekdays and 30 on weekends
+balance_daily=30
+wday=$(date +%u)
+if [[ $wday -ge 1 ]] && [[ $wday -le 5 ]]; then
+  balance_daily=15
+fi
 
-my $output = `$PKUSERS --list $user  2> /dev/null`;
-my $outputd = `$PKUSERSD --list $user  2> /dev/null`;
+# If the daily PyKota command had any output, then set the daily balance to
+#   something other than the default amount since the user has printed today
+if [[ ${#output_daily} -ne 0 ]]; then
+  [[ $output_daily =~ $output_regex ]]
+  balance_daily=${BASH_REMATCH[1]}
+fi
 
-if ( $verbose == 1 ) {
-    print `$PKUSERS -L $user`;
-    exit;
-}
-
-if(length($output)==0)
-{
-    print "$user does not appear to be in our print accounting system -- this is\n";
-    print "probably because $user has not printed anything this semester.\n";
-    exit;
-}
-
-my ( $balance, $total ) =
-  $output =~ m/Account balance : (-?\d+\.\d+)\s*Total paid so far : (-?\d+\.\d+)/s;
-$balance = ceil($balance);
-my $balanced = 30;
-my $wday = (localtime)[6];
-if ($wday >= 1 && $wday <= 5)
-{
-   $balanced = 15;
-}
-
-if(length($outputd)!=0)
-{
-  ( $balanced, $totald ) = $outputd =~ m/Account balance : (-?\d+\.\d+)\s*Total paid so far : (-?\d+\.\d+)/s;
-$balanced = ceil($balanced);
-
-}
-
-print "Printing quota:\n";
-print "Semester: $balance pages remaining\n";
-print "Today: $balanced pages remaining\n";
-
+echo "Printing quota:"
+echo "Semester: $balance_semester pages remaining"
+echo "Today: $balance_daily pages remaining"

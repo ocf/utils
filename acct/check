@@ -54,6 +54,12 @@ if [ $shell = /opt/ocf/bin/sorried ]; then
   echo "WARNING: Account is disabled" >&2
 fi
 
+# account creation time
+creation_time=`ldapsearch -x -LLL uid=$user creationTime | grep ^creationTime | cut -d' ' -f2`
+if [ -n "$creation_time" ]; then
+    echo "Created on: $(python3 -c "import dateutil.parser; print(dateutil.parser.parse('${creation_time}').strftime('%Y-%m-%d'))")"
+fi
+
 # check if Kerberos principal exists
 kerberos="`echo TESTIFEXIST | kinit --password-file=STDIN $user 2>&1`"
 if [ -n "$kerberos" ]; then

@@ -104,6 +104,27 @@ ls -ld $httpdir
 #logging
 echo `/bin/date` - $rootstaffer $sorriedUser >> /opt/acct/sorry.log
 
+# Notify user by email if email address is available.
+email_from='Open Computing Facility <help@ocf.berkeley.edu>'
+email_subject='[OCF] Account disabled'
+email_to="$(ldapsearch "uid=${sorriedUser}" mail | grep ^mail | cut -d' ' -f2)"
+[ -n "$email_to" ] && \
+  mail -a "From: ${email_from}" -s "$email_subject" "$email_to" <<EOF
+Hello,
+
+Your OCF account has been disabled.
+
+Your account name is: ${sorriedUser}
+
+The reason your account has been disabled:
+$(cat "$sorryFile")
+
+Feel free to reply to this message.
+Please do not share your password with anyone or over email.
+
+$(python3 -c 'import ocflib.constants as constants; print(constants.MAIL_SIGNATURE)')
+EOF
+
 if [ -z $SORRY_KRB5CCNAME ]; then
     $KDESTROY
 fi

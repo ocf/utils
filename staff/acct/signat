@@ -67,7 +67,7 @@ def show_signatories_for_group(oid):
     if group:
         accounts = ', '.join(group['accounts']) if group['accounts'] else 'n/a'
         subtitle = 'Group accounts: {}'.format(accounts)
-        title = '{} ({})'.format(group['name'], oid)
+        title = '{} (OID: {}, Email: {})'.format(group['name'], oid, group['email'])
     else:
         subtitle = None
         title = '<unknown group> ({})'.format(oid)

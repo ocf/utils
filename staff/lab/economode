@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+# TODO: rewrite this in python3, and use ocflib to get printers list
 import ssl
 import sys
 from getpass import getpass

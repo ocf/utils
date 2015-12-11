@@ -1,11 +1,9 @@
 #!/usr/bin/env python3
-from ocflib.printing.printers import get_toner
-from ocflib.printing.printers import PRINTERS
+from ocflib.lab.printing import get_toner
+from ocflib.lab.printing import PRINTERS
 
 if __name__ == '__main__':
     for printer in PRINTERS:
         cur, max = get_toner(printer)
-
-        # these are secretly some stupid wrapped integers that don't behave to python3 division
-        percent = (float(cur) / float(max)) * 100
+        percent = (cur / max) * 100
         print('{}: printed={}, remaining={} ({}%)'.format(printer, cur, max - cur, percent))

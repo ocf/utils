@@ -1,27 +1,104 @@
-#!/bin/bash -eu
-if [ "$(whoami)" != "root" ]; then
-    echo "You are not root."
-    exit 1
-fi
+#!/usr/bin/env python3
+import os
+import sys
+from argparse import ArgumentParser
+from collections import defaultdict
+from subprocess import check_call
+from subprocess import check_output
 
-# copy default config files
-mkdir -p /root/.config/apt-dater
-for f in apt-dater.conf screenrc; do
-    path="/root/.config/apt-dater/$f"
-    if [ ! -e "$path" ]; then
-        cp -v "/usr/share/doc/apt-dater/examples/${f}.example" "$path"
-    fi
-done
+from lxml import etree
+from ocflib.constants import MAIL_ROOT
+from ocflib.infra.hosts import hosts_by_filter
+from ocflib.misc.mail import send_mail
 
-# update hosts
-(
-    echo '[ocf]'
-    echo -n 'Hosts='
-    ldapsearch -x -b 'ou=Hosts,dc=OCF,dc=Berkeley,dc=EDU' |
-        grep '^cn: ' | cut -d' ' -f2 | sed 's/^/apt-dater@/' | paste -sd';'
-) > /root/.config/apt-dater/hosts.conf
 
-# and finally call apt-dater
-kinit -t /root/apt-dater.keytab apt-dater
-apt-dater -r > /dev/null
-apt-dater
+def confirm_updates():
+    output = check_output(('sudo', 'apt-dater', '-r')).decode('utf8')
+    t = etree.fromstring(output)
+    updates = t.xpath("//pkg[@hasupdate='1']")
+
+    collected = defaultdict(list)
+
+    for u in updates:
+        collected[u.xpath('../..')[0].attrib['hostname']].append(
+            '{name}: {old} --> {new}'.format(name=u.attrib['name'], old=u.attrib['version'], new=u.attrib.get('data')))
+
+    body = ''
+
+    for host in sorted(collected.keys()):
+        body += host + '\n'
+        updates = collected[host]
+        for update in updates:
+            body += '\t' + update + '\n'
+
+    num_packages = sum(map(len, collected.values()))
+    num_hosts = len(collected.keys())
+
+    print('There are {packages} packages to update on {hosts} hosts.'.format(
+        packages=num_packages,
+        hosts=num_hosts,
+    ))
+    input('Press any key to continue...')
+    print('Emailing root...')
+    send_mail(
+        MAIL_ROOT,
+        '[apt-dater] package updates ({packages} pkgs / {hosts} hosts)'.format(
+            packages=num_packages,
+            hosts=num_hosts,
+        ),
+        body,
+        sender='{} via apt-dater <root@ocf.berkeley.edu>'.format(
+            os.environ.get('SUDO_USER', 'root'),
+        ),
+    )
+
+
+def main(argv=None):
+    parser = ArgumentParser(description='Run apt-dater on all OCF hosts.')
+    parser.parse_args()
+
+    if os.geteuid() != 0:
+        print('You are not root.', file=sys.stderr)
+        return 1
+
+    hozers = []
+    servers = []
+    for host in hosts_by_filter('(&(!(type=desktop))(type=*))'):
+        if any(puppet_var.startswith('owner=') for puppet_var in host.get('puppetVar', [])):
+            hozers.append(host)
+        else:
+            servers.append(host)
+
+    groups = [
+        ('desktops', hosts_by_filter('(type=desktop)')),
+        ('hozers', hozers),
+        ('servers', servers),
+    ]
+
+    # write hosts file
+    hosts_path = os.path.expanduser('~/.config/apt-dater/hosts.xml')
+    tree = etree.parse('/etc/apt-dater/hosts.xml')
+    root = tree.getroot()
+    root.clear()
+    etree.SubElement(root, 'default', attrib={'ssh-user': 'apt-dater'})
+    for group, hosts in groups:
+        group_tree = etree.SubElement(root, 'group', attrib={'name': group})
+        for host in hosts:
+            etree.SubElement(group_tree, 'host', attrib={'name': host['cn'][0]})
+
+    with open(hosts_path, 'wb') as f:
+        tree.write(f, method='xml')
+
+    # write config
+    tree = etree.parse('/etc/apt-dater/apt-dater.xml')
+    tree.find('paths').set('hosts-file', hosts_path)
+    with open(os.path.expanduser('~/.config/apt-dater/apt-dater.xml'), 'wb') as f:
+        tree.write(f, method='xml', xml_declaration=True)
+
+    check_call(('kinit', '-t', '/root/apt-dater.keytab', 'apt-dater'))
+    confirm_updates()
+    check_call(('apt-dater'))
+
+
+if __name__ == '__main__':
+    exit(main())

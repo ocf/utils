@@ -10,10 +10,12 @@ from ocflib.account.validators import validate_password
 from ocflib.misc.shell import green
 from ocflib.misc.shell import prompt_for_new_password
 from ocflib.misc.shell import red
+from ocflib.misc.whoami import current_user
+from ocflib.misc.whoami import current_user_fullname
 
 
 def change_password(user, password):
-    root_principal = '{}/root'.format(getpass.getuser())
+    root_principal = '{}/root'.format(current_user())
     print('Admin is {}.'.format(root_principal))
 
     # keep trying to change the password until we succeed :-)
@@ -26,7 +28,11 @@ def change_password(user, password):
                 user,
                 password,
                 root_principal,
-                root_password)
+                root_password,
+                comment='Your password was reset in the lab by staff member {}.'.format(
+                    current_user_fullname(),
+                ),
+            )
         except ValueError as ex:
             # this usually means the staffer entered their password wrong,
             # so we let them try again, if they want

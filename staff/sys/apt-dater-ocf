@@ -61,18 +61,9 @@ def main(argv=None):
         print('You are not root.', file=sys.stderr)
         return 1
 
-    hozers = []
-    servers = []
-    for host in hosts_by_filter('(&(!(type=desktop))(type=*))'):
-        if any(puppet_var.startswith('owner=') for puppet_var in host.get('puppetVar', [])):
-            hozers.append(host)
-        else:
-            servers.append(host)
-
     groups = [
-        ('desktops', hosts_by_filter('(type=desktop)')),
-        ('hozers', hozers),
-        ('servers', servers),
+        # multiple groups are annoying, so we put them all in one
+        ('ocf', hosts_by_filter('(cn=*)')),
     ]
 
     # write hosts file

@@ -1,5 +1,5 @@
 #!/bin/bash
-
+export PYTHONPATH=/opt/ocf/packages
 PKUSERS_SEMESTER='/opt/ocf/packages/pykota/pkusers --config /etc/pykota/pykota.semester/'
 PKUSERS_DAILY='/opt/ocf/packages/pykota/pkusers'
 

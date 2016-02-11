@@ -65,9 +65,9 @@ def show_signatories_for_group(oid):
                       'active on CalLink.').format(oid)))
 
     if group:
-        accounts = ', '.join(group['accounts']) if group['accounts'] else 'n/a'
+        accounts = ' '.join(group['accounts']) if group['accounts'] else 'n/a'
         subtitle = 'Group accounts: {}'.format(accounts)
-        title = '{} (OID: {}, Email: {})'.format(group['name'], oid, group['email'])
+        title = '{} (OID: {} - Email: {})'.format(group['name'], oid, group['email'])
     else:
         subtitle = None
         title = '<unknown group> ({})'.format(oid)
@@ -96,7 +96,7 @@ def show_groups_by_student_signat(uid):
     groups = groups_by_student_signat(uid)
 
     if groups:
-        columns = [(attrs['name'], ', '.join(attrs['accounts']) or 'n/a', oid)
+        columns = [(attrs['name'], ' '.join(attrs['accounts']) or 'n/a', oid)
                    for oid, attrs in groups.items()]
         headers = ('Group', 'Accounts', 'OID')
         print(tabulate(columns, headers=headers))

@@ -1,24 +1,29 @@
 #!/usr/bin/env python3
-# Migrate a VM from one KVM host to another over SSH.
-#
-# This should be run on the new host, e.g. moving supernova from jaws to the
-# current host:
-#
-#     $ sudo migrate-vm jaws:supernova
-#
-# It performs the steps:
-#
-#   1) Stops the VM on the old host.
-#   2) Creates an LVM volume on the new host with appropriate size.
-#   3) Securely copies the entire disk from the old to new host.
-#   4) Checksums the entire disk on old and new to ensure a match.
-#   5) Imports the domain definition from old to new.
-#   6) Undefines the domain on the old host, but does not remove the LVM
-#      volume.
-#
-# It makes a couple assumptions:
-#   - We use the volume group /dev/vg on both the old and new host.
-#   - VMs are at /dev/vg/${hostname} on both old and new host.
+"""Migrate a VM from one KVM host to another over SSH.
+
+This should be run on the new host, e.g. moving supernova from jaws to the
+current host:
+
+    $ sudo migrate-vm jaws:supernova
+
+It performs the steps:
+
+  1) Stops the VM on the old host.
+  2) Creates an LVM volume on the new host with appropriate size.
+  3) Securely copies the entire disk from the old to new host.
+  4) Checksums the entire disk on old and new to ensure a match.
+  5) Imports the domain definition from old to new.
+
+After the transfer completes and you've verified the guest works on the new
+host, you should do on the *old* host:
+
+    $ virsh undefine guestname
+    $ lvremove /dev/vg/guestname
+
+It makes a couple assumptions:
+  - We use the volume group /dev/vg on both the old and new host.
+  - VMs are at /dev/vg/${hostname} on both old and new host.
+"""
 import argparse
 import os
 import re

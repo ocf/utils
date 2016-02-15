@@ -56,11 +56,11 @@ output_regex='Account balance : (-?[[:digit:]]+)\.'
 [[ $output_semester =~ $output_regex ]]
 balance_semester=${BASH_REMATCH[1]}
 
-# Set the default daily balance as 15 on weekdays and 30 on weekends
-balance_daily=30
+# Set the default daily balance as 8 on weekdays and 16 on weekends
+balance_daily=16
 wday=$(date +%u)
 if [[ $wday -ge 1 ]] && [[ $wday -le 5 ]]; then
-  balance_daily=15
+  balance_daily=8
 fi
 
 # If the daily PyKota command had any output, then set the daily balance to

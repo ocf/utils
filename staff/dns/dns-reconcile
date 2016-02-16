@@ -8,11 +8,14 @@ Requires python3-dnspython
 """
 from ipaddress import ip_address
 from ipaddress import ip_network
+from itertools import chain
 
 from dns import name
 from dns import resolver
 from dns import reversename
 from ocflib.constants import OCF_SUBNET_V4
+
+# TODO: use AXFR to transfer zones from OCF and campus nameservers for diffing
 
 
 def lookup(record, my_resolver=None, rtype='A'):
@@ -22,7 +25,10 @@ def lookup(record, my_resolver=None, rtype='A'):
     return str(my_resolver.query(record, rtype)[0])
 
 # Define subnet and list of nameservers
-net = ip_network(OCF_SUBNET_V4)
+net = list(chain(
+    ip_network(OCF_SUBNET_V4),
+    [ip_address('2607:f140:8801::1:' + str(host).split('.')[3]) for host in ip_network(OCF_SUBNET_V4)],
+))
 
 nameservers_ocf = [lookup('ns.ocf.berkeley.edu')]
 nameservers_cns = [lookup('adns1.berkeley.edu'), lookup('adns2.berkeley.edu')]
@@ -34,11 +40,12 @@ def ptr_records(nameservers=False):
     if nameservers:
         my_resolver.nameservers = nameservers
     records = {}
+
     for ipaddress in net:
         record = reversename.from_address(str(ipaddress))
         try:
             records[str(record)] = lookup(record, my_resolver=my_resolver, rtype='PTR')
-        except resolver.NXDOMAIN:
+        except (resolver.NXDOMAIN, resolver.NoNameservers):
             # Ignore records that are not found
             pass
     return records

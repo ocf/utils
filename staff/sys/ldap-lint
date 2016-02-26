@@ -20,14 +20,23 @@ from ocflib.misc.shell import bold
 from ocflib.misc.shell import red
 
 
-RECOGNIZED_PUPPETVARS = {
+RECOGNIZED_TYPES = frozenset({
+    'desktop',
+    'ipmi',
+    'printer',
+    'server',
+    'switch',
+    'wifi',
+})
+
+RECOGNIZED_PUPPETVARS = frozenset({
     'owner',
     'pubstaff_only',
     'skip_kerberos',
     'skip_ldap',
     'skip_networking',
     'staff_only',
-}
+})
 
 
 def lookup_dns(host, rtype='A'):
@@ -58,7 +67,7 @@ def main():
             cn = attrs['cn'][0]
             type_ = attrs['type'][0]
 
-            if type_ not in {'desktop', 'server'}:
+            if type_ not in RECOGNIZED_TYPES:
                 complain(cn, 'has unknown type ' + type_)
 
             if 'macAddress' in attrs:

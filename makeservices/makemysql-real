@@ -1,153 +1,74 @@
-#!/usr/bin/python
-#
-# This script creates a MySQL database with the same name as the username
-# of the user who runs this program. To prevent the user from taking control
-# of this program and e.g., causing the program to dump core and reveal the
-# MySQL root password, this program should be run under another account,
-# preferably that of the MySQL user.
-#
-# The password set for this new account is randomly generated; it is not
-# user-selectable. This is to prevent compromised MySQL-backed web apps from
-# also compromising the shell account password. Note that the MySQL server
-# should also be patched to prevent the user from later changing the password.
-#
-# The MySQL root password and the hostname of the MySQL server are read from
-# a config file; the path to it is stored in the CONF_FILE global. This file
-# must be readable only by the setuid user! The Python ConfigParser module
-# is used to parse the config file, so the format is basically the Windows
-# INI format.
-#
-from __future__ import print_function
+#!/usr/bin/env python3
+"""Creates a MySQL database with the same name as the username of the user who
+runs this program.
 
+To prevent the user from taking control of this program and e.g., causing the
+program to dump core and reveal the MySQL root password, this program should be
+run under another account, preferably that of the MySQL user.
+
+The password set for this new account is randomly generated; it is not
+user-selectable. This is to prevent compromised MySQL-backed web apps from
+also compromising the shell account password. Note that the MySQL server
+should also be patched to prevent the user from later changing the password.
+
+The MySQL root password and the hostname of the MySQL server are read from
+a config file; the path to it is stored in the CONF_FILE global. This file
+must be readable only by the setuid user! The Python configparser module
+is used to parse the config file, so the format is basically the Windows
+INI format.
+"""
 import os
+import random
+import string
 import sys
+from configparser import ConfigParser
+from textwrap import dedent
 
-import ConfigParser
 import MySQLdb
-
-#
-# Global variable definitions.
-#
-
-RANDOM_PW_CMD = 'pwgen -n1 -y -s 20'
+from ocflib.misc.mail import send_problem_report
 
 
-WELCOME_TEMPLATE = '/opt/ocf/etc/makemysql.template'
-WELCOME_SUBJECT = 'MySQL account information'
-WELCOME_SENDER = 'staff@OCF.Berkeley.EDU'
+CREATE_QUERY = 'CREATE DATABASE {}'
+GRANT_QUERY = "GRANT ALL PRIVILEGES ON {username}.* TO '{username}'@'%' IDENTIFIED BY '{userpass}'"
 
-MAIL_USER_CMD = "/usr/bin/sed -e 's/FOO/%%s/' < %s | \
-        /usr/bin/mailx -s '%s' -r '%s' %%s" % \
-                (WELCOME_TEMPLATE, WELCOME_SUBJECT, WELCOME_SENDER)
+CONF_FILE = '/opt/share/makeservices/makemysql.conf'
+MYSQL_HOST = 'mysql.ocf.berkeley.edu'
 
-
-GRANT_QUERY = "GRANT ALL PRIVILEGES ON %s.* TO %s@'%%' IDENTIFIED BY '%s'"
-
-CREATE_QUERY = 'CREATE DATABASE %s'
-
-CONF_FILE = '/opt/ocf/etc/makemysql.conf'
-MYSQL_HOST = 'maelstrom.int.ocf.berkeley.edu'
-MYSQL_ROOT_PW = None  # No default; this must be read from the config file.
-
-#
-# For debugging purposes.
-#
-
-DEBUG_MODE = False
-DEBUG_EMAIL_ADDR = 'wheel@OCF.Berkeley.EDU'
-
-#
-# Function and class definitions.
-#
-
-
-def send_error_email(username, exc_info):
-    import smtplib
-    import string
-    import traceback
-    from_addr = 'root@OCF.Berkeley.EDU'
-    if DEBUG_MODE:
-        to_addr = DEBUG_EMAIL_ADDR
-    else:
-        to_addr = 'root@OCF.Berkeley.EDU'
-    msg = 'From: makemysql at OCF <%s>\n' % from_addr
-    msg += 'To: MySQL <%s>\n' % to_addr
-    msg += "Subject: 'makemysql' unhandled exception\n"
-    msg += '\n'
-    msg += "Username: '%s'\n\n" % username
-    msg += 'An unhandled exception has occurred:\n\n'
-    msg += string.join(traceback.format_exception(*exc_info), '')
-    msg += '\n<EOT>\n'
-    msg = msg.replace('\n', '\r\n')
-    server = smtplib.SMTP('smtp')
-    server.sendmail(from_addr, to_addr, msg)
-    server.quit()
-
-# Read in the configuration file and set the appropriate globals.
+PW_LENGTH = 24
 
 
 def read_config():
-    global MYSQL_HOST, MYSQL_ROOT_PW
-    conf = ConfigParser.RawConfigParser()
+    """Fetches the MySQL hostname and root password from the config in
+    '/opt/share/makeservices'."""
+    conf = ConfigParser()
     conf.readfp(open(CONF_FILE))
-    MYSQL_HOST = conf.get('makemysql', 'host')
-    MYSQL_ROOT_PW = conf.get('makemysql', 'passwd')
-
-# Tell the user what this script does, and ask if he is ready to continue.
+    mysql_host = conf.get('makemysql', 'host')
+    mysql_root_pw = conf.get('makemysql', 'passwd')
+    return mysql_host, mysql_root_pw
 
 
 def intro_prompt():
-    print()
-    print('This program will create a MySQL database for your account,')
-    print('if one does not already exist. A randomly-generated password')
-    print('will be assigned for access to your database. MySQL passwords')
-    print('are no longer user-selectable because of frequent occurrences of')
-    print('Unix account passwords being compromised when faulty or out-of-date')
-    print('web applications are exploited.')
-    print()
-    print('The randomly-generated password will be displayed on-screen.')
-    print('Please make sure you are in an environment where nobody else will')
-    print('see it when it appears.')
-    print()
-    print("If you are ready to continue, type 'yes'.")
-    print("Typing anything other than 'yes' will abort this script.")
-    print()
-    print('Continue? ')
-    try:
-        inp = sys.stdin.readline().strip()
-        if inp != 'yes':
-            raise None
-    except:
-        print()
-        print('>>> Aborted by user request.')
-        print()
-        sys.exit(0)
-    # Script continues on if user entered 'yes'.
-    print
+    print(dedent(
+        """
+        This program will create a MySQL database for your account,
+        if one does not already exist. A randomly-generated password
+        will be assigned for access to your database. MySQL passwords
+        are no longer user-selectable because of frequent occurrences of
+        Unix account passwords being compromised when faulty or out-of-date
+        web applications are exploited.
 
-# Handle the case where the database already exists.
+        The randomly-generated password will be displayed on-screen.
+        Please make sure you are in an environment where nobody else will
+        see it when it appears.
 
-
-def database_already_exists(username):
-    print()
-    print("The MySQL database '%s' already exists." % username)
-    print('The database password will be reset.')
-    print()
-    print('In case you have forgotten how to access your database')
-    print('(or you inherited it, in the case of a group account),')
-    print('an informational email regarding how to access and manage')
-    print('your database is being sent to your OCF email address now.')
-    print('Please check for it momentarily.')
-    print()
-    print('You can also find the same information at:')
-    print()
-    print('  http://ocf.berkeley.edu/docs/services/mysql/')
-    print()
+        If you are ready to continue, type 'yes'.
+        Typing anything other than 'yes' will abort this script.
+        """
+    ))
+    return input('Continue? ') == 'yes'
 
 
 def main():
-    global RANDOM_PW_CMD, GRANT_QUERY, CREATE_QUERY
-
     try:
         username = os.environ.get('SUDO_USER')
 
@@ -155,85 +76,105 @@ def main():
             raise RuntimeError('Unable to read SUDO_USER.')
 
         # Read config file.
-        read_config()
+        mysql_host, mysql_root_pw = read_config()
 
         # Check whether the script should proceed.
-        intro_prompt()
+        if not intro_prompt():
+            print('>>> Aborted by user request.')
+            return
 
         # Connect to the MySQL server.
         try:
             print('>>> Connecting to MySQL database server...')
-            connection = MySQLdb.connect(host=MYSQL_HOST,
+            connection = MySQLdb.connect(host=mysql_host,
                                          user='root',
-                                         passwd=MYSQL_ROOT_PW)
+                                         passwd=mysql_root_pw)
         except:
             print('>>> Error: Failed to connect to MySQL server.')
-            sys.exit(1)
+            raise
 
         # Check if the database already exists.
         try:
-            print(">>> Checking if database '%s' already exists..." % username)
+            print(">>> Checking if database '{}' already exists...".format(username))
             connection.select_db(username)
+
+            # The database already exists, so skip the creation step.
             print('yes.')
             db_create = False
-            database_already_exists(username)
+            print(dedent("""
+            The MySQL database '{}' already exists.
+            The database password will be reset.
+
+            If you are unsure how to access or use your database, please visit
+
+              https://www.ocf.berkeley.edu/docs/services/mysql/
+
+            If you run into trouble trying to use your database, contact us at
+
+                help@ocf.berkeley.edu
+            """).format(username))
         except:
-            # The database already exists, so skip the creation step.
             print('no.')
             db_create = True
 
         # Add or update user database privileges.
         try:
-            userpass = os.popen(RANDOM_PW_CMD).read().strip()
-            query = GRANT_QUERY % (username, username, userpass)
+            r = random.SystemRandom()
+            userpass = ''.join(r.choice(string.ascii_letters + string.digits)
+                               for _ in range(PW_LENGTH))
+            query = GRANT_QUERY.format(username=username, userpass=userpass)
             connection.query(query)
             connection.store_result()
             # Result should be "Query OK, 0 rows affected",
             # but we'll assume no exception means success.
         except:
             print('>>> Error: Failed to grant database privileges.')
-            sys.exit(1)
+            raise
 
         # Create new database, if necessary.
         if db_create:
             try:
-                print(">>> Creating new database '%s'..." % username)
-                query = CREATE_QUERY % username
+                print(">>> Creating new database '{}'...".format(username))
+                query = CREATE_QUERY.format(username)
                 connection.query(query)
                 connection.store_result()
                 # Result should be "Query OK, 1 row affected",
                 # but we'll assume no exception means success.
             except:
                 print('>>> Error: Failed to create database.')
-                sys.exit(1)
+                raise
 
-        # Database is ready for use. Send out a welcome email.
+        # Database is ready for use.
         if db_create:
-            print()
-            print('Your MySQL database has been created.')
-            print()
-            print('Please check your OCF email account momentarily for information')
-            print('regarding how to access and manage your MySQL database.')
-            print()
-            print('You can also find the same information at:')
-            print()
-            print('  http://ocf.berkeley.edu/docs/services/mysql/')
-            print()
+            print(dedent("""
+            Your MySQL database has been created.
 
-        print('>>> Your MySQL database password is: %s' % userpass)
-        print()
-    except SystemExit:
-        # Do not go gentle into that good night. Or not...
-        pass
-    except:
-        send_error_email(username, sys.exc_info())
-        print(sys.exc_info())
-        print()
-        print('A fatal error was detected during program execution.')
-        print('OCF Staff has been notified of the problem.')
-        print()
+            For instructions on accessing and using your database, please visit
 
-#
-# Entry point.
-#
-main()
+              https://www.ocf.berkeley.edu/docs/services/mysql/
+
+            If you run into trouble trying to use your database, contact us at
+
+                help@ocf.berkeley.edu
+            """))
+
+        print('>>> Your MySQL database password is: {}'.format(userpass))
+    except Exception as ex:
+        send_problem_report(dedent(
+            """\
+            Fatal error for user '{}'
+
+            {}: {}\
+            """
+        ).format(username, ex.__class__.__name__, ex))
+        print(dedent(
+            """
+            A fatal error was encountered during program execution.
+            OCF staff have been notified of the problem.
+            """
+        ))
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()

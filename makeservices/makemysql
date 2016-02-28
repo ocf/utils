@@ -1,5 +1,5 @@
 #!/bin/bash -eu
-if [[ "$(hostname)" != "tsunami" ]]; then
+if [[ "$(hostname)" != "tsunami" && "$(hostname)" != "dev-tsunami" ]]; then
     echo -e '\033[1m\033[31mYou must run this command on tsunami.'
     exit 1
 fi

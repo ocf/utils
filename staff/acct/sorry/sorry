@@ -54,7 +54,7 @@ else
     export KRB5CCNAME
 fi
 
-sorryshell=/opt/ocf/bin/sorried
+sorryshell=/opt/share/utils/bin/sorried
 
 echo ""
 echo "Copying sorry file and making .oldshell file"

@@ -1,0 +1,54 @@
+#!/usr/bin/env python3
+"""Wrapper script around parallel-ssh that helps with targeting OCF systems."""
+import argparse
+import sys
+import tempfile
+from subprocess import call
+from textwrap import dedent
+
+from ocflib.constants import OCF_LDAP_HOSTS
+from ocflib.infra.ldap import ldap_ocf
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(
+        description='Execute SSH commands in parallel.',
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog=dedent(
+            '''\
+            We'll add a -h (hosts file) to the arguments you supply which lists
+            the hosts in the class you requested.
+
+            Example usage:
+
+                {arg0} desktop -- -i uptime
+                {arg0} all -- -i 'hostname && /sbin/ifconfig && uname -a'
+
+            You probably want to make sure your Kerberos ticket is valid first (`kinit $USER`).
+            '''.format(arg0=(argv or sys.argv)[0]),
+        ),
+    )
+    parser.add_argument('host_class', type=str, choices=('all', 'desktop', 'server'))
+    parser.add_argument('args', type=str, nargs='+')
+
+    args = parser.parse_args(argv)
+    ldap_filter = {
+        'all': '(cn=*)',
+        'desktop': '(type=desktop)',
+        'server': '(type=server)',
+    }[args.host_class]
+
+    with ldap_ocf() as c:
+        c.search(OCF_LDAP_HOSTS, ldap_filter, attributes=['cn'])
+        hosts = {result['attributes']['cn'][0] for result in c.response}
+
+    with tempfile.NamedTemporaryFile(mode='w') as f:
+        f.write('\n'.join(hosts) + '\n')
+        f.flush()
+
+        pssh_args = ['-h', f.name] + args.args
+        call(['parallel-ssh'] + pssh_args)
+
+
+if __name__ == '__main__':
+    exit(main())

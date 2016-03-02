@@ -50,7 +50,7 @@ fi
 
 # check if sorried
 shell=`ldapsearch -x -LLL uid=$user loginshell | grep ^loginShell | cut -d' ' -f2`
-if [ $shell = /opt/ocf/bin/sorried ]; then
+if [ $shell = /opt/share/utils/bin/sorried ]; then
   echo "WARNING: Account is disabled" >&2
 fi
 

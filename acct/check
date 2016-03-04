@@ -75,7 +75,7 @@ letter=`echo $user | cut -c1`
 letter2=`echo $user | cut -c1-2`
 homedir=/home/$letter/$letter2/$user
 if [ ! -d $homedir ]; then
-  echo "WARNING: Home directory does not exist (banished?)" >&2
+  echo "WARNING: Home directory does not exist" >&2
 else
   # if home directory exists, check if web directory exists
   webdir=/services/http/users/$letter/$user

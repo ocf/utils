@@ -1,0 +1,80 @@
+#!/usr/bin/env python3
+import argparse
+import json
+import sys
+from datetime import datetime
+
+from ocflib.misc.shell import bold
+from ocflib.misc.shell import green
+from ocflib.misc.shell import red
+from ocflib.misc.whoami import current_user
+from ocflib.printing.quota import add_refund
+from ocflib.printing.quota import get_connection
+from ocflib.printing.quota import get_quota
+from ocflib.printing.quota import Refund
+
+
+def staff_creds():
+    """Return dictionary of staff creds, if we can read them."""
+    return json.load(open('/opt/adm/ocfprinting.json'))
+
+
+def view(args):
+    with get_connection() as c:
+        quota = get_quota(c, args.user)
+
+    def highlight(num, text):
+        return bold('  --> ' + (green if num > 0 else red)('\u2b24 {}{}'.format(num, text)))
+
+    print('{} printing quota:'.format(bold(quota.user)))
+    print(highlight(quota.semesterly, ' remaining this semester'))
+    print(highlight(quota.daily, ' remaining today'))
+
+
+def refund(args):
+    refund = Refund(
+        user=args.user,
+        time=datetime.now(),
+        pages=args.pages,
+        staffer=current_user(),
+        reason=args.reason,
+    )
+    prompt = bold('Refund {} pages to {}? [yN] '.format(refund.pages, refund.user))
+    if input(prompt) not in {'y', 'yes'}:
+        print('Cancelled.')
+        return
+
+    with get_connection(**staff_creds()) as c:
+        add_refund(c, refund)
+
+    print('Added.')
+
+
+def main(argv=None):
+    commands = {
+        'view': view,
+        'refund': refund,
+    }
+
+    parser = argparse.ArgumentParser(description='View and manipulate page quotas.')
+    subparsers = parser.add_subparsers(dest='command', help='command to run')
+    subparsers.required = True
+
+    parser_view = subparsers.add_parser('view', help="view a user's print quota")
+    parser_view.add_argument('--user', '-u', type=str, default=current_user())
+
+    parser_refund = subparsers.add_parser('refund', help="refund a user's pages")
+    parser_refund.add_argument('--pages', '-p', required=True, type=int)
+    parser_refund.add_argument('--reason', '-r', required=True, type=str)
+    parser_refund.add_argument('user', type=str)
+
+    if len(argv or sys.argv) == 1:
+        args = parser.parse_args(['view'])
+    else:
+        args = parser.parse_args(argv)
+
+    commands[args.command](args)
+
+
+if __name__ == '__main__':
+    exit(main())

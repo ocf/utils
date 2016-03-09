@@ -1,0 +1,137 @@
+#!/usr/bin/env python3
+import sys
+
+import ldap
+from progressbar import ProgressBar
+from yaml import dump
+
+# Settings
+ocf_uri = 'ldaps://ldap.ocf.berkeley.edu'
+ocf_basedn = 'ou=People,dc=OCF,dc=Berkeley,dc=EDU'
+ocf_calnetuid = 'calnetUid'
+ocf_attrlist = [ocf_calnetuid]
+calnet_uri = 'ldap://nds.berkeley.edu'
+calnet_basedn = 'ou=people,dc=berkeley,dc=edu'
+calnet_affiliations = 'berkeleyEduAffiliations'
+calnet_attrlist = [calnet_affiliations]
+calnet_affiliates = set(['AFFILIATE-TYPE-CONSULTANT',
+                         'AFFILIATE-TYPE-LBLOP STAFF',
+                         'AFFILIATE-TYPE-VISITING SCHOLAR',
+                         'AFFILIATE-TYPE-VOLUNTEER',
+                         'AFFILIATE-TYPE-HHMI RESEARCHER',
+                         'AFFILIATE-TYPE-VISITING STU RESEARCHER',
+                         'AFFILIATE-TYPE-LBL/DOE POSTDOC',
+                         'AFFILIATE-TYPE-TEMP AGENCY',
+                         'AFFILIATE-TYPE-COMMITTEE MEMBER',
+                         'AFFILIATE-TYPE-STAFF OF UC/OP/AFFILIATED ORGS',
+                         'AFFILIATE-TYPE-CONTRACTOR'
+                         'AFFILIATE-TYPE-CONCURR ENROLL'])
+
+
+def ldap_uid_filter(uids):
+    """Build LDAP search filter matching given list of UIDs"""
+    filterstr = '(|'
+    for uid in uids:
+        filterstr += ('(uid=' + str(uid) + ')')
+    filterstr += ')'
+    return filterstr
+
+
+def get_ocf_entries(users=None, ldapfilter=None):
+    """Get list of OCF LDAP entries with their CalNet UIDs"""
+    if users:
+        # get CalNet UIDs of specified users
+        filterstr = ('(&(' + ocf_calnetuid + '=*)' +
+                     ldap_uid_filter(users) + ')')
+    else:
+        # get all CalNet UIDs
+        filterstr = '(' + ocf_calnetuid + '=*)'
+    if ldapfilter:
+        # add extra LDAP filter
+        if not ldapfilter.startswith('('):
+            ldapfilter = ('(' + ldapfilter + ')')
+        filterstr = ('(&' + filterstr + ldapfilter + ')')
+    directory = ldap.initialize(ocf_uri)
+    entries = directory.search_s(ocf_basedn,
+                                 ldap.SCOPE_ONELEVEL,
+                                 filterstr=filterstr,
+                                 attrlist=ocf_attrlist)
+    return entries
+
+
+def add_calnet_affiliations(ocf_entries):
+    """Add CalNet affiliations to list of OCF LDAP entries"""
+    if not ocf_entries:
+        return []
+    calnet = ldap.initialize(calnet_uri)
+    sys.stderr.write('Looking up {0} OCF LDAP entries in CalNet\n'.format(len(ocf_entries)))
+    progress = ProgressBar(maxval=len(ocf_entries)).start()
+    for (i, ocf_entry) in enumerate(ocf_entries):
+        calnet_uid = int(ocf_entry[1][ocf_calnetuid][0])
+        try:
+            calnet_entry = calnet.search_s(calnet_basedn,
+                                           ldap.SCOPE_ONELEVEL,
+                                           filterstr=ldap_uid_filter([calnet_uid]),
+                                           attrlist=calnet_attrlist)[0]
+            ocf_entry[1][calnet_affiliations] = calnet_entry[1][calnet_affiliations]
+        except IndexError:
+            # Not found in CalNet People OU
+            ocf_entry[1][calnet_affiliations] = []
+        progress.update(i + 1)
+    progress.finish()
+    return ocf_entries
+
+
+def get_calnet_affiliations(users=None, ldapfilter=None):
+    """Get list of OCF LDAP entries and their CalNet affiliations"""
+    return add_calnet_affiliations(get_ocf_entries(users, ldapfilter))
+
+
+def summarize_affiliations(users=None):
+    """Summarize active OCF membership affiliations from CalNet"""
+
+    ldapfilter = '(!(loginshell=/opt/ocf/bin/sorry))'
+    calnet_uids = set()
+    affiliations = []
+    for entry in get_calnet_affiliations(users, ldapfilter):
+        calnet_uid = int(entry[1][ocf_calnetuid][0])
+        if calnet_uid not in calnet_uids:
+            # CalNet UID is unique
+            calnet_uids.add(calnet_uid)
+            affiliations.append(entry[1][calnet_affiliations])
+
+    affiliates = {}
+    affiliates['students, registered'] = 0
+    affiliates['students, non-registered'] = 0
+    affiliates['faculty'] = 0
+    affiliates['staff'] = 0
+    affiliates['affiliates'] = 0
+    affiliates['alumni'] = 0
+    for affiliation in affiliations:
+        if ('STUDENT-TYPE-REGISTERED' in affiliation and
+                'STUDENT-STATUS-EXPIRED' not in affiliation):
+            affiliates['students, registered'] += 1
+        elif ('STUDENT-TYPE-NOT REGISTERED' in affiliation and
+              'STUDENT-STATUS-EXPIRED' not in affiliation):
+            affiliates['students, non-registered'] += 1
+        elif ('EMPLOYEE-TYPE-ACADEMIC' in affiliation and
+              'EMPLOYEE-STATUS-EXPIRED' not in affiliation):
+            affiliates['faculty'] += 1
+        elif ('EMPLOYEE-TYPE-STAFF' in affiliation and
+              'EMPLOYEE-STATUS-EXPIRED' not in affiliation):
+            affiliates['staff'] += 1
+        elif (set(affiliation).intersection(calnet_affiliates) and
+              'AFFILIATE-STATUS-EXPIRED' not in affiliation):
+            affiliates['affiliates'] += 1
+        else:
+            affiliates['alumni'] += 1
+
+    print('Affiliations of unique CalNet users with non-sorried OCF accounts')
+    dump(affiliates, sys.stdout, default_flow_style=False)
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        users = sys.argv[1:]
+    else:
+        users = None
+    summarize_affiliations(users)

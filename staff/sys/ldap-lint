@@ -22,6 +22,7 @@ from ocflib.misc.shell import red
 
 RECOGNIZED_TYPES = frozenset({
     'desktop',
+    'dhcp',
     'ipmi',
     'printer',
     'server',

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-from ocflib.lab.printing import get_toner
-from ocflib.lab.printing import PRINTERS
+from ocflib.printing.printers import get_toner
+from ocflib.printing.printers import PRINTERS
 
 if __name__ == '__main__':
     for printer in PRINTERS:

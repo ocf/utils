@@ -7,6 +7,7 @@ from datetime import datetime
 from ocflib.misc.shell import bold
 from ocflib.misc.shell import green
 from ocflib.misc.shell import red
+from ocflib.misc.shell import yellow
 from ocflib.misc.whoami import current_user
 from ocflib.printing.quota import add_refund
 from ocflib.printing.quota import get_connection
@@ -23,12 +24,18 @@ def view(args):
     with get_connection() as c:
         quota = get_quota(c, args.user)
 
-    def highlight(num, text):
-        return bold('  --> ' + (green if num > 0 else red)('\u2b24 {}{}'.format(num, text)))
+    def highlight(num, text, warning_level):
+        if num > warning_level:
+            color = green
+        elif 0 < num <= warning_level:
+            color = yellow
+        else:
+            color = red
+        return bold('  ' + color('→ {}{}'.format(num, text)))
 
     print('{} printing quota:'.format(bold(quota.user)))
-    print(highlight(quota.semesterly, ' remaining this semester'))
-    print(highlight(quota.daily, ' remaining today'))
+    print(highlight(quota.semesterly, ' remaining this semester', 30))
+    print(highlight(quota.daily, ' remaining today', 5))
 
 
 def refund(args):
@@ -61,7 +68,7 @@ def main(argv=None):
     subparsers.required = True
 
     parser_view = subparsers.add_parser('view', help="view a user's print quota")
-    parser_view.add_argument('--user', '-u', type=str, default=current_user())
+    parser_view.add_argument('user', nargs='?', type=str, default=current_user())
 
     parser_refund = subparsers.add_parser('refund', help="refund a user's pages")
     parser_refund.add_argument('--pages', '-p', required=True, type=int)

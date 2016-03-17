@@ -3,13 +3,15 @@
 
 # specify location of User_Info file
 User_Info_file='/home/s/st/staff/User_Info'
+# specify location of vhost file
+vhost_file='/home/s/st/staff/vhost/vhost.conf'
 # specify location of wtmp files
 wtmp_files='/var/log/wtmp /var/log/wtmp.1'
 # default number of logins to display from wtmp files
 login_count=5
 
 usage(){
-  echo "Usage: '`basename $0` USER [login_count]'"
+  echo "Usage: $(basename $0) USER [login_count]"
   echo "USER is the username to look up, must be alphanumeric"
   echo "login_count is the number of logins to display, default is 5"
   echo
@@ -27,9 +29,9 @@ elif [ "$1" = '-h' ] || [ "$1" = '--help' ]; then
   usage
   exit
 else
-  user="`echo "$1" | tr -cd '[:alnum:]'`"
+  user=$(echo "$1" | tr -cd '[:alnum:]')
   if [ -n "$2" ]; then
-    login_count="`echo "$2" | tr -cd '[:digit:]'`"
+    login_count=$(echo "$2" | tr -cd '[:digit:]')
     if [ -z $login_count ]; then
       echo 'Error: Invalid login_count' >&2
       echo
@@ -40,7 +42,7 @@ else
 fi
 
 # check user entry in passwd database
-getent="`getent passwd $user`"
+getent=$(getent passwd $user)
 if [ -n "$getent" ]; then
   echo "$getent"
 else
@@ -49,52 +51,54 @@ else
 fi
 
 # check if sorried
-shell=`ldapsearch -x -LLL uid=$user loginshell | grep ^loginShell | cut -d' ' -f2`
+shell=$(ldapsearch -x -LLL uid=$user loginshell | grep ^loginShell | cut -d' ' -f2)
 if [ $shell = /opt/share/utils/bin/sorried ]; then
   echo "WARNING: Account is disabled" >&2
 fi
 
 # account creation time
-creation_time=`ldapsearch -x -LLL uid=$user creationTime | grep ^creationTime | cut -d' ' -f2`
+creation_time=$(ldapsearch -x -LLL uid=$user creationTime | grep ^creationTime | cut -d' ' -f2)
 if [ -n "$creation_time" ]; then
     echo "Created on: $(python3 -c "import dateutil.parser; print(dateutil.parser.parse('${creation_time}').strftime('%Y-%m-%d'))")"
 fi
 
 # check if Kerberos principal exists
-kerberos="`echo TESTIFEXIST | kinit --password-file=STDIN $user 2>&1`"
+kerberos=$(echo TESTIFEXIST | kinit --password-file=STDIN $user 2>&1)
 if [ -n "$kerberos" ]; then
-  if [ -n "`echo "$kerberos" | grep unknown$`" ]; then
+  if [ -n "$(echo "$kerberos" | grep unknown$)" ]; then
     echo "WARNING: Kerberos principal does not exist" >&2
   elif [ "$kerberos" != "kinit: Password incorrect" ]; then
    echo "$kerberos"
   fi
 fi
 
-# check if home directory exists
-letter=`echo $user | cut -c1`
-letter2=`echo $user | cut -c1-2`
-homedir=/home/$letter/$letter2/$user
-if [ ! -d $homedir ]; then
-  echo "WARNING: Home directory does not exist" >&2
-else
-  # if home directory exists, check if web directory exists
-  webdir=/services/http/users/$letter/$user
-  if [ ! -d $webdir ]; then
-  echo "WARNING: Web directory does not exist" >&2
-  echo "  You can create web directory by running:"
-  echo "    sudo mkdir $webdir"
-  echo "    sudo chown $user:ocf $webdir" >&2
+# if on NFS, check if home directory exists
+if mount | grep -qE '^[a-z]+://home\b'; then
+  letter=$(echo $user | cut -c1)
+  letter2=$(echo $user | cut -c1-2)
+  homedir=/home/$letter/$letter2/$user
+  if [ ! -d $homedir ]; then
+    echo "WARNING: Home directory does not exist" >&2
+  else
+    # if home directory exists, check if web directory exists
+    webdir=/services/http/users/$letter/$user
+    if [ ! -d $webdir ]; then
+      echo "WARNING: Web directory does not exist" >&2
+      echo "  You can create web directory by running:"
+      echo "    sudo mkdir $webdir"
+      echo "    sudo chown $user:ocf $webdir" >&2
+    fi
   fi
 fi
 
 # check if member of groups other than ocf
-groups="`groups $user | cut -d " " -f3- | grep -v "^ocf$"`"
+groups=$(groups $user | cut -d " " -f3- | grep -v "^ocf$")
 if [ -n "$groups" ]; then
    echo "Member of group(s): $groups"
 fi
 
 # check if CalLink OID number exists in LDAP
-callinkOid="`ldapsearch -x -LLL uid=$user callinkOid | grep -i ^callinkOid | cut -d' ' -f2`"
+callinkOid=$(ldapsearch -x -LLL uid=$user callinkOid | grep -i ^callinkOid | cut -d' ' -f2)
 if [ -n "$callinkOid" ]; then
    echo "CalLink OID number: $callinkOid"
    if [ "$callinkOid" != 0 ]; then
@@ -103,10 +107,10 @@ if [ -n "$callinkOid" ]; then
 fi
 
 # check if CalNet UID number exists in LDAP
-calnetuid="`ldapsearch -x -LLL uid=$user calnetuid | grep -i ^calnetuid | cut -d' ' -f2`"
+calnetuid=$(ldapsearch -x -LLL uid=$user calnetuid | grep -i ^calnetuid | cut -d' ' -f2)
 if [ -n "$calnetuid" ]; then
-   calnetemail="`ldapsearch -x -LLL -H ldap://nds.berkeley.edu -b dc=berkeley,dc=edu uid=$calnetuid  mail | grep ^mail | cut -d' ' -f2`"
-   calnetaffiliations="`ldapsearch -x -LLL -H ldap://nds.berkeley.edu -b dc=berkeley,dc=edu uid=$calnetuid berkeleyEduAffiliations | grep ^berkeleyEduAffiliations | cut -d' ' -f2- | sed -r 's/(^|$)/\"/g' | sort | tr '\n' ' ' | sed 's/ $//g'`"
+   calnetemail=$(ldapsearch -x -LLL -H ldap://nds.berkeley.edu -b dc=berkeley,dc=edu uid=$calnetuid  mail | grep ^mail | cut -d' ' -f2)
+   calnetaffiliations=$(ldapsearch -x -LLL -H ldap://nds.berkeley.edu -b dc=berkeley,dc=edu uid=$calnetuid berkeleyEduAffiliations | grep ^berkeleyEduAffiliations | cut -d' ' -f2- | sed -r 's/(^|$)/\"/g' | sort | tr '\n' ' ' | sed 's/ $//g')
    echo "CalNet UID number: $calnetuid"
    if [ -n "$calnetemail" ]; then
      echo "CalNet email address: $calnetemail"
@@ -117,7 +121,7 @@ if [ -n "$calnetuid" ]; then
 fi
 
 # check virtual hosting config
-if vhost="`grep -E "^[#[:space:]]*$user[![:space:]]" /home/s/st/staff/vhost/vhost.conf`"  > /dev/null; then
+if vhost=$([ -f "$vhost_file" ] && grep -E "^[#[:space:]]*$user[![:space:]]" "$vhost_file"); then
   echo
   echo "Virtual hosts:"
   echo "-------------------------------------------------------------------------------"
@@ -126,17 +130,14 @@ if vhost="`grep -E "^[#[:space:]]*$user[![:space:]]" /home/s/st/staff/vhost/vhos
 fi
 
 # check print quota, requires PyKota privileges
-pkusers="`groups | grep -Fwq ocfstaff && pkusers --list "$user" 2> /dev/null | grep -F 'Account balance' | cut -d':' -f2 | cut -d'.' -f1 | tr -d -c '[:digit:]'`"
-#pkusers="`pkusers --list "$user" 2> /dev/null | sed -e '1d' -e 's/^[ ]*//g'`"
+pkusers=$(groups | grep -Fwq ocfstaff && pkusers --list "$user" 2> /dev/null | grep -F 'Account balance' | cut -d':' -f2 | cut -d'.' -f1 | tr -d -c '[:digit:]')
 if [ -n "$pkusers" ]; then
   echo
   echo "Pages remaining: $pkusers"
 fi
 
 # check User_Info entries
-User_Info="`grep ^$user: "$User_Info_file" | cut -d: -f2-`"
-#User_Info="`grep ^$user: "$User_Info_file" | awk '{$1=""; print $0}' | sed 's/^[ ]*//g'`"
-# awk and sed for double the fun
+User_Info=$([ -f "$User_Info_file" ] && grep ^$user: "$User_Info_file" | cut -d: -f2-)
 if [ -n "$User_Info" ]; then
   echo
   echo "User_Info entr(y|ies):"
@@ -146,7 +147,7 @@ if [ -n "$User_Info" ]; then
 fi
 
 # check user crontab, probably requires root privileges
-crontab="`crontab -lu $user 2> /dev/null | sed '/^[ ]*$/d'`"
+crontab=$(crontab -lu $user 2> /dev/null | sed '/^[ ]*$/d')
 if [ -n "$crontab" ]; then
   echo
   echo "Crontab on local machine:"
@@ -157,8 +158,8 @@ fi
 
 
 # check currently running processes in tree format
-ps="`ps Sfw -u $user 2> /dev/null | grep -Fv "PID TTY"`"
-fingerl="`finger -m $user | grep "^On since"`"
+ps=$(ps Sfw -u $user 2> /dev/null | grep -Fv "PID TTY")
+fingerl=$(finger -m $user | grep "^On since")
 if [ -n "$fingerl" ] || [ -n "$ps" ]; then
   echo
   echo "Currently running processes on local machine:"
@@ -173,7 +174,7 @@ if [ -n "$fingerl" ] || [ -n "$ps" ]; then
 fi
 
 # check most recent login history
-last="`(for wtmp_file in $wtmp_files; do last -a $user -f $wtmp_file; done) | egrep -v ' begins|^$' | head -n $login_count | awk '{$1=""; print $0}' | sed 's/^[ ]*//g'`"
+last=$( (for wtmp_file in $wtmp_files; do last -a $user -f $wtmp_file; done) | egrep -v ' begins|^$' | head -n $login_count | awk '{$1=""; print $0}' | sed 's/^[ ]*//g')
 if [ -n "$last" ]; then
   echo
   echo "Recent login history on local machine:"

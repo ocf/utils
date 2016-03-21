@@ -6,91 +6,66 @@ in the OCF subnet returned by the OCF nameserver.
 
 Requires python3-dnspython
 """
-from ipaddress import ip_address
-from ipaddress import ip_network
-from itertools import chain
+import random
 
-from dns import name
+from dns import query
 from dns import resolver
 from dns import reversename
-from ocflib.constants import OCF_SUBNET_V4
+from dns import zone
+from ocflib.infra.net import OCF_DNS_RESOLVER
+from ocflib.infra.net import OCF_SUBNET_V4
+from ocflib.infra.net import OCF_SUBNET_V6
 
-# TODO: use AXFR to transfer zones from OCF and campus nameservers for diffing
 
-
-def lookup(record, my_resolver=None, rtype='A'):
+def lookup(record, nameservers=None, rtype='A'):
     """Return stringified first result for the given record and record type."""
-    if not my_resolver:
+    if nameservers:
+        my_resolver = resolver.Resolver()
+        my_resolver.nameservers = nameservers
+    else:
         my_resolver = resolver
     return str(my_resolver.query(record, rtype)[0])
 
-# Define subnet and list of nameservers
-net = list(chain(
-    ip_network(OCF_SUBNET_V4),
-    [ip_address('2607:f140:8801::1:' + str(host).split('.')[3]) for host in ip_network(OCF_SUBNET_V4)],
-))
 
-nameservers_ocf = [lookup('ns.ocf.berkeley.edu')]
-nameservers_cns = [lookup('adns1.berkeley.edu'), lookup('adns2.berkeley.edu')]
+def main(argv=None):
+    ns_ocf = [OCF_DNS_RESOLVER.exploded]
+    ns_cns = [lookup('adns1.berkeley.edu'), lookup('adns2.berkeley.edu')]
 
+    v4_subnet = str(reversename.from_address(OCF_SUBNET_V4.network_address.exploded)).split('.', 1)[-1]
+    v6_subnet = str(reversename.from_address(OCF_SUBNET_V6.network_address.exploded)).split('.', 16)[-1]
 
-def ptr_records(nameservers=False):
-    '''Generate dict of PTR records in subnet from specified nameservers'''
-    my_resolver = resolver.Resolver()
-    if nameservers:
-        my_resolver.nameservers = nameservers
-    records = {}
+    ocf_records = set()
+    cns_records = set()
 
-    for ipaddress in net:
-        record = reversename.from_address(str(ipaddress))
-        try:
-            records[str(record)] = lookup(record, my_resolver=my_resolver, rtype='PTR')
-        except (resolver.NXDOMAIN, resolver.NoNameservers):
-            # Ignore records that are not found
-            pass
-    return records
+    for subnet in v4_subnet, v6_subnet:
+        for ns, records in (ns_ocf, ocf_records), (ns_cns, cns_records):
+            for r in zone.from_xfr(query.xfr(random.choice(ns), subnet)):
+                str_record = '{}.{}'.format(r.to_text(), subnet).lower()
+                try:
+                    result = lookup(str_record, ns, 'PTR').lower()
+                except resolver.NXDOMAIN:
+                    pass
+                else:
+                    records.add((str_record, result))
 
-records_ocf = ptr_records(nameservers_ocf)
-records_cns = ptr_records(nameservers_cns)
+    to_add = ocf_records - cns_records
+    to_remove = cns_records - ocf_records
 
-delete = []
-add = []
-# Compare OCF and CNS PTR records
-for key in records_cns.keys():
-    try:
-        if records_cns[key].lower() != records_ocf[key].lower():
-            # Modify (delete and add) inconsistent PTR records
-            delete.append(key + ' IN PTR ' + records_cns[key])
-            add.append(key + ' IN PTR ' + records_ocf[key])
-    except KeyError:
-        # Delete CNS PTR records not in OCF DNS
-        delete.append(key + ' IN PTR ' + records_cns[key])
+    if not to_add and not to_remove:
+        print('No changes needed')
+        return 0
 
-# Add OCF PTR records not in CNS DNS
-for key in set(records_ocf).difference(set(records_cns)):
-    add.append(key + ' IN PTR ' + records_ocf[key])
+    if to_add:
+        print('Please add the following to the DNS:')
+        for record, result in sorted(to_add, key=lambda s: s[0][::-1]):
+            print('{} IN PTR {}'.format(record, result))
+        print()
+
+    if to_remove:
+        print('Please remove the following from the DNS:')
+        for record, result in sorted(to_add, key=lambda s: s[0][::-1]):
+            print('{} IN PTR {}'.format(record, result))
 
 
-def ptr_to_ipv4(record):
-    """Convert a PTR record to an IPv4 address"""
-    domain = name.from_text(record.split()[0])
-    ipaddress = ip_address(reversename.to_address(domain))
-    return ipaddress
-
-if delete:
-    # Print records to delete in sorted order
-    print('Please delete the following {0} DNS record(s):'.format(len(delete)))
-    for record in sorted(delete, key=ptr_to_ipv4):
-        print(record)
-if delete and add:
-    # Separate deletions and additions
-    print('')
-if add:
-    # Print records to add in sorted order
-    print('Please add the following {0} DNS record(s):'.format(len(add)))
-    for record in sorted(add, key=ptr_to_ipv4):
-        print(record)
-if delete or add:
-    print('\nThank you!')
-else:
-    print('No changes needed')
+if __name__ == '__main__':
+    exit(main())

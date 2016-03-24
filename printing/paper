@@ -1,75 +1,87 @@
-#!/bin/bash
-export PYTHONPATH=/opt/ocf/packages
-PKUSERS_SEMESTER='/opt/ocf/packages/pykota/pkusers --config /etc/pykota/pykota.semester/'
-PKUSERS_DAILY='/opt/ocf/packages/pykota/pkusers'
+#!/usr/bin/env python3
+import argparse
+import json
+import sys
+from datetime import datetime
 
-# Show usage information if more than 2 arguments are used
-if (( $# > 2 )); then
-  echo "Usage: paper [-v] [username]"
-  echo "       Running paper with no username present will get information on the"
-  echo "       current user."
-  echo "       Must be run on a machine with the pkusers command."
-  exit
-fi
+from ocflib.misc.shell import bold
+from ocflib.misc.shell import green
+from ocflib.misc.shell import red
+from ocflib.misc.shell import yellow
+from ocflib.misc.whoami import current_user
+from ocflib.printing.quota import add_refund
+from ocflib.printing.quota import get_connection
+from ocflib.printing.quota import get_quota
+from ocflib.printing.quota import Refund
 
-# Parse command line arguments for the username and -v flag
-if [[ $1 && $1 == "-v" ]]; then
-  verbose=1
-  user=$2
-elif [[ $2 && $2 == "-v" ]]; then
-  verbose=1
-  user=$1
-else
-  verbose=0
-  user=$1
-fi
 
-# If no user was passed in as an argument, use the current user
-if [[ ! $user ]]; then
-  user="$(whoami)"
-fi
+def staff_creds():
+    """Return dictionary of staff creds, if we can read them."""
+    return json.load(open('/etc/ocfprinting.json'))
 
-# Check the user has a reasonable format (e.g. all letters)
-if [[ ! "$user" =~ ^[a-z]+$ ]]; then
-  echo "Invalid user: $user"
-  exit 1
-fi
 
-# In verbose mode, simply output the PyKota output directly
-if [[ $verbose -eq 1 ]]; then
-  echo "$( $PKUSERS_SEMESTER -L $user )"
-  exit 0
-fi
+def view(args):
+    with get_connection() as c:
+        quota = get_quota(c, args.user)
 
-output_semester="$( $PKUSERS_SEMESTER --list $user 2> /dev/null )"
-output_daily="$( $PKUSERS_DAILY --list $user 2> /dev/null )"
+    def highlight(num, text, warning_level):
+        if num > warning_level:
+            color = green
+        elif 0 < num <= warning_level:
+            color = yellow
+        else:
+            color = red
+        return bold('  ' + color('→ {}{}'.format(num, text)))
 
-# If no output occurs, the user is likely not in the semester database
-if [[ ${#output_semester} -eq 0 ]]; then
-  echo "$user does not appear to be in our print accounting system -- this is"
-  echo "probably because $user has not printed anything this semester."
-  exit 1
-fi
+    print('{} printing quota:'.format(bold(quota.user)))
+    print(highlight(quota.semesterly, ' remaining this semester', 30))
+    print(highlight(quota.daily, ' remaining today', 5))
 
-# Parse the PyKota output and find the account balance amount
-output_regex='Account balance : (-?[[:digit:]]+)\.'
-[[ $output_semester =~ $output_regex ]]
-balance_semester=${BASH_REMATCH[1]}
 
-# Set the default daily balance as 8 on weekdays and 16 on weekends
-balance_daily=16
-wday=$(date +%u)
-if [[ $wday -ge 1 ]] && [[ $wday -le 5 ]]; then
-  balance_daily=8
-fi
+def refund(args):
+    refund = Refund(
+        user=args.user,
+        time=datetime.now(),
+        pages=args.pages,
+        staffer=current_user(),
+        reason=args.reason,
+    )
+    prompt = bold('Refund {} pages to {}? [yN] '.format(refund.pages, refund.user))
+    if input(prompt) not in {'y', 'yes'}:
+        print('Cancelled.')
+        return
 
-# If the daily PyKota command had any output, then set the daily balance to
-#   something other than the default amount since the user has printed today
-if [[ ${#output_daily} -ne 0 ]]; then
-  [[ $output_daily =~ $output_regex ]]
-  balance_daily=${BASH_REMATCH[1]}
-fi
+    with get_connection(**staff_creds()) as c:
+        add_refund(c, refund)
 
-echo "Printing quota:"
-echo "Semester: $balance_semester pages remaining"
-echo "Today: $balance_daily pages remaining"
+    print('Added.')
+
+
+def main(argv=None):
+    commands = {
+        'view': view,
+        'refund': refund,
+    }
+
+    parser = argparse.ArgumentParser(description='View and manipulate page quotas.')
+    subparsers = parser.add_subparsers(dest='command', help='command to run')
+    subparsers.required = True
+
+    parser_view = subparsers.add_parser('view', help="view a user's print quota")
+    parser_view.add_argument('user', nargs='?', type=str, default=current_user())
+
+    parser_refund = subparsers.add_parser('refund', help="refund a user's pages")
+    parser_refund.add_argument('--pages', '-p', required=True, type=int)
+    parser_refund.add_argument('--reason', '-r', required=True, type=str)
+    parser_refund.add_argument('user', type=str)
+
+    if len(argv or sys.argv) == 1:
+        args = parser.parse_args(['view'])
+    else:
+        args = parser.parse_args(argv)
+
+    commands[args.command](args)
+
+
+if __name__ == '__main__':
+    exit(main())

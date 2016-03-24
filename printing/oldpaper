@@ -1,0 +1,76 @@
+#!/bin/bash
+# TODO: REMOVE THIS SCRIPT ENTIRELY
+export PYTHONPATH=/opt/ocf/packages
+PKUSERS_SEMESTER='/opt/ocf/packages/pykota/pkusers --config /etc/pykota/pykota.semester/'
+PKUSERS_DAILY='/opt/ocf/packages/pykota/pkusers'
+
+# Show usage information if more than 2 arguments are used
+if (( $# > 2 )); then
+  echo "Usage: paper [-v] [username]"
+  echo "       Running paper with no username present will get information on the"
+  echo "       current user."
+  echo "       Must be run on a machine with the pkusers command."
+  exit
+fi
+
+# Parse command line arguments for the username and -v flag
+if [[ $1 && $1 == "-v" ]]; then
+  verbose=1
+  user=$2
+elif [[ $2 && $2 == "-v" ]]; then
+  verbose=1
+  user=$1
+else
+  verbose=0
+  user=$1
+fi
+
+# If no user was passed in as an argument, use the current user
+if [[ ! $user ]]; then
+  user="$(whoami)"
+fi
+
+# Check the user has a reasonable format (e.g. all letters)
+if [[ ! "$user" =~ ^[a-z]+$ ]]; then
+  echo "Invalid user: $user"
+  exit 1
+fi
+
+# In verbose mode, simply output the PyKota output directly
+if [[ $verbose -eq 1 ]]; then
+  echo "$( $PKUSERS_SEMESTER -L $user )"
+  exit 0
+fi
+
+output_semester="$( $PKUSERS_SEMESTER --list $user 2> /dev/null )"
+output_daily="$( $PKUSERS_DAILY --list $user 2> /dev/null )"
+
+# If no output occurs, the user is likely not in the semester database
+if [[ ${#output_semester} -eq 0 ]]; then
+  echo "$user does not appear to be in our print accounting system -- this is"
+  echo "probably because $user has not printed anything this semester."
+  exit 1
+fi
+
+# Parse the PyKota output and find the account balance amount
+output_regex='Account balance : (-?[[:digit:]]+)\.'
+[[ $output_semester =~ $output_regex ]]
+balance_semester=${BASH_REMATCH[1]}
+
+# Set the default daily balance as 8 on weekdays and 16 on weekends
+balance_daily=16
+wday=$(date +%u)
+if [[ $wday -ge 1 ]] && [[ $wday -le 5 ]]; then
+  balance_daily=8
+fi
+
+# If the daily PyKota command had any output, then set the daily balance to
+#   something other than the default amount since the user has printed today
+if [[ ${#output_daily} -ne 0 ]]; then
+  [[ $output_daily =~ $output_regex ]]
+  balance_daily=${BASH_REMATCH[1]}
+fi
+
+echo "Printing quota:"
+echo "Semester: $balance_semester pages remaining"
+echo "Today: $balance_daily pages remaining"

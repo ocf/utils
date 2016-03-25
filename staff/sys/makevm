@@ -179,7 +179,7 @@ def _main(args):
                         help='amount of memory (in MB)')
     parser.add_argument('-c', '--vcpus', type=int, default=2,
                         help='number of vCPUs')
-    parser.add_argument('-s', '--storage', type=int, default=10,
+    parser.add_argument('-s', '--storage', type=int, default=15,
                         help='amount of disk storage (in GB)')
     parser.add_argument('--os-type', type=str, default='linux',
                         help='os type')

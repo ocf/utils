@@ -16,9 +16,10 @@ def build_host_filter(hosts):
     return '(&' + ALL_HOSTS_FILTER + '(|(cn=' + ')(cn='.join(hosts) + ')))'
 
 
-def wake_hosts(filter):
+def wake_hosts(filter, quiet):
     subprocess.check_call(
-        ['wakeonlan'] + [host['macAddress'][0] for host in hosts_by_filter(filter)]
+        ['wakeonlan'] + [host['macAddress'][0] for host in hosts_by_filter(filter)],
+        stdout=subprocess.DEVNULL if quiet else sys.stdout,
     )
 
 
@@ -34,7 +35,10 @@ def main(argv=None):
     force = args.force or args.host
 
     if force or Day.from_date().is_open():
-        wake_hosts(build_host_filter(args.host) if args.host else ALL_HOSTS_FILTER)
+        wake_hosts(
+            build_host_filter(args.host) if args.host else ALL_HOSTS_FILTER,
+            args.quiet,
+        )
     else:
         if not args.quiet:
             print(

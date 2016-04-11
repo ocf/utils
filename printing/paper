@@ -4,6 +4,7 @@ import json
 import sys
 from datetime import datetime
 
+from ocflib.account.search import user_is_group
 from ocflib.misc.shell import bold
 from ocflib.misc.shell import green
 from ocflib.misc.shell import red
@@ -36,6 +37,9 @@ def view(args):
     print('{} printing quota:'.format(bold(quota.user)))
     print(highlight(quota.semesterly, ' remaining this semester', 30))
     print(highlight(quota.daily, ' remaining today', 5))
+
+    if user_is_group(quota.user):
+        print(bold(red("Group accounts can't print. Sorry!")))
 
 
 def refund(args):

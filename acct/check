@@ -129,12 +129,8 @@ if vhost=$([ -f "$vhost_file" ] && grep -E "^[#[:space:]]*$user[![:space:]]" "$v
   echo "-------------------------------------------------------------------------------"
 fi
 
-# check print quota, requires PyKota privileges
-pkusers=$(groups | grep -Fwq ocfstaff && pkusers --list "$user" 2> /dev/null | grep -F 'Account balance' | cut -d':' -f2 | cut -d'.' -f1 | tr -d -c '[:digit:]')
-if [ -n "$pkusers" ]; then
-  echo
-  echo "Pages remaining: $pkusers"
-fi
+# check print quota
+paper view "$user"
 
 # check User_Info entries
 User_Info=$([ -f "$User_Info_file" ] && grep ^$user: "$User_Info_file" | cut -d: -f2-)

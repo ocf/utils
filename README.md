@@ -6,7 +6,7 @@ at the University of California, Berkeley.
 
 ## What belongs here
 ### Scripts for humans do
-3
+
 In general, scripts which might be executed by a person should go here.
 System scripts (things that go primarily in cronjobs or similar) should go in
 the [ocf/puppet][ocf/puppet] repo instead.

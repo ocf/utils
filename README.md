@@ -6,7 +6,7 @@ at the University of California, Berkeley.
 
 ## What belongs here
 ### Scripts for humans do
-
+3
 In general, scripts which might be executed by a person should go here.
 System scripts (things that go primarily in cronjobs or similar) should go in
 the [ocf/puppet][ocf/puppet] repo instead.
@@ -32,7 +32,7 @@ binary in this repo.
 
 * Use [ocflib][ocflib] functionality when it exists, and put reusable code
   there (and call it from an executable here).
-* When possible, target Python 3.2 and 3.4 (same versions as ocflib)
+* When possible, target Python 3.4 and 3.5 (same versions as ocflib)
 * Generally follow [PEP8][pep8].
 
 ### Shell/Bash

@@ -63,7 +63,7 @@ def main(argv=None):
 
     if to_remove:
         print('Please remove the following from the DNS:')
-        for record, result in sorted(to_add, key=lambda s: s[0][::-1]):
+        for record, result in sorted(to_remove, key=lambda s: s[0][::-1]):
             print('{} IN PTR {}'.format(record, result))
 
 

@@ -1,79 +1,115 @@
-#!/usr/bin/env python
-# TODO: rewrite this in python3, and use ocflib to get printers list
-import ssl
+#!/usr/bin/env python3
+import getpass
 import sys
-from getpass import getpass
-from ssl import SSLError
-from urllib import urlencode
 
-import urllib2
+import lxml.html
+import requests
 
-printers = ['deforestation', 'logjam']
-username = 'admin'
-password = getpass('Printer password: ')
+# TODO: get this from ocflib instead once logjam dies
+PRINTERS = ['papercut', 'pagefault']
 
 
-def set_economode(setting, hostname, username, password):
-    """
-    Enable or disable EconoMode on an HP printer.
+class Printer:
 
-    Connects to the embedded web server using SSL and basic auth.
-    Does not verify server's certificate as it is likely invalid.
-    Retries up to twice after a three-second timeout or server error.
-    """
+    def __init__(self, server):
+        self.session = requests.Session()
+        # Don't verify the self-signed SSL certificate
+        self.session.verify = False
+        self.server = server
+        self.logged_in = False
 
-    # POST data to change EconoMode setting
-    data = {'33-ee4c-11d4-96-4e-0-10-83-cf-45-99': int(setting)}
+    def __enter__(self):
+        self.session.__enter__()
+        return self
 
-    # build opener to handle HTTP basic authentication with user/pass
-    url = ('https://' + hostname +
-           '/hp/device/this.LCDispatcher?nav=hp.ConfigDevice&menu=6.2')
-    password_mgr = urllib2.HTTPPasswordMgrWithDefaultRealm()
-    password_mgr.add_password(None, url, username, password)
-    handler = urllib2.HTTPBasicAuthHandler(password_mgr)
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self.logged_in:
+            self.log_out()
+        self.session.__exit__()
 
-    ctx = ssl.create_default_context()
-    ctx.check_hostname = False
-    ctx.verify_mode = ssl.CERT_NONE
+    def log_in(self, password):
+        """Logs in to the printer and returns whether that succeeded."""
 
-    opener = urllib2.build_opener(handler, urllib2.HTTPSHandler(context=ctx))
+        resp = self.session.post('https://' + self.server +
+                                 '/hp/device/SignIn/Index',
+                                 data={'agentIdSelect': 'hp_EmbeddedPin_v1',
+                                       'PinDropDown': 'AdminItem',
+                                       'PasswordTextBox': password})
+        if '<h2>Sign In failed</h2>' in resp.text:
+            return False
+        else:
+            self.logged_in = True
+            return True
 
-    # attempt up to 3 times to POST data to printer
-    max_attempts = 3
-    for attempt in range(1, max_attempts + 1):
-        try:
-            # POST data using opener
-            f = opener.open(url, data=urlencode(data), timeout=3)
-            f.close()
-            break
-        except (SSLError, urllib2.URLError) as e:
-            sys.stderr.write(str(e))
-            if isinstance(e, urllib2.HTTPError) and e.code == 401:
-                # has HTTP error code and error code is 401 Unauthorized
-                sys.stderr.write('\n')
-                raise ValueError('Incorrect password')
-            elif attempt < max_attempts:
-                sys.stderr.write('...retrying...')
+    def log_out(self):
+        """Logs out from the printer."""
+
+        self.session.get('https://' + self.server + '/hp/device/SignIn/Leave')
+        self.logged_in = False
+
+    def get_print_quality_opts(self):
+        """Gets the current print quality options as a dictionary of
+        form option name -> form option value."""
+
+        resp = self.session.get('https://' + self.server +
+                                '/hp/device/MenuTree/IndexForm?id=PrintQuality')
+        tree = lxml.html.fromstring(resp.content)
+        opts = {}
+        for select_elem in tree.xpath('//form//select'):
+            val = select_elem.xpath('option[@selected]/@value')[0]
+            opts[select_elem.name] = val
+        return opts
+
+    def change_economode(self, setting):
+        """Changes the economode setting on the printer and returns whether
+        that succeeded.
+
+        'setting' must be "On" or "Off"."""
+
+        if not self.logged_in:
+            raise ValueError('You must log in first')
+        if setting not in ('On', 'Off'):
+            raise ValueError('setting must be "On" or "Off"')
+
+        # We must fetch the current option values and re-submit them, or else
+        # the printer will set the options other than economode to the wrong
+        # values
+        opts = self.get_print_quality_opts()
+        opts['Economode__mEconomodeListBox'] = setting
+        opts['FormButtonSubmit'] = 'OK'
+        resp = self.session.post('https://' + self.server +
+                                 '/hp/device/MenuTree/IndexForm?id=PrintQuality',
+                                 data=opts)
+        return '<h2>The operation was executed successfully.</h2>' in resp.text
+
+
+def usage():
+    print("""Usage: {} {{on,off}}
+Change the economode setting on the printers.""".format(sys.argv[0]))
+    sys.exit(2)
+
+
+def main():
+    if len(sys.argv) < 2 or sys.argv[1] not in ('on', 'off'):
+        usage()
+    setting = sys.argv[1].title()
+
+    # Prompt for password
+    password = getpass.getpass('Enter printer password: ')
+
+    for printer_name in PRINTERS:
+        print('Setting economode to {} for {}...'.format(setting, printer_name),
+              end=' ')
+        sys.stdout.flush()
+        with Printer(printer_name) as printer:
+            if not printer.log_in(password):
+                print('Error: the password is not correct. Try again.')
+                sys.exit(1)
+            if printer.change_economode(setting):
+                print('OK')
             else:
-                # attempts exhausted, raise exception
-                sys.stderr.write('\n')
-                raise
+                print('Failure')
+                sys.exit(1)
 
 if __name__ == '__main__':
-    if len(sys.argv) > 1:
-        if sys.argv[1] == 'on':
-            setting = True
-        elif sys.argv[1] == 'off':
-            setting = False
-        else:
-            sys.stderr.write("Argument must be 'on' or 'off'")
-            sys.exit(1)
-    else:
-        # default to enabling EconoMode
-        setting = True
-
-    for printer in printers:
-        sys.stderr.write('Connecting to %s...' % printer)
-        set_economode(setting, hostname=printer, username=username,
-                      password=password)
-        sys.stderr.write('done.\n')
+    main()

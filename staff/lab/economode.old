@@ -1,0 +1,79 @@
+#!/usr/bin/env python
+# TODO: rewrite this in python3, and use ocflib to get printers list
+import ssl
+import sys
+from getpass import getpass
+from ssl import SSLError
+from urllib import urlencode
+
+import urllib2
+
+printers = ['deforestation', 'logjam']
+username = 'admin'
+password = getpass('Printer password: ')
+
+
+def set_economode(setting, hostname, username, password):
+    """
+    Enable or disable EconoMode on an HP printer.
+
+    Connects to the embedded web server using SSL and basic auth.
+    Does not verify server's certificate as it is likely invalid.
+    Retries up to twice after a three-second timeout or server error.
+    """
+
+    # POST data to change EconoMode setting
+    data = {'33-ee4c-11d4-96-4e-0-10-83-cf-45-99': int(setting)}
+
+    # build opener to handle HTTP basic authentication with user/pass
+    url = ('https://' + hostname +
+           '/hp/device/this.LCDispatcher?nav=hp.ConfigDevice&menu=6.2')
+    password_mgr = urllib2.HTTPPasswordMgrWithDefaultRealm()
+    password_mgr.add_password(None, url, username, password)
+    handler = urllib2.HTTPBasicAuthHandler(password_mgr)
+
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+
+    opener = urllib2.build_opener(handler, urllib2.HTTPSHandler(context=ctx))
+
+    # attempt up to 3 times to POST data to printer
+    max_attempts = 3
+    for attempt in range(1, max_attempts + 1):
+        try:
+            # POST data using opener
+            f = opener.open(url, data=urlencode(data), timeout=3)
+            f.close()
+            break
+        except (SSLError, urllib2.URLError) as e:
+            sys.stderr.write(str(e))
+            if isinstance(e, urllib2.HTTPError) and e.code == 401:
+                # has HTTP error code and error code is 401 Unauthorized
+                sys.stderr.write('\n')
+                raise ValueError('Incorrect password')
+            elif attempt < max_attempts:
+                sys.stderr.write('...retrying...')
+            else:
+                # attempts exhausted, raise exception
+                sys.stderr.write('\n')
+                raise
+
+if __name__ == '__main__':
+    if len(sys.argv) > 1:
+        if sys.argv[1] == 'on':
+            setting = True
+        elif sys.argv[1] == 'off':
+            setting = False
+        else:
+            sys.stderr.write("Argument must be 'on' or 'off'")
+            sys.exit(1)
+    else:
+        # default to enabling EconoMode
+        setting = True
+
+    for printer in printers:
+        sys.stderr.write('Connecting to %s...' % printer)
+        set_economode(setting, hostname=printer, username=username,
+                      password=password)
+        sys.stderr.write('done.\n')

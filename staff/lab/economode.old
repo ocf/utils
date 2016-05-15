@@ -8,7 +8,7 @@ from urllib import urlencode
 
 import urllib2
 
-printers = ['deforestation', 'logjam']
+printers = ['logjam']
 username = 'admin'
 password = getpass('Printer password: ')
 

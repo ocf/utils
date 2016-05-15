@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+"""Change the economode setting on the printers."""
+import argparse
 import getpass
 import sys
 
@@ -83,33 +85,27 @@ class Printer:
         return '<h2>The operation was executed successfully.</h2>' in resp.text
 
 
-def usage():
-    print("""Usage: {} {{on,off}}
-Change the economode setting on the printers.""".format(sys.argv[0]))
-    sys.exit(2)
-
-
 def main():
-    if len(sys.argv) < 2 or sys.argv[1] not in ('on', 'off'):
-        usage()
-    setting = sys.argv[1].title()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('setting', choices=('on', 'off'), help='economode setting')
+    args = parser.parse_args()
 
     # Prompt for password
     password = getpass.getpass('Enter printer password: ')
 
     for printer_name in PRINTERS:
-        print('Setting economode to {} for {}...'.format(setting, printer_name),
+        print('Setting economode to {} for {}...'.format(args.setting, printer_name),
               end=' ')
         sys.stdout.flush()
         with Printer(printer_name) as printer:
             if not printer.log_in(password):
                 print('Error: the password is not correct. Try again.')
-                sys.exit(1)
-            if printer.change_economode(setting):
+                return 1
+            if printer.change_economode(args.setting.title()):
                 print('OK')
             else:
                 print('Failure')
-                sys.exit(1)
+                return 1
 
 if __name__ == '__main__':
-    main()
+    exit(main())

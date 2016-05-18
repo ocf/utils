@@ -56,7 +56,8 @@ if __name__ == '__main__':
         description='Control the OCF television.',
     )
     parser.add_argument('-H', '--host', type=str, default='tv')
-    parser.add_argument('command', type=str, choices=commands.keys())
+    parser.add_argument('command', type=str, choices=commands.keys(),
+                        default='connect')
 
     args = parser.parse_args()
     commands[args.command](args)

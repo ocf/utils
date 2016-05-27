@@ -5,6 +5,8 @@
 User_Info_file='/home/s/st/staff/User_Info'
 # specify location of vhost file
 vhost_file='/home/s/st/staff/vhost/vhost.conf'
+# specify location of vhost-app file
+vhost_app_file='/home/s/st/staff/vhost/vhost-app.conf'
 # specify location of wtmp files
 wtmp_files='/var/log/wtmp /var/log/wtmp.1'
 # default number of logins to display from wtmp files
@@ -121,7 +123,7 @@ if [ -n "$calnetuid" ]; then
 fi
 
 # check virtual hosting config
-if vhost=$([ -f "$vhost_file" ] && grep -E "^[#[:space:]]*$user[![:space:]]" "$vhost_file"); then
+if [ -f "$vhost_file" ] && vhost=$(grep -E "^[#[:space:]]*$user[![:space:]]" "$vhost_file"); then
   echo
   echo "Virtual hosts:"
   echo "-------------------------------------------------------------------------------"
@@ -129,7 +131,17 @@ if vhost=$([ -f "$vhost_file" ] && grep -E "^[#[:space:]]*$user[![:space:]]" "$v
   echo "-------------------------------------------------------------------------------"
 fi
 
+# check apphosting config
+if [ -f "$vhost_app_file" ] && vhost=$(grep -E "^[#[:space:]]*$user[![:space:]]" "$vhost_app_file"); then
+  echo
+  echo "Virtual apphosts:"
+  echo "-------------------------------------------------------------------------------"
+  echo "$vhost"
+  echo "-------------------------------------------------------------------------------"
+fi
+
 # check print quota
+echo
 paper view "$user"
 
 # check User_Info entries

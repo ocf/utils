@@ -18,5 +18,6 @@ fi
 # update from remote
 git fetch origin
 git reset --hard origin/master
-git submodule sync -q
-git submodule update --init --recursive
+
+# Install third-party modules
+make vendor

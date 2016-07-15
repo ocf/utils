@@ -129,7 +129,7 @@ if __name__ == '__main__':
             )
         return HostAndVm(host=m.group(1), vm=m.group(2))
 
-    parser = argparse.ArgumentParser(description='Process some integers.')
+    parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('host_and_vm', metavar='host:vm', type=host_and_vm, help='Host and VM name to transfer.')
 
     args = parser.parse_args()

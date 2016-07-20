@@ -3,6 +3,7 @@
 student group.
 """
 import argparse
+import sys
 import textwrap
 
 import ocflib.account.search as search
@@ -189,6 +190,10 @@ def main():
     group_parser.add_argument('name', metavar='WORD', type=str, nargs='+',
                               help='List of keywords to search for on the '
                                    'CalLink API')
+
+    if len(sys.argv) == 1:
+        parser.print_help()
+        sys.exit(2)
 
     args = parser.parse_args()
     if args.idtype == 'uid':

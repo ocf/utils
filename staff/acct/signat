@@ -168,7 +168,9 @@ def main():
                                        help=OID_DESC)
     oid_parser.add_argument('oid', metavar='OID', type=int)
 
-    USER_DESC = 'Look up the signatory status of an OCF user'
+    USER_DESC = 'For an individual account, look up the signatory status of ' \
+                'the account holder. For a group account, look up the ' \
+                'signatories of the group.'
     user_parser = subparsers.add_parser('user', description=USER_DESC,
                                         help=USER_DESC)
     user_parser.add_argument('username', metavar='USERNAME', type=str)

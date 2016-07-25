@@ -172,6 +172,8 @@ def main(args):
 
     if options.connect or not options.start:
         connect_irc(TERM_EMUS[options.emu], options.session)
+
+
 TERM_EMUS = {
     'screen': {
         'start': ['screen', '-dmaUT', 'xterm', '-ln', '-fn', '-S'],
@@ -197,7 +199,7 @@ IRC_CLIENTS = {
 IRC_NETWORKS = {
     'ocf': {
         # hostname, port, use_ssl, verify_ssl
-        'servers': [('irc.ocf.berkeley.edu', 6697, True, False)],
+        'servers': [('irc.ocf.berkeley.edu', 6697, True, True)],
         'channels': ['#rebuild', '#ocf'],
     },
 }

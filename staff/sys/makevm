@@ -11,12 +11,18 @@ import os.path
 import random
 import re
 import socket
-import struct
 import subprocess
 import sys
 import time
+from ipaddress import ip_address
+from ipaddress import IPv4Address
 
 import paramiko
+from ocflib.infra.net import ipv4_to_ipv6
+from ocflib.infra.net import is_ocf_ip
+from ocflib.infra.net import OCF_GATEWAY_V4
+from ocflib.infra.net import OCF_GATEWAY_V6
+from ocflib.infra.net import OCF_SUBNET_V4
 from ocflib.misc.shell import bold
 from ocflib.misc.shell import green
 
@@ -92,7 +98,7 @@ def get_ip(mac):
     """Get IP address for the given MAC address. This needs some work."""
     while True:
         try:
-            subprocess.check_call('sudo -u nobody nmap -sn 169.229.226.0/24',
+            subprocess.check_call('sudo -u nobody nmap -sn {}'.format(OCF_SUBNET_V4),
                                   stdout=devnull, shell=True)
             cmd = "arp -an | grep '{}'".format(mac)
             result = subprocess.check_output(cmd, shell=True).decode('utf-8').strip()
@@ -124,11 +130,8 @@ def get_ssh_connection(mac, user, password):
 
 
 def configure_network(ssh, ipv4):
-    gateway_v6 = '2607:f140:8801::1'
-
-    # Get the corresponding ipv6 address for the ipv4 address given
-    match = re.compile('\.(\d+)$').search(ipv4)
-    ipv6 = '{}:{}'.format(gateway_v6, match.group(1))
+    """Set up the correct IPv4 and IPv6 static addresses."""
+    ipv6 = ipv4_to_ipv6(ipv4)
 
     lines = [
         'auto lo',
@@ -138,32 +141,18 @@ def configure_network(ssh, ipv4):
         'iface eth0 inet static',
         '\taddress {}'.format(ipv4),
         '\tnetmask 255.255.255.0',
-        '\tgateway 169.229.226.1',
+        '\tgateway {}'.format(OCF_GATEWAY_V4),
         '',
         'iface eth0 inet6 static',
         '\taddress {}'.format(ipv6),
         '\tnetmask 64',
-        '\tgateway {}'.format(gateway_v6),
+        '\tgateway {}'.format(OCF_GATEWAY_V6),
     ]
 
     ssh.exec_command("echo -n \"\" > /etc/network/interfaces")
 
     for line in lines:
         ssh.exec_command("echo \"{}\" >> /etc/network/interfaces".format(line))
-
-
-def validate_ip(ip, subnet):
-    """Tests whether \"ip\" is an address in the subnet.
-
-        \"ip\" should take the standard form \"x.x.x.x\" in decimal digits, while
-        subnet should be like \"x.x.x.x/xx\"."""
-
-    subnetaddr, mask = subnet.split('/')
-    ipbits = struct.unpack('>L', socket.inet_aton(ip))[0]
-    subnetbits = struct.unpack('>L', socket.inet_aton(subnetaddr))[0]
-    maskbits = 0xFFFFFFFF << (32 - int(mask))
-    ipmask = ipbits & maskbits
-    return ipmask == subnetbits
 
 
 def confirm(prompt='Continue?', default=False):
@@ -206,7 +195,7 @@ def _main(args):
     parser.add_argument('hostname', type=str,
                         help='hostname for the new VM')
     parser.add_argument('ip', type=str,
-                        help='static ip address for the new VM')
+                        help='static IPv4 address for the new VM')
 
     args = parser.parse_args()
 
@@ -233,9 +222,10 @@ def _main(args):
             print('Cancelled.')
             sys.exit(2)
 
-    if not validate_ip(args.ip, '169.229.226.0/24'):
+    ip_addr = ip_address(args.ip)
+    if not is_ocf_ip(ip_addr) and isinstance(ip_addr, IPv4Address):
         print("Warning: Your IP is '{}'.".format(args.ip))
-        print('It should probably be in 169.229.226.0/24.')
+        print('It should probably be in {}.'.format(OCF_SUBNET_V4))
 
         if not confirm():
             print('Cancelled.')
@@ -283,7 +273,7 @@ def _main(args):
     client.exec_command('hostname -F /etc/hostname')
 
     print('Configuring static IP {}...'.format(args.ip))
-    configure_network(client, args.ip)
+    configure_network(client, ip_addr)
 
     print('Turning on puppet...')
     client.exec_command('rm -f /var/lib/puppet/state/agent_disabled.lock')

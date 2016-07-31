@@ -222,8 +222,9 @@ def _main(args):
             print('Cancelled.')
             sys.exit(2)
 
+    # Check to make sure the IP address provided is an OCF IPv4 address
     ip_addr = ip_address(args.ip)
-    if not is_ocf_ip(ip_addr) and isinstance(ip_addr, IPv4Address):
+    if not is_ocf_ip(ip_addr) or not isinstance(ip_addr, IPv4Address):
         print("Warning: Your IP is '{}'.".format(args.ip))
         print('It should probably be in {}.'.format(OCF_SUBNET_V4))
 

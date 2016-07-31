@@ -123,18 +123,27 @@ def get_ssh_connection(mac, user, password):
         time.sleep(1)
 
 
-def configure_network(ssh, ip):
+def configure_network(ssh, ipv4):
+    gateway_v6 = '2607:f140:8801::1'
+
+    # Get the corresponding ipv6 address for the ipv4 address given
+    match = re.compile('\.(\d+)$').search(ipv4)
+    ipv6 = '{}:{}'.format(gateway_v6, match.group(1))
+
     lines = [
         'auto lo',
         'iface lo inet loopback',
         '',
         'auto eth0',
         'iface eth0 inet static',
-        '\taddress {}'.format(ip),
-
-        # TODO: argparse these
+        '\taddress {}'.format(ipv4),
         '\tnetmask 255.255.255.0',
-        '\tgateway 169.229.226.1'
+        '\tgateway 169.229.226.1',
+        '',
+        'iface eth0 inet6 static',
+        '\taddress {}'.format(ipv6),
+        '\tnetmask 64',
+        '\tgateway {}'.format(gateway_v6),
     ]
 
     ssh.exec_command("echo -n \"\" > /etc/network/interfaces")

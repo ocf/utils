@@ -1,10 +1,13 @@
 #!/bin/sh
 
+# TODO: Change to new share when on new puppetmaster
+$PRIV_SHARE="/opt/puppet/shares/private"
+
 read -p 'Your username: ' user
 echo 'List of hosts (leave off domain) to generate principals for, separated by spaces:'
 read hostnames
 
-cd /opt/puppet/shares/private
+cd $PRIV_SHARE
 for host in $hostnames; do
   mkdir -p $host
   echo "Creating host/$host.ocf.berkeley.edu principal"
@@ -14,5 +17,5 @@ for host in $hostnames; do
   kadmin -p $user/admin ext_keytab -k $host/krb5.keytab host/$host.ocf.berkeley.edu
 done
 
-chown -R puppet:puppet /opt/puppet/shares/private
-chmod -R u=rX,g=,o= /opt/puppet/shares/private
+chown -R puppet:puppet $PRIV_SHARE
+chmod -R u=rX,g=,o= $PRIV_SHARE

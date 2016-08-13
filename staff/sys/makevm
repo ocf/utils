@@ -276,6 +276,7 @@ def _main(args):
     print('Configuring static IP {}...'.format(args.ip))
     configure_network(client, ip_addr)
 
+    # TODO: Convert this to use the new puppet paths with puppet-agent
     print('Turning on puppet...')
     client.exec_command('rm -f /var/lib/puppet/state/agent_disabled.lock')
 

@@ -2,6 +2,9 @@
 # Update the OCF root password. We use a ridiculous number of hash iterations
 # to make cracking the hashes way over-the-top impossible.
 
+# TODO: Change this location when on the new puppetmaster
+$ROOT_PW_FILE="/opt/puppet/shares/private/rootpw"
+
 echo "########################################################"
 echo "This will update the root password for ALL OCF MACHINES."
 echo "    YOU PROBABLY SHOULD NOT BE RUNNING THIS COMMAND."
@@ -21,6 +24,6 @@ if [ -z "$HASH" ]; then
     exit 1
 fi
 
-echo -n "$HASH" > /opt/puppet/shares/private/rootpw
-chown puppet:puppet /opt/puppet/shares/private/rootpw
-chmod 600 /opt/puppet/shares/private/rootpw
+echo -n "$HASH" > $ROOT_PW_FILE
+chown puppet:puppet $ROOT_PW_FILE
+chmod 600 $ROOT_PW_FILE

@@ -1,5 +1,6 @@
 #!/bin/bash -e
-PRODUCTION="/opt/puppet/env/production"
+ENV_DIR=$(puppet config print environmentpath)
+PRODUCTION="$ENV_DIR/production"
 REMOTE="https://github.com/ocf/puppet.git"
 
 if [ ! -d "$PRODUCTION" ]; then

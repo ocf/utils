@@ -12,21 +12,19 @@ from progressbar import ProgressBar
 
 # Settings
 OCF_CALNET_UID = 'calnetUid'
-OCF_ATTRS = [OCF_CALNET_UID]
 CALNET_AFFILIATIONS = 'berkeleyEduAffiliations'
-CALNET_ATTRS = [CALNET_AFFILIATIONS]
-CALNET_AFFILIATES = set(['AFFILIATE-TYPE-CONSULTANT',
-                         'AFFILIATE-TYPE-LBLOP STAFF',
-                         'AFFILIATE-TYPE-VISITING SCHOLAR',
-                         'AFFILIATE-TYPE-VOLUNTEER',
-                         'AFFILIATE-TYPE-HHMI RESEARCHER',
-                         'AFFILIATE-TYPE-VISITING STU RESEARCHER',
-                         'AFFILIATE-TYPE-LBL/DOE POSTDOC',
-                         'AFFILIATE-TYPE-TEMP AGENCY',
-                         'AFFILIATE-TYPE-COMMITTEE MEMBER',
-                         'AFFILIATE-TYPE-STAFF OF UC/OP/AFFILIATED ORGS',
-                         'AFFILIATE-TYPE-CONTRACTOR'
-                         'AFFILIATE-TYPE-CONCURR ENROLL'])
+CALNET_AFFILIATES = frozenset(['AFFILIATE-TYPE-CONSULTANT',
+                               'AFFILIATE-TYPE-LBLOP STAFF',
+                               'AFFILIATE-TYPE-VISITING SCHOLAR',
+                               'AFFILIATE-TYPE-VOLUNTEER',
+                               'AFFILIATE-TYPE-HHMI RESEARCHER',
+                               'AFFILIATE-TYPE-VISITING STU RESEARCHER',
+                               'AFFILIATE-TYPE-LBL/DOE POSTDOC',
+                               'AFFILIATE-TYPE-TEMP AGENCY',
+                               'AFFILIATE-TYPE-COMMITTEE MEMBER',
+                               'AFFILIATE-TYPE-STAFF OF UC/OP/AFFILIATED ORGS',
+                               'AFFILIATE-TYPE-CONTRACTOR'
+                               'AFFILIATE-TYPE-CONCURR ENROLL'])
 
 
 def ldap_uid_filter(uids):
@@ -58,7 +56,7 @@ def get_ocf_entries(users=None, ldapfilter=None):
         c.search(OCF_LDAP_PEOPLE,
                  filterstr,
                  search_scope=SEARCH_SCOPE_SINGLE_LEVEL,
-                 attributes=OCF_ATTRS)
+                 attributes=[OCF_CALNET_UID])
         entries = c.response
 
     return entries
@@ -78,7 +76,7 @@ def add_calnet_affiliations(ocf_entries):
                 c.search(UCB_LDAP_PEOPLE,
                          ldap_uid_filter([calnet_uid]),
                          search_scope=SEARCH_SCOPE_SINGLE_LEVEL,
-                         attributes=CALNET_ATTRS)
+                         attributes=[CALNET_AFFILIATIONS])
                 calnet_entry = c.response[0]
 
                 ocf_entry['attributes'][CALNET_AFFILIATIONS] = calnet_entry['attributes'][CALNET_AFFILIATIONS]
@@ -90,12 +88,12 @@ def add_calnet_affiliations(ocf_entries):
     return ocf_entries
 
 
-def get_calnet_affiliations(users=[], ldapfilter=None):
+def get_calnet_affiliations(users=None, ldapfilter=None):
     """Get list of OCF LDAP entries and their CalNet affiliations"""
     return add_calnet_affiliations(get_ocf_entries(users, ldapfilter))
 
 
-def summarize_affiliations(users=[]):
+def summarize_affiliations(users=None):
     """Summarize active OCF membership affiliations from CalNet"""
 
     ldapfilter = '(!(loginshell=/opt/ocf/bin/sorry))'
@@ -108,7 +106,7 @@ def summarize_affiliations(users=[]):
             calnet_uids.add(calnet_uid)
             affiliations.append(entry['attributes'][CALNET_AFFILIATIONS])
 
-    affiliates = defaultdict(lambda: 0)
+    affiliates = defaultdict(int)
     for affiliation in affiliations:
         if ('STUDENT-TYPE-REGISTERED' in affiliation and
                 'STUDENT-STATUS-EXPIRED' not in affiliation):

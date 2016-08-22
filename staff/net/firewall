@@ -1,6 +1,6 @@
 #!/bin/bash
 # Download and launch Java firewall config client
 cd $(mktemp -d)
-curl -sL http://contrib.ocf.berkeley.edu/jre-8u5-linux-x64.tar.gz | tar xfz -
+curl -sL http://contrib.ocf.berkeley.edu/jre-8u101-linux-x64.tar.gz | tar xfz -
 curl -4 --insecure https://firewall/admin/public/startup.jnlp > startup.jnlp
 jre*/bin/javaws startup.jnlp

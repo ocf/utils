@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # TODO: Change to new share when on new puppetmaster
-$PRIV_SHARE="/opt/puppet/shares/private"
+PRIV_SHARE="/opt/puppet/shares/private"
 
 read -p 'Your username: ' user
 echo 'List of hosts (leave off domain) to generate principals for, separated by spaces:'

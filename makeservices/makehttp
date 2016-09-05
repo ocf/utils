@@ -10,13 +10,11 @@ symlinks or renaming any file or directory with the same path.
 import datetime
 import os
 import os.path
-import sys
+from argparse import ArgumentParser
 
-USER_SERVICES = '/services/http/users/{user[0]}/{user}'
-
-
-def usage(args):
-    return 'Usage: ' + args[0]
+from ocflib.account.utils import home_dir
+from ocflib.account.utils import web_dir
+from ocflib.misc.whoami import current_user
 
 
 def rectify_link(path, webdir):
@@ -42,12 +40,12 @@ def rectify_link(path, webdir):
 
 
 def main():
-    if len(sys.argv) > 1:
-        print(usage(sys.argv))
-        return
+    parser = ArgumentParser(description=__doc__)
+    parser.parse_args()
 
-    path = os.path.expanduser('~/public_html')
-    webdir = USER_SERVICES.format(user=os.getlogin())
+    user = current_user()
+    path = home_dir(user) + '/public_html'
+    webdir = web_dir(user)
 
     rectify_link(path, webdir)
 

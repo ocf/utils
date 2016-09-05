@@ -1,53 +1,58 @@
-#!/bin/bash
+#!/usr/bin/env python3
+"""Creates a symlink to the current user's web directory in their home folder.
 
-if [ $# -ne 0 ]; then
-  echo "Usage: '$0'"
-  exit 1
-fi
+The symlink is called "public_html" by default and points to
+"/services/http/users/<first letter of username>/<username>". This script is
+idempotent: if the symlink exists and points to the correct path, makehttp
+takes no action; otherwise, it creates the symlink after removing broken
+symlinks or renaming any file or directory with the same path.
+"""
+import datetime
+import os
+import os.path
+import sys
 
-USER_SERVICES="/services/http/users/${USER:0:1}/$USER"
+USER_SERVICES = '/services/http/users/{user[0]}/{user}'
 
-create_symlink() {
-    ln -v -s "$USER_SERVICES" ~/public_html
-    chmod -v 755 "$USER_SERVICES"
 
-    if [ $? -eq 0 ]; then
-        echo
-        echo "public_html folder has been created successfully."
-    else
-        echo
-        echo "public_html folder was NOT created successfully."
-    fi
-}
+def usage(args):
+    return 'Usage: ' + args[0]
 
-if [[ -e "$HOME/public_html" ]]; then
-    # Get the epoch time for renaming the old public_html link/folder
-    EXT=$(date "+%s")
 
-    if [[ -h "$HOME/public_html" ]]; then
-        SYMLINK_PATH=$(readlink $HOME/public_html)
+def rectify_link(path, webdir):
+    if os.path.islink(path):
+        if os.readlink(path) == webdir:
+            # Do nothing if link is correct
+            print('public_html already points to web directory')
+            return
+        elif not os.path.exists(path):
+            # Delete any broken link
+            print('Removing broken symlink')
+            os.remove(path)
 
-        if [[ "$SYMLINK_PATH" != "$USER_SERVICES" ]]; then
-            echo "Your symbolic link public_html is incorrect"
-            echo "Creating a new link and moving the old link to public_html.$EXT"
-            mv public_html public_html.$EXT
+    if os.path.exists(path):
+        ext = datetime.datetime.now().strftime('%s')
+        print('{} is an existing file, folder, or symlink'.format(path))
+        print('Renaming to {}.{}'.format(path, ext))
+        os.rename(path, path + '.' + ext)
 
-            create_symlink
-            exit 2
-        else
-            echo "public_html already exists"
-            echo "Not creating symlink"
-            exit 3
-        fi
-    else
-        echo "A folder with data exists in $HOME/public_html"
-        echo "Moving the old folder to public_html.$EXT"
-        mv public_html public_html.$EXT
+    print('Creating symlink to web directory')
+    os.symlink(webdir, path)
+    os.chmod(path, 0o755)
 
-        create_symlink
-        exit 4
-    fi
-else
-    create_symlink
-    exit 0
-fi
+
+def main():
+    if len(sys.argv) > 1:
+        print(usage(sys.argv))
+        return
+
+    path = os.path.expanduser('~/public_html')
+    webdir = USER_SERVICES.format(user=os.getlogin())
+
+    rectify_link(path, webdir)
+
+    print('Your public_html directory is ready to use!')
+
+
+if __name__ == '__main__':
+    main()

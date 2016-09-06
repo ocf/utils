@@ -55,7 +55,14 @@ def refund(args):
         print('Cancelled.')
         return
 
-    with get_connection(**staff_creds()) as c:
+    try:
+        credentials = staff_creds()
+    except FileNotFoundError:
+        print(red('Could not find the file for staff credentials.'))
+        print(red('Are you running this on supernova?'))
+        sys.exit(1)
+
+    with get_connection(**credentials) as c:
         add_refund(c, refund)
 
     print('Added.')
@@ -88,4 +95,4 @@ def main(argv=None):
 
 
 if __name__ == '__main__':
-    exit(main())
+    main()

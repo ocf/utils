@@ -80,7 +80,7 @@ def add_calnet_affiliations(ocf_entries):
                 calnet_entry = c.response[0]
 
                 ocf_entry['attributes'][CALNET_AFFILIATIONS] = calnet_entry['attributes'][CALNET_AFFILIATIONS]
-            except IndexError:
+            except (IndexError, KeyError):
                 # Not found in CalNet People OU
                 ocf_entry['attributes'][CALNET_AFFILIATIONS] = []
             progress.update(i + 1)

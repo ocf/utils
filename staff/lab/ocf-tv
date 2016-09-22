@@ -3,7 +3,6 @@ import argparse
 import random
 import socket
 import time
-from contextlib import closing
 from subprocess import call
 from subprocess import Popen
 
@@ -29,7 +28,7 @@ def unused_port():
 def wait_for_port(host, port, timeout=5):
     spent = 0
     while True:
-        with closing(socket.socket(socket.AF_INET, socket.SOCK_STREAM)) as s:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             if s.connect_ex((host, port)) == 0:
                 return
         time.sleep(0.1)

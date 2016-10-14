@@ -24,6 +24,9 @@ def main(argv=None):
                 {arg0} desktop -- -i uptime
                 {arg0} all -- -i 'hostname && /sbin/ifconfig && uname -a'
 
+            The -i flag will print stdout and stderr from each host; feel free to
+            omit it if viewing this output is not necessary.
+
             You probably want to make sure your Kerberos ticket is valid first (`kinit $USER`).
             '''.format(arg0=(argv or sys.argv)[0]),
         ),

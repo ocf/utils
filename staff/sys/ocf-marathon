@@ -16,6 +16,11 @@ user = None
 password = None
 
 
+def unbuf_print(*args, file=sys.stdout, **kwargs):
+    print(*args, file=file, **kwargs)
+    file.flush()
+
+
 def _request(method, path, *args, expected_status=200, **kwargs):
     req = requests.request(
         method,
@@ -42,7 +47,7 @@ def list_apps(args):
     req = get('/v2/apps')
 
     for app in sorted(req.json()['apps'], key=itemgetter('id')):
-        print('{}: {} desired, {} healthy, {} unhealthy, {} staged'.format(
+        unbuf_print('{}: {} desired, {} healthy, {} unhealthy, {} staged'.format(
             app['id'].lstrip('/'),
             app['instances'],
             app['tasksHealthy'],
@@ -56,15 +61,15 @@ def deploy_app(args):
     image, tag = status['app']['container']['docker']['image'].split(':')
 
     if status['app']['deployments']:
-        print('A deployment is already in progress:')
-        print(status['app']['deployments'])
+        unbuf_print('A deployment is already in progress:')
+        unbuf_print(status['app']['deployments'])
 
         if not args.force:
             return 1
         else:
-            print('You specified --force, so going ahead anyway.')
+            unbuf_print('You specified --force, so going ahead anyway.')
 
-    print('Updating from current tag "{}" to "{}"'.format(tag, args.version))
+    unbuf_print('Updating from current tag "{}" to "{}"'.format(tag, args.version))
     status['app']['container']['docker']['image'] = '{}:{}'.format(image, args.version)
     put(
         '/v2/apps/' + args.app + ('?force=true' if args.force else ''),
@@ -76,15 +81,15 @@ def deploy_app(args):
     for _ in range(60):
         status = app_status(args.app)
         if not status['app']['deployments']:
-            print('Deployment finished!')
+            unbuf_print('Deployment finished!')
             return 0
         else:
-            print('Waiting for deployment to finish: {}'.format(status['app']['deployments']))
+            unbuf_print('Waiting for deployment to finish: {}'.format(status['app']['deployments']))
             time.sleep(1)
     else:
         bad_deployment, = status['app']['deployments']
-        print('Gave up waiting for deployment.')
-        print('Rolling back deployment: {}'.format(bad_deployment))
+        unbuf_print('Gave up waiting for deployment.')
+        unbuf_print('Rolling back deployment: {}'.format(bad_deployment))
 
         delete('/v2/deployments/' + bad_deployment['id'])
         return 2
@@ -164,7 +169,7 @@ def main(argv=None):
     global user
     global password
     if os.path.isfile(args.cred_path):
-        print('Loading credentials from {}.'.format(args.cred_path))
+        unbuf_print('Loading credentials from {}.'.format(args.cred_path))
         with open(args.cred_path) as f:
             creds = json.load(f)
         user = creds['user']

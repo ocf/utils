@@ -78,7 +78,7 @@ def deploy_app(args):
 
     # wait for deployment to finish, report status
     status = None
-    for _ in range(60):
+    for _ in range(180):
         status = app_status(args.app)
         if not status['app']['deployments']:
             unbuf_print('Deployment finished!')

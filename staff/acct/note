@@ -1,12 +1,9 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import getpass
 import pwd
 import shutil
 import sys
 from datetime import date
-
-if sys.version_info[0] < 3:
-    raise "Must be using python 3"
 
 USER_INFO = '/home/s/st/staff/User_Info'
 USER_INFO_BAK = '/tmp/User_Info.bak.' + getpass.getuser()

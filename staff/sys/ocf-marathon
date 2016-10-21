@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Control apps deployed via Marathon."""
 import argparse
+import code
 import getpass
 import json
 import os.path
@@ -41,6 +42,17 @@ post = partial(_request, 'post')
 def app_status(app):
     req = get('/v2/apps/' + app)
     return req.json()
+
+
+def shell(args):
+    print("Here's a Python shell for you.")
+    print('Some things you might find useful:')
+    print('  * View app status:')
+    print('      app_status(app_name)')
+    print('  * Make API requests:')
+    print("      get('/v2/apps/')")
+    print('    (other verbs work too)')
+    code.interact(local=dict(globals(), **locals()))
 
 
 def list_apps(args):
@@ -159,6 +171,11 @@ def main(argv=None):
     )
     parser_view_errors.add_argument('app')
 
+    # shell
+    subparsers.add_parser(
+        'shell', help='drop into a Python shell',
+    )
+
     # parse and dispatch
     args = parser.parse_args(argv)
 
@@ -182,6 +199,7 @@ def main(argv=None):
         'deploy-app': deploy_app,
         'list-apps': list_apps,
         'scale-app': scale_app,
+        'shell': shell,
         'view-errors': view_errors,
     }[args.command](args)
 

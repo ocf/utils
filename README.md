@@ -52,5 +52,5 @@ binary in this repo.
 [ocf]: https://www.ocf.berkeley.edu/
 [ocf/puppet]: https://github.com/ocf/puppet/
 [ocflib]: https://github.com/ocf/ocflib/
-[use-bin-bash]: https://google-styleguide.googlecode.com/svn/trunk/shell.xml?showone=Which_Shell_to_Use#Which_Shell_to_Use
+[use-bin-bash]: https://google.github.io/styleguide/shell.xml?showone=Which_Shell_to_Use#Which_Shell_to_Use
 [pep8]: https://www.python.org/dev/peps/pep-0008/

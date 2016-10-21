@@ -14,8 +14,6 @@
 <waf> how does one run it?
 <nattofriends> with bash
 """
-from __future__ import print_function
-
 import os
 import subprocess
 import sys

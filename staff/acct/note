@@ -1,11 +1,12 @@
 #!/usr/bin/env python
-from __future__ import print_function
-
 import getpass
 import pwd
 import shutil
 import sys
 from datetime import date
+
+if sys.version_info[0] < 3:
+    raise "Must be using python 3"
 
 USER_INFO = '/home/s/st/staff/User_Info'
 USER_INFO_BAK = '/tmp/User_Info.bak.' + getpass.getuser()

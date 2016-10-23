@@ -1,8 +1,7 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 # pyrc - Wrapper to make it easier for ocf users to use irc
 # Author: Nader Morshed
 # Version: 0.0.8
-# Requires python >= 2.4 (2.6?)
 import optparse
 import os
 import shutil
@@ -127,9 +126,7 @@ def find_emu_sessions(emu, session):
     """Checks if the terminal emulator session is already open."""
 
     out = Popen(emu['list'], stdout=PIPE, stderr=PIPE).stdout
-
-    if sys.version_info[0] >= 3:
-        out = [str(i, encoding=sys.getdefaultencoding()) for i in out]
+    out = [str(i, encoding=sys.getdefaultencoding()) for i in out]
 
     return [line for line in out if session in line]
 

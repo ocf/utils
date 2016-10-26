@@ -1,11 +1,12 @@
 #!/usr/bin/python3
+import argparse
+
 import ocflib.account.search as search
+import ocflib.account.utils as utils
 import ocflib.misc.mail as mail
 
-vhost_file = '/home/s/st/staff/vhost/vhost.conf'
-target_list = 'final_missing_img'
-
 subject = '%s - Missing OCF Banner from Website'
+# Warning: Email is date-specific and only makes sense once a year.
 email_body = """Dear %s:
 
 The OCF staff noticed that your group's website [1] does not have the "Hosted
@@ -22,8 +23,8 @@ Your username is "%s".
 If you've forgotten how to login, instructions can be found here [3]. If
 you've forgotten your password, you can reset it here [4].
 
-Peter Wu
-Deputy Manager
+Thanks for flying OCF,
+The friendly staff of 171 MLK Student Union
 
 1. %s
 2. https://www.ocf.berkeley.edu/docs/services/vhost/#h3_including-the-ocf-banner
@@ -31,37 +32,46 @@ Deputy Manager
 4. https://www.ocf.berkeley.edu/account/password/
 """
 
-username_site_pairs = []
-contact_list = []
 
-with open(target_list) as t_l:
-    for line in t_l:
-        contact_list.append(line.strip('\n'))
+def send_mass_mail(target_log, dry_run):
+    username_site_pairs = []
+    contact_list = []
+    with open(target_log) as t_l:
+        for line in t_l:
+            contact_list.append(line.strip('\n'))
 
-with open(vhost_file) as v_h:
-    for line in v_h:
-        line = line.strip('\n')
-        # Active site
-        if (line and not line.startswith('#')):
-            # Putting site into right format
-            entries = line.split(' ')
-            user = entries[0].strip('!')
-            if (entries[1] == '-'):
-                site = entries[0]
-            else:
-                site = entries[1]
-            site = 'http://' + site.strip('!')
-            if '.' not in site:
-                site += '.berkeley.edu'
-            if site in contact_list:
-                username_site_pairs.append((user, site))
+    vhosts = utils.get_vhosts()
+    for vhost_url in vhosts.keys():
+        site = 'http://' + vhost_url
+        if site in contact_list:
+            username_site_pairs.append((vhosts[vhost_url]['username'],
+                                        vhost_url))
 
-# Sanity check
-assert len(username_site_pairs) == len(contact_list)
+    # Sanity check
+    assert len(username_site_pairs) == len(contact_list)
 
-for user, site in username_site_pairs:
-    name = search.user_attrs(user)['cn'][0]
-    try:
-        mail.send_mail_user(user, subject % user, email_body % (name, user, site))
-    except Exception as e:
-        print((name, user, site, e))
+    if not dry_run:
+        print('Emailing...')
+        for user, site in username_site_pairs:
+            name = search.user_attrs(user)['cn'][0]
+            try:
+                print(user)
+                mail.send_mail_user(user, subject % user,
+                                    email_body % (name, user, site))
+            except Exception as e:
+                print((name, user, site, e))
+    else:
+        print("Actual run would've emailed the following:")
+        for user, site in username_site_pairs:
+            print(user)
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Check if vhost banner and '
+                                     'disclaimer exist')
+    parser.add_argument('target_log', type=str, nargs='+',
+                        help='Log file (list of websites) to email')
+    parser.add_argument('--actual', nargs='?', const=1, default=0,
+                        help='Run script as not a dry-run')
+
+    args = parser.parse_args()
+    send_mass_mail(args.target_log[0], not args.actual)

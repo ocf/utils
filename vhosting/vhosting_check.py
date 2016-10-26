@@ -68,7 +68,7 @@ def check_vhosting():
             if is_special(vhost_url) or any([is_special(alias) for alias in
                                              vhosts[vhost_url]['aliases']]):
                 continue
-            vhost_urls.append('http://' + vhost_url)
+            vhost_urls.append('http://' + vhost_url + '\n')
         # For log niceness
         vhost_urls.sort()
         for site in vhost_urls:

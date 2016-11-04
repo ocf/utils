@@ -44,11 +44,7 @@ banner_hashes = {  # ocfbadge_mini8.png
     'ce48822dd63785f77d5826b6b215b18d',
     # lighter152x41.gif.png
     'a9bfe3f918552692f5eddbd3c5446367'}
-# To-do: Readability
-# hosting_logos_prefix = "https://www.ocf.berkeley.edu/hosting-logos/"
-# banner_urls = [hosting_logos_prefix + banner_url for banner_url
-#                in banner_urls]
-# To-do: logs -> small DB
+
 disclaimer = 'We are a student group acting independently of the University'\
              ' of California. We take full responsibility for our'\
              ' organization and this web site.'
@@ -57,9 +53,6 @@ special_strings = ['asuc', 'ocf']
 
 
 def is_special(url_string):
-    # To-do: Read from log of known exceptions
-    # if url_string in exceptions:
-    #     return True
     return any([special_string in url_string for special_string in
                 special_strings])
 

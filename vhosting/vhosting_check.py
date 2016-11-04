@@ -45,9 +45,11 @@ banner_hashes = {  # ocfbadge_mini8.png
     # lighter152x41.gif.png
     'a9bfe3f918552692f5eddbd3c5446367'}
 
-disclaimer = 'We are a student group acting independently of the University'\
-             ' of California. We take full responsibility for our'\
-             ' organization and this web site.'
+disclaimer_re = 'We\s*are\s*a\s*student\s*group\s*acting\s*independently\s*'\
+                'of\s*the\s*University\s*of\s*California.\s*We\s*take\s*full'\
+                '\s*responsibility\s*for\s*our\s*organization\s*and\s*this'\
+                '\s*web\s*site.'
+disclaimer_pattern = re.compile(disclaimer_re)
 img_regex = re.compile("=\"?(\S+\.png|\S+\.gif|\S+\.jpg)")
 special_strings = ['asuc', 'ocf']
 
@@ -73,7 +75,7 @@ def check_vhosting():
                 site_opened = req.urlopen(site, timeout=10)
                 site_html = site_opened.readall().decode('utf-8')
                 counter = False
-                if disclaimer not in site_html:
+                if not disclaimer_pattern.search(site_html):
                     counter = True
                     m_d.writelines(site)
                 # Check if they have any OCF banner in their images

@@ -5,9 +5,9 @@ import ocflib.account.search as search
 import ocflib.account.utils as utils
 import ocflib.misc.mail as mail
 
-subject = '%s - Missing OCF Banner from Website'
+subject = '{user} - Missing OCF Banner from Website'
 # Warning: Email is date-specific and only makes sense once a year.
-email_body = """Dear %s:
+email_body = """Dear {user}:
 
 The OCF staff noticed that your group's website [1] does not have the "Hosted
 by OCF" banner required by the virtual hosting rules [2]. All student group
@@ -18,7 +18,7 @@ requirements. Please add both sometime within the next 3 weeks (by May 24) to
 prevent disabling of your website. Thanks for your cooperation and good luck
 on finals.
 
-Your username is "%s".
+Your username is {name}.
 
 If you've forgotten how to login, instructions can be found here [3]. If
 you've forgotten your password, you can reset it here [4].
@@ -26,7 +26,7 @@ you've forgotten your password, you can reset it here [4].
 Thanks for flying OCF,
 The friendly staff of 171 MLK Student Union
 
-1. %s
+1. {site}
 2. https://www.ocf.berkeley.edu/docs/services/vhost/#h3_including-the-ocf-banner
 3. https://www.ocf.berkeley.edu/docs/services/shell/
 4. https://www.ocf.berkeley.edu/account/password/
@@ -56,8 +56,8 @@ def send_mass_mail(target_log, dry_run):
             name = search.user_attrs(user)['cn'][0]
             try:
                 print(user)
-                mail.send_mail_user(user, subject % user,
-                                    email_body % (name, user, site))
+                mail.send_mail_user(user, subject.format(user=user),
+                                    email_body.format(user=user, name=name, site=site))
             except Exception as e:
                 print((name, user, site, e))
     else:

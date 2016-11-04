@@ -12,7 +12,7 @@ missing_disc = 'missing_disc.log'
 missing_both = 'missing_both.log'
 errors = 'errors.log'
 # md5 hashes
-banner_hashes = [  # ocfbadge_mini8.png
+banner_hashes = {  # ocfbadge_mini8.png
     'b23ee41fdc537191381684dd826cf77f',
     # ocfbadge_mini8dark.png
     'c425451be5b2697bebe4dae12730ce8a',
@@ -43,7 +43,7 @@ banner_hashes = [  # ocfbadge_mini8.png
     # OCF-Flag.png
     'ce48822dd63785f77d5826b6b215b18d',
     # lighter152x41.gif.png
-    'a9bfe3f918552692f5eddbd3c5446367']
+    'a9bfe3f918552692f5eddbd3c5446367'}
 # To-do: Readability
 # hosting_logos_prefix = "https://www.ocf.berkeley.edu/hosting-logos/"
 # banner_urls = [hosting_logos_prefix + banner_url for banner_url
@@ -70,8 +70,7 @@ def check_vhosting():
         vhosts = utils.get_vhosts()
         vhost_urls = []
         for vhost_url in vhosts.keys():
-            if is_special(vhost_url) or any([is_special(alias) for alias in
-                                             vhosts[vhost_url]['aliases']]):
+            if any(is_special(url) for url in {vhost_url} | set(vhosts[vhost_url]['aliases'])):
                 continue
             vhost_urls.append('http://' + vhost_url + '\n')
         # For log niceness
@@ -85,14 +84,10 @@ def check_vhosting():
                     counter = True
                     m_d.writelines(site)
                 # Check if they have any OCF banner in their images
-                img_urls = [img_url if img_url.startswith('http') else
-                            site + '/' + img_url for img_url in
-                            img_regex.findall(site_html)]
-                img_hashes = [hashlib.md5(requests.get(img_url).content)
-                              .hexdigest() for img_url in img_urls]
-                if not any([any([banner_hash == img_hash for img_hash in
-                                 img_hashes])
-                            for banner_hash in banner_hashes]):
+                img_urls = {img_url if img_url.startswith('http') else site + '/' + img_url for img_url in
+                            img_regex.findall(site_html)}
+                img_hashes = {hashlib.md5(requests.get(img_url).content).hexdigest() for img_url in img_urls}
+                if not banner_hashes & img_hashes:
                     m_i.writelines(site)
                     if counter:
                         m_b.writelines(site)
@@ -101,7 +96,6 @@ def check_vhosting():
                 error_file.writelines(str(e) + '\n\n')
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Check if vhost banner and '
-                                     'disclaimer exist')
+    parser = argparse.ArgumentParser(description='Check if vhost banner and disclaimer exist')
     args = parser.parse_args()
     check_vhosting()

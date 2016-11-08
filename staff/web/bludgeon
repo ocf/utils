@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """
 Force the Disable Comments plugin onto an existing Wordpress install.
 
@@ -127,7 +127,10 @@ def get_mysql_password(path):
 
 
 def main():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(
+        description=__doc__,
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
     parser.add_argument('path', help='Filesystem path to a Wordpress installation')
 
     args = parser.parse_args()

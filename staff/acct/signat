@@ -36,19 +36,19 @@ def show_by_username(username):
         print(red('User not found.'))
         return
 
-    uid = attrs.get('calnetUid', [None])[0]
-    oid = attrs.get('callinkOid', [None])[0]
+    uid = attrs.get('calnetUid', None)
+    oid = attrs.get('callinkOid', None)
 
     if uid and oid:
         print(yellow('Both CalNet UID and CalLink OID are defined for '
                      'this account.'))
-        show_groups_by_student_signat(int(uid))
+        show_groups_by_student_signat(uid)
         print()
-        show_signatories_for_group(int(oid))
+        show_signatories_for_group(oid)
     elif uid:
-        show_groups_by_student_signat(int(uid))
+        show_groups_by_student_signat(uid)
     elif oid:
-        show_signatories_for_group(int(oid))
+        show_signatories_for_group(oid)
     else:
         print(red('This account has no CalNet UID or CalLink OID.'))
 

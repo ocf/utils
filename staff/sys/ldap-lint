@@ -66,12 +66,12 @@ def main():
         )
         for attrs in map(itemgetter('attributes'), c.response):
             cn = attrs['cn'][0]
-            type_ = attrs['type'][0]
+            type_ = attrs['type']
 
             if type_ not in RECOGNIZED_TYPES:
                 complain(cn, 'has unknown type ' + type_)
 
-            if 'macAddress' in attrs:
+            if attrs['macAddress']:
                 mac_addr = attrs['macAddress'][0].lower()
 
                 if type_ != 'desktop':

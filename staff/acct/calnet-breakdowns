@@ -3,7 +3,7 @@ import argparse
 import sys
 from collections import defaultdict
 
-from ldap3 import SEARCH_SCOPE_SINGLE_LEVEL
+from ldap3 import LEVEL
 from ocflib.constants import OCF_LDAP_PEOPLE
 from ocflib.constants import UCB_LDAP_PEOPLE
 from ocflib.infra.ldap import ldap_ocf
@@ -55,7 +55,7 @@ def get_ocf_entries(users=None, ldapfilter=None):
     with ldap_ocf() as c:
         c.search(OCF_LDAP_PEOPLE,
                  filterstr,
-                 search_scope=SEARCH_SCOPE_SINGLE_LEVEL,
+                 search_scope=LEVEL,
                  attributes=[OCF_CALNET_UID])
         entries = c.response
 
@@ -71,11 +71,11 @@ def add_calnet_affiliations(ocf_entries):
         sys.stderr.write('Looking up {0} OCF LDAP entries in CalNet\n'.format(len(ocf_entries)))
         progress = ProgressBar(maxval=len(ocf_entries)).start()
         for (i, ocf_entry) in enumerate(ocf_entries):
-            calnet_uid = int(ocf_entry['attributes'][OCF_CALNET_UID][0])
+            calnet_uid = int(ocf_entry['attributes'][OCF_CALNET_UID])
             try:
                 c.search(UCB_LDAP_PEOPLE,
                          ldap_uid_filter([calnet_uid]),
-                         search_scope=SEARCH_SCOPE_SINGLE_LEVEL,
+                         search_scope=LEVEL,
                          attributes=[CALNET_AFFILIATIONS])
                 calnet_entry = c.response[0]
 
@@ -100,7 +100,7 @@ def summarize_affiliations(users=None):
     calnet_uids = set()
     affiliations = []
     for entry in get_calnet_affiliations(users, ldapfilter):
-        calnet_uid = int(entry['attributes'][OCF_CALNET_UID][0])
+        calnet_uid = int(entry['attributes'][OCF_CALNET_UID])
         if calnet_uid not in calnet_uids:
             # CalNet UID is unique
             calnet_uids.add(calnet_uid)

@@ -1,9 +1,9 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 import argparse
 
 import ocflib.account.search as search
-import ocflib.account.utils as utils
 import ocflib.misc.mail as mail
+from ocflib.vhost.web import get_vhosts
 
 subject = '{user} - Missing OCF Banner from Website'
 # Warning: Email is date-specific and only makes sense once a year.
@@ -40,7 +40,7 @@ def send_mass_mail(target_log, dry_run):
         for line in t_l:
             contact_list.append(line.strip('\n'))
 
-    vhosts = utils.get_vhosts()
+    vhosts = get_vhosts()
     for vhost_url in vhosts.keys():
         site = 'http://' + vhost_url
         if site in contact_list:

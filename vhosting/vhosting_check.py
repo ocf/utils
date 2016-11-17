@@ -1,11 +1,11 @@
-#!/usr/bin/python3
+#!/usr/bin/env python3
 import argparse
 import hashlib
 import re
 import urllib.request as req
 
-import ocflib.account.utils as utils
 import requests
+from ocflib.vhost.web import get_vhosts
 
 missing_img = 'missing_img.log'
 missing_disc = 'missing_disc.log'
@@ -62,7 +62,7 @@ def is_special(url_string):
 def check_vhosting():
     with open(missing_img, 'w') as m_i, open(missing_disc, 'w') as m_d,\
             open(missing_both, 'w') as m_b, open(errors, 'w') as error_file:
-        vhosts = utils.get_vhosts()
+        vhosts = get_vhosts()
         vhost_urls = []
         for vhost_url in vhosts.keys():
             if any(is_special(url) for url in {vhost_url} | set(vhosts[vhost_url]['aliases'])):

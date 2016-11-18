@@ -1,0 +1,32 @@
+#!/usr/bin/env python3
+# Small utility to just get the weather from wttr.in, since wego is kind of
+# annoying to set up and install
+
+import optparse
+import requests
+import sys
+
+def get_weather(location):
+    # ugly but need to fake the user agent to match curl,
+    # otherwise we get html in our response
+    headers = {'User-Agent': 'curl'}
+    res = requests.get(WTTR_SERVER + location, headers=headers)
+    if res.status_code == 200 and res.text != WTTR_ERROR:
+        print(res.text)
+    else:
+        print('location not found')
+
+def main(args):
+    parser = optparse.OptionParser()
+    parser.add_option('-l', '--location', default=DEFAULT_LOCATION,
+                      help="specify name of a location to look up the weather")
+    (options, args) = parser.parse_args(args=args)
+    get_weather(options.location)
+
+DEFAULT_LOCATION = 'Berkeley'
+# we can always make one of our own using wego, but too lazy to set up right now
+WTTR_SERVER = 'http://wttr.in/'
+WTTR_ERROR = 'ERROR'
+
+if __name__ == '__main__':
+    main(sys.argv[1:])

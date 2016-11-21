@@ -11,6 +11,7 @@ Currently checks the Hosts OU for:
     * Unrecognized puppetVar (often typos)
     * Reverse DNS for IP exists and matches hostname
 """
+from ipaddress import ip_address
 from operator import itemgetter
 
 import dns
@@ -26,18 +27,14 @@ RECOGNIZED_TYPES = frozenset({
     'ipmi',
     'printer',
     'server',
+    'staffvm',
     'switch',
+    'vip',
     'wifi',
 })
 
-RECOGNIZED_PUPPETVARS = frozenset({
-    'owner',
-    'pubstaff_only',
-    'skip_kerberos',
-    'skip_ldap',
-    'skip_networking',
-    'staff_only',
-})
+# inclusive
+STAFFVM_RANGE = (ip_address('169.229.226.200'), ip_address('169.229.226.249'))
 
 
 def lookup_dns(host, rtype='A'):
@@ -62,7 +59,7 @@ def main():
         c.search(
             OCF_LDAP_HOSTS,
             '(cn=*)',
-            attributes=['cn', 'type', 'macAddress', 'ipHostNumber', 'puppetVar'],
+            attributes=['cn', 'type', 'macAddress', 'ipHostNumber', 'puppetVar', 'puppetClass'],
         )
         for attrs in map(itemgetter('attributes'), c.response):
             cn = attrs['cn'][0]
@@ -83,6 +80,13 @@ def main():
                     seen_macs[mac_addr] = cn
             elif type_ == 'desktop':
                 complain(cn, 'has no MAC address but is a desktop')
+
+            ip = ip_address(attrs['ipHostNumber'][0])
+            in_staffvm_range = STAFFVM_RANGE[0] <= ip <= STAFFVM_RANGE[1]
+            if type_ == 'staffvm' and not in_staffvm_range:
+                complain(cn, 'is a staff VM, but not in staffvm IP range')
+            elif type_ != 'staffvm' and in_staffvm_range:
+                complain(cn, 'is in staffvm IP range, but not a staffvm')
 
             ip = attrs['ipHostNumber'][0]
             dns_ip = lookup_dns(cn + '.ocf.berkeley.edu')
@@ -106,10 +110,12 @@ def main():
             else:
                 complain(cn, 'missing reverse DNS for {}'.format(ip))
 
-            for puppet_var in attrs.get('puppetVar', []):
-                var, val = puppet_var.split('=', 1)
-                if var not in RECOGNIZED_PUPPETVARS:
-                    complain(cn, 'has unrecognized puppetVar: {}'.format(puppet_var))
+            # TODO: remove these from schema
+            # for puppet_var in attrs.get('puppetVar', []):
+            #    complain(cn, 'has puppetVar: {}'.format(puppet_var))
+
+            # for puppet_class in attrs.get('puppetClass', []):
+            #    complain(cn, 'has puppetClass: {}'.format(puppet_class))
 
     return retval
 

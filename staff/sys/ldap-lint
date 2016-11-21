@@ -111,11 +111,11 @@ def main():
                 complain(cn, 'missing reverse DNS for {}'.format(ip))
 
             # TODO: remove these from schema
-            # for puppet_var in attrs.get('puppetVar', []):
-            #    complain(cn, 'has puppetVar: {}'.format(puppet_var))
+            for puppet_var in attrs.get('puppetVar', []):
+                complain(cn, 'has puppetVar: {}'.format(puppet_var))
 
-            # for puppet_class in attrs.get('puppetClass', []):
-            #    complain(cn, 'has puppetClass: {}'.format(puppet_class))
+            for puppet_class in attrs.get('puppetClass', []):
+                complain(cn, 'has puppetClass: {}'.format(puppet_class))
 
     return retval
 

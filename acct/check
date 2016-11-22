@@ -52,25 +52,25 @@ else
   exit 2
 fi
 
-# check if sorried
-shell=$(ldapsearch -x -LLL uid=$user loginshell | grep ^loginShell | cut -d' ' -f2)
-if [ $shell = /opt/share/utils/bin/sorried ]; then
-  echo "WARNING: Account is disabled" >&2
-fi
-
 # account creation time
 creation_time=$(ldapsearch -x -LLL uid=$user creationTime | grep ^creationTime | cut -d' ' -f2)
 if [ -n "$creation_time" ]; then
     echo "Created on: $(python3 -c "import dateutil.parser; print(dateutil.parser.parse('${creation_time}').strftime('%Y-%m-%d'))")"
 fi
 
+# check if sorried
+shell=$(ldapsearch -x -LLL uid=$user loginshell | grep ^loginShell | cut -d' ' -f2)
+if [ $shell = /opt/share/utils/bin/sorried ]; then
+  echo "WARNING: Account is disabled" >&2
+fi
+
 # check if Kerberos principal exists
 kerberos=$(echo TESTIFEXIST | kinit --password-file=STDIN $user 2>&1)
 if [ -n "$kerberos" ]; then
-  if [ -n "$(echo "$kerberos" | grep unknown$)" ]; then
+  if echo "$kerberos" | grep -q 'unknown$'; then
     echo "WARNING: Kerberos principal does not exist" >&2
   elif [ "$kerberos" != "kinit: Password incorrect" ]; then
-   echo "$kerberos"
+    echo "$kerberos"
   fi
 fi
 
@@ -96,30 +96,24 @@ fi
 # check if member of groups other than ocf
 groups=$(groups $user | cut -d " " -f3- | grep -v "^ocf$")
 if [ -n "$groups" ]; then
-   echo "Member of group(s): $groups"
+  echo "Member of group(s): $groups"
 fi
 
-# check if CalLink OID number exists in LDAP
-callinkOid=$(ldapsearch -x -LLL uid=$user callinkOid | grep -i ^callinkOid | cut -d' ' -f2)
-if [ -n "$callinkOid" ]; then
-   echo "CalLink OID number: $callinkOid"
-   if [ "$callinkOid" != 0 ]; then
-       echo "https://ocf.io/callinkapi?status=&category=&type=&name=&OrganizationID=$callinkOid"
-   fi
-fi
+# check CalLink signatories
+echo
+signat user $user
 
 # check if CalNet UID number exists in LDAP
 calnetuid=$(ldapsearch -x -LLL uid=$user calnetuid | grep -i ^calnetuid | cut -d' ' -f2)
 if [ -n "$calnetuid" ]; then
-   calnetemail=$(ldapsearch -x -LLL -H ldap://nds.berkeley.edu -b dc=berkeley,dc=edu uid=$calnetuid  mail | grep ^mail | cut -d' ' -f2)
-   calnetaffiliations=$(ldapsearch -x -LLL -H ldap://nds.berkeley.edu -b dc=berkeley,dc=edu uid=$calnetuid berkeleyEduAffiliations | grep ^berkeleyEduAffiliations | cut -d' ' -f2- | sed -r 's/(^|$)/\"/g' | sort | tr '\n' ' ' | sed 's/ $//g')
-   echo "CalNet UID number: $calnetuid"
-   if [ -n "$calnetemail" ]; then
-     echo "CalNet email address: $calnetemail"
-   fi
-   if [ -n "$calnetaffiliations" ]; then
-     echo "CalNet affilations: $calnetaffiliations"
-   fi
+  calnetemail=$(ldapsearch -x -LLL -H ldap://nds.berkeley.edu -b dc=berkeley,dc=edu uid=$calnetuid  mail | grep ^mail | cut -d' ' -f2)
+  calnetaffiliations=$(ldapsearch -x -LLL -H ldap://nds.berkeley.edu -b dc=berkeley,dc=edu uid=$calnetuid berkeleyEduAffiliations | grep ^berkeleyEduAffiliations | cut -d' ' -f2- | sed -r 's/(^|$)/\"/g' | sort | tr '\n' ' ' | sed 's/ $//g')
+  if [ -n "$calnetemail" ]; then
+    echo "CalNet email address: $calnetemail"
+  fi
+  if [ -n "$calnetaffiliations" ]; then
+    echo "CalNet affilations: $calnetaffiliations"
+  fi
 fi
 
 # check virtual hosting config

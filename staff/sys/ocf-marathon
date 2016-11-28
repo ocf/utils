@@ -6,15 +6,9 @@ import getpass
 import json
 import os.path
 import sys
-import time
-from functools import partial
 from operator import itemgetter
 
-import requests
-
-marathon_url = None
-user = None
-password = None
+from ocflib.infra.mesos import marathon
 
 
 def unbuf_print(*args, file=sys.stdout, **kwargs):
@@ -22,29 +16,7 @@ def unbuf_print(*args, file=sys.stdout, **kwargs):
     file.flush()
 
 
-def _request(method, path, *args, expected_status=200, **kwargs):
-    req = requests.request(
-        method,
-        marathon_url + path,
-        auth=(user, password),
-        *args,
-        **kwargs
-    )
-    assert req.status_code == expected_status, req.status_code
-    return req
-
-get = partial(_request, 'get')
-put = partial(_request, 'put')
-delete = partial(_request, 'delete')
-post = partial(_request, 'post')
-
-
-def app_status(app):
-    req = get('/v2/apps/' + app)
-    return req.json()
-
-
-def shell(args):
+def shell(client, args):
     print("Here's a Python shell for you.")
     print('Some things you might find useful:')
     print('  * View app status:')
@@ -55,8 +27,8 @@ def shell(args):
     code.interact(local=dict(globals(), **locals()))
 
 
-def list_apps(args):
-    req = get('/v2/apps')
+def list_apps(client, args):
+    req = client.get('/v2/apps')
 
     for app in sorted(req.json()['apps'], key=itemgetter('id')):
         unbuf_print('{}: {} desired, {} healthy, {} unhealthy, {} staged'.format(
@@ -68,52 +40,22 @@ def list_apps(args):
         ))
 
 
-def deploy_app(args):
-    status = app_status(args.app)
-    image, tag = status['app']['container']['docker']['image'].split(':')
-
-    if status['app']['deployments']:
-        unbuf_print('A deployment is already in progress:')
-        unbuf_print(status['app']['deployments'])
-
-        if not args.force:
-            return 1
-        else:
-            unbuf_print('You specified --force, so going ahead anyway.')
-
-    unbuf_print('Updating from current tag "{}" to "{}"'.format(tag, args.version))
-    status['app']['container']['docker']['image'] = '{}:{}'.format(image, args.version)
-    put(
-        '/v2/apps/' + args.app + ('?force=true' if args.force else ''),
-        json={'container': status['app']['container']},
+def deploy_app(client, args):
+    client.deploy_app(
+        args.app,
+        args.version,
+        report=unbuf_print,
+        force=args.force,
     )
 
-    # wait for deployment to finish, report status
-    status = None
-    for _ in range(180):
-        status = app_status(args.app)
-        if not status['app']['deployments']:
-            unbuf_print('Deployment finished!')
-            return 0
-        else:
-            unbuf_print('Waiting for deployment to finish: {}'.format(status['app']['deployments']))
-            time.sleep(1)
-    else:
-        bad_deployment, = status['app']['deployments']
-        unbuf_print('Gave up waiting for deployment.')
-        unbuf_print('Rolling back deployment: {}'.format(bad_deployment))
 
-        delete('/v2/deployments/' + bad_deployment['id'])
-        return 2
-
-
-def view_errors(args):
-    status = app_status(args.app)
+def view_errors(client, args):
+    status = client.app_status(args.app)
     json.dump(status['app']['lastTaskFailure'], sys.stdout, indent=True)
 
 
-def scale_app(args):
-    put(
+def scale_app(client, args):
+    client.put(
         '/v2/apps/' + args.app,
         json={
             'instances': args.instances,
@@ -126,8 +68,7 @@ def main(argv=None):
         description=__doc__,
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
-    # TODO: ideally this could use any of the marathon hosts
-    parser.add_argument('--marathon', default='https://marathon0.ocf.berkeley.edu')
+    parser.add_argument('--marathon', default=marathon.MARATHON_URL)
     parser.add_argument('--user', default=getpass.getuser())
     parser.add_argument(
         '--cred-path',
@@ -180,11 +121,8 @@ def main(argv=None):
     args = parser.parse_args(argv)
 
     # this really kinda sucks
-    global marathon_url
     marathon_url = args.marathon
 
-    global user
-    global password
     if os.path.isfile(args.cred_path):
         unbuf_print('Loading credentials from {}.'.format(args.cred_path))
         with open(args.cred_path) as f:
@@ -195,13 +133,15 @@ def main(argv=None):
         user = args.user
         password = getpass.getpass("{}'s password: ".format(user))
 
+    client = marathon.MarathonClient(user, password, url=marathon_url)
+
     return {
         'deploy-app': deploy_app,
         'list-apps': list_apps,
         'scale-app': scale_app,
         'shell': shell,
         'view-errors': view_errors,
-    }[args.command](args)
+    }[args.command](client, args)
 
 
 if __name__ == '__main__':

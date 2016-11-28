@@ -38,7 +38,7 @@ def main(argv=None):
     ldap_filter = {
         'all': '(cn=*)',
         'desktop': '(type=desktop)',
-        'server': '(type=server)',
+        'server': '(|(type=server)(type=staffvm))',
     }[args.host_class]
 
     with ldap_ocf() as c:

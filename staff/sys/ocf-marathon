@@ -41,7 +41,7 @@ def list_apps(client, args):
 
 
 def deploy_app(client, args):
-    client.deploy_app(
+    client.deploy_new_version(
         args.app,
         args.version,
         report=unbuf_print,

@@ -32,7 +32,7 @@ def main(argv=None):
         ),
     )
     parser.add_argument('host_class', type=str, choices=('all', 'desktop', 'server'))
-    parser.add_argument('args', type=str, nargs='+')
+    parser.add_argument('args', type=str, nargs='+', metavar='PSSH-ARG')
 
     args = parser.parse_args(argv)
     ldap_filter = {

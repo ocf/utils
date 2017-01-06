@@ -76,20 +76,19 @@ def get_minutes(folder):
     # checks that file is ####.##.## exactly
     # this is done to excluse extra files that uploaded like pdfs and
     # membership file
-    pattern = compile("^" + "[0-9]" * 4 + "-" +
-                      "[0-9]" * 2 + "-" + "[0-9]" * 2 + "$")
+    pattern = compile("^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
     return(sorted([i for i in listdir(folder) if pattern.match(i)]))
 
 
 def attendance(path):
-    a = []
+    attended = []
     with open(path) as f:
         lines = f.read().splitlines()
         i = lines.index("Attendance:") + 1
         while lines[i] and len(lines[i].split()) == 1:
-            a += [lines[i]]
+            attended += [lines[i]]
             i += 1
-    return(a)
+    return(attended)
 
 
 def new_semester():

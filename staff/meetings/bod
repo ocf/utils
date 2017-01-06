@@ -21,9 +21,9 @@ def danger():
     path = meetings.get_current_minutes_path("bod")
     minutes = meetings.get_minutes(path)
     if len(minutes) > 0:
-        bod = meetings.ls(state="bod")
-        a = meetings.attendance(path + "/" + minutes[-1])
-        for user in [user for user in bod if user not in a]:
+        bod = set( meetings.ls(state="bod") )
+        attended_last_meeting = set( meetings.attendance(path + "/" + minutes[-1]) )
+        for user in bod - attended_last_meeting:
             print(user)
 
 

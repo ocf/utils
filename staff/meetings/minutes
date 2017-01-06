@@ -25,14 +25,14 @@ def main():
     if choice not in options:
         return(0)
 
-    path = "/".join([path, choice])
+    path = os.path.join(path, choice)
 
     if not os.path.isdir(path):
         os.makedirs(path)
 
     name = meetings.get_minutes_file()
 
-    notes = "/".join([meetings.get_current_minutes_path("bod"), name])
+    notes = os.path.join(meetings.get_current_minutes_path("bod"), name)
 
     meetings.minutes_setup(notes, choice)
 

@@ -38,7 +38,7 @@ def main():
 
     call([get_editor(), notes])
     if choice == "bod":
-        meetings.minutes_done(notes,choice)
+        meetings.minutes_done(notes, choice)
 
 if __name__ == '__main__':
     exit(main())

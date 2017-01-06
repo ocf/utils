@@ -3,7 +3,7 @@ from datetime import datetime
 from getpass import getuser
 from math import ceil
 from os import listdir, makedirs
-from os.path import expanduser, exists
+from os.path import expanduser, exists, join
 from re import compile
 from shutil import copyfile
 from time import strftime
@@ -27,9 +27,9 @@ def quorum():
 
 def get_template(choice):
     minutes_folder = get_minutes_folder()
-    if exists("/".join([minutes_folder, choice, "/template"])):
-        return "/".join([minutes_folder, choice, "/template"])
-    return "/".join([minutes_folder, "/template"])
+    if exists(join(minutes_folder, choice, "template")):
+        return join(minutes_folder, choice, "template")
+    return join(minutes_folder, "template")
 
 
 def get_minutes_choices():
@@ -45,10 +45,10 @@ def get_minutes_file():
 
 
 def get_minutes_path(choice, semester):
-    path = get_minutes_folder() + "/" + choice
+    path = join(get_minutes_folder(), choice)
     if not exists(path):
         raise ValueError("argument must be from get_minutes_choices()")
-    path += "/" + semester
+    path = join(path, semester)
     if not exists(path):
         makedirs(path)
     return path
@@ -68,10 +68,9 @@ def get_semester():
         sem = "Spring"
     else:
         sem = "Summer"
-    return(str(year) + "/" + sem)
+    return(join(str(year), sem))
 
 
-# gets the list of files in the folder which are minutes documents
 def get_minutes(folder):
     # checks that file is ####.##.## exactly
     # this is done to excluse extra files that uploaded like pdfs and
@@ -95,15 +94,15 @@ def new_semester():
     year, semester = get_semester().split("/")
     sem_map = {"Spring": "Fall", "Fall": "Spring"}
     year_map = {"Spring": -1, "Fall": 0}
-    last_sem = "/".join([str(int(year) + year_map[semester]),
-                         sem_map[semester]])
-    old_file = get_minutes_path("bod", last_sem) + "/membership"
-    new_file = get_current_minutes_path("bod") + "/membership"
+    last_sem = join(str(int(year) + year_map[semester]),
+                    sem_map[semester])
+    old_file = join(get_minutes_path("bod", last_sem), "membership")
+    new_file = join(get_current_minutes_path("bod"), "membership")
     copyfile(old_file, new_file)
 
 
 def get_membership_status(folder):
-    path = folder + "/membership"
+    path = join(folder, "membership")
     if not exists(path):
         new_semester()
     status = defaultdict(lambda: 0)
@@ -146,7 +145,7 @@ def update_membership(semester=get_semester()):
     new_status = defaultdict(lambda: 0)
     last_attended = defaultdict(lambda: "1989-02-16")
     for m in minutes:
-        users = attendance(path + "/" + m)
+        users = join(attendance(path, m))
         for user in users:
             last_attended[user] = m
             new_status[user] += 1
@@ -155,10 +154,10 @@ def update_membership(semester=get_semester()):
     for user in {k: v for k, v in special.items() if v == "offbod"}:
         special[user] = "bod"
     new_status.update(special)
-    eligible = {k: v for k, v in new_status.items() if type(v) == int
-                and v >= 4 and k in attendees}
+    eligible = {k: v for k, v in new_status.items() if type(v) == int and
+                v >= 4 and k in attendees}
     for user in eligible:
-        print(user + " is eligible to join bod, would they like to join? (y/n)")
+        print(user + " is eligible to join bod, would they like to join?(y/n)")
         ans = input()
         if ans == "y" or ans == "yes":
             new_status[user] = "bod"
@@ -172,5 +171,5 @@ def update_membership(semester=get_semester()):
     s = ""
     for user in new_status:
         s += user + " " + str(new_status[user]) + "\n"
-    f = open(path + "/membership", "w")
+    f = open(join(path, "membership"), "w")
     f.write(s)

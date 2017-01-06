@@ -5,6 +5,7 @@ import re
 from datetime import datetime
 from collections import defaultdict
 from math import ceil
+from os.path import join
 
 
 def quorum():
@@ -21,8 +22,8 @@ def danger():
     path = meetings.get_current_minutes_path("bod")
     minutes = meetings.get_minutes(path)
     if len(minutes) > 0:
-        bod = set( meetings.ls(state="bod") )
-        attended_last_meeting = set( meetings.attendance(path + "/" + minutes[-1]) )
+        bod = set(meetings.ls(state="bod"))
+        attended_last_meeting = set(join(meetings.attendance(path, minutes[-1])))
         for user in bod - attended_last_meeting:
             print(user)
 

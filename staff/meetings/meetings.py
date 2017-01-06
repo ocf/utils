@@ -40,6 +40,10 @@ def get_current_minutes_path(choice):
     return get_minutes_path(choice, get_semester())
 
 
+def get_minutes_file():
+    return strftime("%Y-%m-%d")
+
+
 def get_minutes_path(choice, semester):
     path = get_minutes_folder() + "/" + choice
     if not exists(path):
@@ -81,7 +85,6 @@ def attendance(path):
     a = []
     with open(path) as f:
         lines = f.read().splitlines()
-        print(path)
         i = lines.index("Attendance:") + 1
         while lines[i] and len(lines[i].split()) == 1:
             a += [lines[i]]
@@ -150,7 +153,7 @@ def update_membership(semester=get_semester()):
             new_status[user] += 1
 
     special = {k: v for k, v in cur_status.items() if type(v) != int}
-    for user in {k: v for k, v in special if v == "offbod"}:
+    for user in {k: v for k, v in special.items() if v == "offbod"}:
         special[user] = "bod"
     new_status.update(special)
     eligible = {k: v for k, v in new_status.items() if type(v) == int

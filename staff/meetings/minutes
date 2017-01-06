@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import os
 import meetings
+from ocflib.misc.shell import get_editor
 from sys import exit
 from datetime import datetime
 from subprocess import call, check_output
@@ -35,14 +36,9 @@ def main():
 
     meetings.minutes_setup(notes, choice)
 
-    if 'EDITOR' in os.environ:
-        editor = os.environ['EDITOR']
-    else:
-        editor = 'nano'
-
-    call([editor, notes])
+    call([get_editor(), notes])
     if choice == "bod":
-        meetings.minutes_done(notes)
+        meetings.minutes_done(notes,choice)
 
 if __name__ == '__main__':
     exit(main())

@@ -1,0 +1,46 @@
+#!/usr/bin/env python3
+import os
+import meetings
+from sys import exit
+from datetime import datetime
+from subprocess import call, check_output
+from time import strftime
+
+#note that bod (which is stored in public_html, as they are publicly readable) is symlinked in this folder
+
+#bod template file
+
+def main():
+
+    path = os.path.expanduser( "~staff/minutes" )
+    options = os.listdir( path )
+
+    print("What are you taking notes for?")
+    print("Options:", ", ".join( options ) )
+
+    choice = input()
+    if choice not in options:
+        return(0)
+
+    path = "/".join( [ path, choice ] )
+
+    if not os.path.isdir( path ):
+        os.makedirs( path )
+
+    name = meetings.get_minutes_file()
+
+    notes = "/".join( [ meetings.get_current_minutes_path( "bod" ), name ] )
+
+    meetings.minutes_setup( notes, choice )
+
+    if 'EDITOR' in os.environ:
+        editor = os.environ['EDITOR']
+    else:
+        editor = 'nano'
+
+    call( [ editor, notes ] )
+    if choice == "bod":
+        meetings.minutes_done( notes )
+
+if __name__ == '__main__':
+    exit( main() )

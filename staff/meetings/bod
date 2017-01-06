@@ -8,23 +8,23 @@ from math import ceil
 
 
 def quorum():
-    print( meetings.quorum() )
+    print(meetings.quorum())
 
 
 def ls():
     d = meetings.ls()
     for user in d:
-        print( user, d[ user ] )
+        print(user, d[user])
 
 
 def danger():
-    path = meetings.get_current_minutes_path( "bod" ) 
-    minutes = meetings.get_minutes( path )
-    if len( minutes ) > 0:
-        bod = meetings.ls( state = "bod" )
-        a = meetings.attendance( path + "/" + minutes[-1] )
-        for user in [ user for user in bod if user not in a ]:
-            print( user )
+    path = meetings.get_current_minutes_path("bod")
+    minutes = meetings.get_minutes(path)
+    if len(minutes) > 0:
+        bod = meetings.ls(state="bod")
+        a = meetings.attendance(path + "/" + minutes[-1])
+        for user in [user for user in bod if user not in a]:
+            print(user)
 
 
 # update membership file based on minutes in current semester
@@ -36,12 +36,15 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser()
     commands = {
-        'quorum': quorum, #lists number of people currently needed for quorum
-        'ls': ls,         #lists people on bod
-        'danger': danger, #lists people in "danger" of being kicked off, i.e. people who missed last meeting on bod
+        'quorum': quorum,  # lists number of people currently needed for quorum
+        'ls': ls,  # lists people on bod
+        # lists people in "danger" of being kicked off, i.e. people who missed
+        # last meeting on bod
+        'danger': danger,
         'update': update,
     }
-    parser.add_argument( "command", type=str, nargs='?', choices=commands.keys() )
+    parser.add_argument("command", type=str, nargs='?',
+                        choices=commands.keys())
 
     args = parser.parse_args()
-    commands[args.command]() 
+    commands[args.command]()

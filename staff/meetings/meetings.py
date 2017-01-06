@@ -145,7 +145,7 @@ def update_membership(semester=get_semester()):
     new_status = defaultdict(lambda: 0)
     last_attended = defaultdict(lambda: "1989-02-16")
     for m in minutes:
-        users = join(attendance(path, m))
+        users = attendance(join(path, m))
         for user in users:
             last_attended[user] = m
             new_status[user] += 1

@@ -119,7 +119,7 @@ def get_membership_status(folder):
     path = join(folder, 'membership')
     if not exists(path):
         new_semester()
-    status = defaultdict(0)
+    status = defaultdict(int)
     with open(path) as f:
         for line in f:
             user, state = line.split()

@@ -1,11 +1,10 @@
 #!/usr/bin/env python3
 import os
+from subprocess import call
+from sys import exit
+
 import meetings
 from ocflib.misc.shell import get_editor
-from sys import exit
-from datetime import datetime
-from subprocess import call, check_output
-from time import strftime
 
 # note that bod (which is stored in public_html, as they are publicly
 # readable) is symlinked in this folder
@@ -15,11 +14,11 @@ from time import strftime
 
 def main():
 
-    path = os.path.expanduser("~staff/minutes")
+    path = os.path.expanduser('~staff/minutes')
     options = os.listdir(path)
 
-    print("What are you taking notes for?")
-    print("Options:", ", ".join(options))
+    print('What are you taking notes for?')
+    print('Options:', ', '.join(options))
 
     choice = input()
     if choice not in options:
@@ -32,13 +31,14 @@ def main():
 
     name = meetings.get_minutes_file()
 
-    notes = os.path.join(meetings.get_current_minutes_path("bod"), name)
+    notes = os.path.join(meetings.get_current_minutes_path('bod'), name)
 
     meetings.minutes_setup(notes, choice)
 
     call([get_editor(), notes])
-    if choice == "bod":
+    if choice == 'bod':
         meetings.minutes_done(notes, choice)
+
 
 if __name__ == '__main__':
     exit(main())

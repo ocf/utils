@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 import argparse
-import meetings
-import re
-from datetime import datetime
-from collections import defaultdict
-from math import ceil
 from os.path import join
+
+import meetings
 
 
 def quorum():
@@ -13,17 +10,16 @@ def quorum():
 
 
 def ls():
-    d = meetings.ls()
-    for user in d:
-        print(user, d[user])
+    for user, status in meetings.ls().items():
+        print(user, status)
 
 
 def danger():
-    path = meetings.get_current_minutes_path("bod")
+    path = meetings.get_current_minutes_path('bod')
     minutes = meetings.get_minutes(path)
     if len(minutes) > 0:
-        bod = set(meetings.ls(state="bod"))
-        attended_last_meeting = set(join(meetings.attendance(path, minutes[-1])))
+        bod = set(meetings.ls(state='bod'))
+        attended_last_meeting = set(meetings.attendance(join(path, minutes[-1])))
         for user in bod - attended_last_meeting:
             print(user)
 
@@ -44,8 +40,7 @@ if __name__ == '__main__':
         'danger': danger,
         'update': update,
     }
-    parser.add_argument("command", type=str, nargs='?',
-                        choices=commands.keys())
+    parser.add_argument('command', type=str, choices=commands.keys())
 
     args = parser.parse_args()
     commands[args.command]()

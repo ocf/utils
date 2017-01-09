@@ -44,7 +44,7 @@ def volume(args):
 def volume_in_range(val):
     x = int(val)
     if x < 0 or x > 130:
-        raise argparse.ArgumentTypeError("{} is not within the range (0, 130)".format(val))
+        raise argparse.ArgumentTypeError("{} is not within the range (0, 150)".format(val))
     return val
         
 def connect(args):

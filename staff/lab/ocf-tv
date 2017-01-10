@@ -26,9 +26,12 @@ def unused_port():
     return port
 
 
-def wait_for_port(host, port, timeout=5):
+def wait_for_port(host, port, timeout=5, ssh_proc=None):
     spent = 0
     while True:
+        if ssh_proc and ssh_proc.poll():
+            raise ChildProcessError("SSH exited too quickly. Maybe run kinit?")
+
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             if s.connect_ex((host, port)) == 0:
                 return
@@ -54,12 +57,12 @@ def volume_in_range(val):
 def connect(args):
     port = unused_port()
     proc = Popen(['ssh', '-N', '-o', 'ExitOnForwardFailure=yes',
+                  '-o', 'BatchMode=yes',
                   '-L', '{}:localhost:5900'.format(port), args.host])
-    wait_for_port('localhost', port)
+    wait_for_port('localhost', port, ssh_proc=proc)
     call(['xvnc4viewer', 'localhost:{}'.format(port)])
     proc.terminate()
     proc.wait()
-    call(['stty', 'echo'])
 
 
 if __name__ == '__main__':

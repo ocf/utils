@@ -53,11 +53,13 @@ def volume_in_range(val):
 
 def connect(args):
     port = unused_port()
-    proc = Popen(('ssh', '-L', '{}:localhost:5900'.format(port), '-N', args.host))
+    proc = Popen(['ssh', '-N', '-o', 'ExitOnForwardFailure=yes',
+                  '-L', '{}:localhost:5900'.format(port), args.host])
     wait_for_port('localhost', port)
-    call(('xvnc4viewer', 'localhost:{}'.format(port)))
+    call(['xvnc4viewer', 'localhost:{}'.format(port)])
     proc.terminate()
     proc.wait()
+    call(['stty', 'echo'])
 
 
 if __name__ == '__main__':

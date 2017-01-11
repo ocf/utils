@@ -46,10 +46,12 @@ def connect(args):
     proc = Popen(['ssh', '-N', '-o', 'ExitOnForwardFailure=yes',
                   '-o', 'BatchMode=yes',
                   '-L', '{}:localhost:5900'.format(port), args.host])
-    wait_for_port('localhost', port, ssh_proc=proc)
-    call(['xvnc4viewer', 'localhost:{}'.format(port)])
-    proc.terminate()
-    proc.wait()
+    try:
+        wait_for_port('localhost', port, ssh_proc=proc)
+        call(['xvnc4viewer', 'localhost:{}'.format(port)])
+    finally:
+        proc.terminate()
+        proc.wait()
 
 
 if __name__ == '__main__':

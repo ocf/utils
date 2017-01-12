@@ -2,6 +2,7 @@
 import argparse
 import random
 import socket
+import sys
 import time
 from subprocess import call
 from subprocess import Popen
@@ -29,7 +30,7 @@ def wait_for_port(host, port, timeout=5, ssh_proc=None):
     spent = 0
     while True:
         if ssh_proc and ssh_proc.poll():
-            raise ChildProcessError("SSH exited too quickly. Maybe run kinit?")
+            raise ChildProcessError('SSH exited too quickly. Maybe run kinit?')
 
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             if s.connect_ex((host, port)) == 0:
@@ -39,6 +40,18 @@ def wait_for_port(host, port, timeout=5, ssh_proc=None):
 
         if spent > timeout:
             raise TimeoutError('Timed out after {} seconds.'.format(timeout))
+
+
+def volume(args):
+    call(('ssh', args.host,
+          'export PULSE_SERVER=localhost; pactl set-sink-volume {} {}%'.format(args.sink, args.amount)))
+
+
+def volume_in_range(val):
+    x = int(val)
+    if x < 0 or x > 130:
+        raise argparse.ArgumentTypeError('{} is not within the range (0, 150)'.format(val))
+    return val
 
 
 def connect(args):
@@ -57,13 +70,25 @@ def connect(args):
 if __name__ == '__main__':
     commands = {
         'connect': connect,
+        'volume': volume
     }
     parser = argparse.ArgumentParser(
         description='Control the OCF television.',
     )
     parser.add_argument('-H', '--host', type=str, default='tv')
-    parser.add_argument('command', type=str, nargs='?',
-                        choices=commands.keys(), default='connect')
 
-    args = parser.parse_args()
+    command_subparser = parser.add_subparsers(dest='command', help='command to run')
+
+    subparser_connect = command_subparser.add_parser('connect', help='open a vnc instance to view the TV screen')
+
+    subparser_volume = command_subparser.add_parser('volume', help='set the volume for a PulseAudio sink on the TV')
+    subparser_volume.add_argument('--sink', '-s', required=False, type=str, default='0')
+    subparser_volume.add_argument('amount', type=volume_in_range,
+                                  default='100', help='volume in percent between 0 and 130')
+
+    if len(sys.argv) == 1:
+        args = parser.parse_args(['connect'])
+    else:
+        args = parser.parse_args()  # default is sys.argv
+
     commands[args.command](args)

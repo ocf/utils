@@ -1,15 +1,36 @@
+import string
 from collections import defaultdict
 from datetime import datetime
 from getpass import getuser
 from math import ceil
+from os import chmod
 from os import listdir
 from os import makedirs
 from os.path import exists
 from os.path import expanduser
+from os.path import isdir
 from os.path import join
 from re import compile
+from shutil import chown
 from shutil import copyfile
 from time import strftime
+
+
+class ForgivingFormatter(string.Formatter):
+
+    def get_value(self, key, args, kwargs):
+        try:
+            return super().get_value(key, args, kwargs)
+        except KeyError:
+            return '{' + key + '}'
+
+
+def set_group_and_permissions(path):
+    chown(path, group='ocfstaff')
+    if isdir(path):
+        chmod(path, 0o775)
+    else:
+        chmod(path, 0o664)
 
 
 def get_minutes_folder():
@@ -54,6 +75,7 @@ def get_minutes_path(choice, semester):
     path = join(path, semester)
     if not exists(path):
         makedirs(path)
+        set_group_and_permissions(path)
     return path
 
 
@@ -113,6 +135,7 @@ def new_semester():
     old_file = join(get_minutes_path('bod', last_sem), 'membership')
     new_file = join(get_current_minutes_path('bod'), 'membership')
     copyfile(old_file, new_file)
+    set_group_and_permissions(new_file)
 
 
 def get_membership_status(folder):
@@ -130,12 +153,15 @@ def get_membership_status(folder):
 def minutes_setup(notes, choice):
     if not exists(notes):
         copyfile(get_template(choice), notes)
+        set_group_and_permissions(notes)
     with open(notes, 'r') as f:
         s = f.read()
-    s = s.replace('<USERNAME>', getuser())
-    s = s.replace('<START TIME>', strftime('%H:%M'))
-    if choice == 'bod':
-        s = s.replace('<QUORUM>', str(quorum()))
+    s = ForgivingFormatter().format(
+        format_string=s,
+        username=getuser(),
+        start_time=strftime('%H:%M'),
+        quorum=str(quorum()),
+    )
     with open(notes, 'w') as f:
         f.write(s)
 
@@ -143,7 +169,10 @@ def minutes_setup(notes, choice):
 def minutes_done(notes, choice):
     with open(notes, 'r') as f:
         s = f.read()
-    s = s.replace('<END TIME>', strftime('%H:%M'))
+    s = ForgivingFormatter().format(
+        format_string=s,
+        end_time=strftime('%H:%M'),
+    )
     with open(notes, 'w') as f:
         f.write(s)
     if choice == 'bod':

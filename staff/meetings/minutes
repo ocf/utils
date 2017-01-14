@@ -28,13 +28,12 @@ def main():
 
     name = meetings.get_minutes_file()
 
-    notes = os.path.join(meetings.get_current_minutes_path('bod'), name)
+    notes = os.path.join(meetings.get_minutes_path(choice), name)
 
     meetings.minutes_setup(notes, choice)
 
     call([get_editor(), notes])
-    if choice == 'bod':
-        meetings.minutes_done(notes, choice)
+    meetings.minutes_done(notes, choice)
 
 
 if __name__ == '__main__':

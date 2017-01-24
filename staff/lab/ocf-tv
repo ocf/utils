@@ -61,7 +61,7 @@ def connect(args):
                   '-L', '{}:localhost:5900'.format(port), args.host])
     try:
         wait_for_port('localhost', port, ssh_proc=proc)
-        call(['xvnc4viewer', 'localhost:{}'.format(port)])
+        call(['xvncviewer', 'localhost:{}'.format(port)])
     finally:
         proc.terminate()
         proc.wait()

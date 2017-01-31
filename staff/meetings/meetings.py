@@ -2,6 +2,7 @@ from collections import defaultdict
 from datetime import datetime
 from getpass import getuser
 from math import ceil
+from os import chmod
 from os import listdir
 from os import makedirs
 from os.path import exists
@@ -137,6 +138,7 @@ def new_semester():
 def minutes_setup(notes, choice):
     if not exists(notes):
         copyfile(get_template(choice), notes)
+        chmod(notes, 0o664)
     with open(notes, 'r') as f:
         s = Template(f.read())
     subs = {'username': getuser(), 'start_time': strftime('%H:%M')}

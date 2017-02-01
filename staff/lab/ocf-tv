@@ -48,18 +48,20 @@ def volume(args):
     if args.amount is not None:
         cmd += 'pactl set-sink-volume 0 {}%; '.format(args.amount)
 
-    # thanks SO for awk tricks
+    # awk prints the 9th line after the match
     cmd += "pactl list sinks | awk '/Sink #0/{nr[NR+9]}; NR in nr' | cut -d' ' -f 6;"
 
-    # tornado has 2 sinks, we default to sink 0 which is HDMI out to TV
     return call(('ssh', args.host, cmd))
 
 
 def volume_in_range(val):
+    # allow things like +20, -30, and absolute numbers
     x = int(val[1:]) if val[0] in ['+', '-'] else int(val)
     if x < 0 or x > 150:
         raise argparse.ArgumentTypeError('{} is not within the range [0, 150]'.format(val))
-    return '-- ' + val if val[0] is '-' else val  # pactl doesn't like negatives
+
+    # need -- before negatives or pactl interprets it as an arg
+    return '-- ' + val if val[0] == '-' else val
 
 
 def connect(args):
@@ -81,9 +83,11 @@ if __name__ == '__main__':
         'volume': volume,
         'mute': volume,
     }
+
     parser = argparse.ArgumentParser(
         description='Control the OCF television.',
     )
+
     parser.add_argument('-H', '--host', type=str, default='tv')
 
     command_subparser = parser.add_subparsers(dest='command')
@@ -93,10 +97,10 @@ if __name__ == '__main__':
     subparser_volume = command_subparser.add_parser('volume', help='set the volume on the TV using PulseAudio')
     subparser_volume.add_argument('amount', type=volume_in_range, nargs='?',
                                   help='volume in percent between 0% and 150%.'
-                                       '+/- a relative value is also allowed.')
+                                       ' +/- a relative value is also allowed.')
 
     subparser_mute = command_subparser.add_parser('mute', help='mute the TV')
-    # dirty hack so volume() can be reused
+    # hack so volume() can be reused
     subparser_mute.add_argument('--amount', default=0, help=argparse.SUPPRESS)
 
     if len(sys.argv) == 1:

@@ -48,20 +48,19 @@ def volume(args):
     if args.amount is not None:
         cmd += 'pactl set-sink-volume 0 {}%; '.format(args.amount)
 
-    # awk prints the 9th line after the match
+    # prints 9th line after match, which has volume info
     cmd += "pactl list sinks | awk '/Sink #0/{nr[NR+9]}; NR in nr' | cut -d' ' -f 6;"
 
     return call(('ssh', args.host, cmd))
 
 
-def volume_in_range(val):
-    # allow things like +20, -30, and absolute numbers
-    x = int(val[1:]) if val[0] in ['+', '-'] else int(val)
-    if x < 0 or x > 150:
-        raise argparse.ArgumentTypeError('{} is not within the range [0, 150]'.format(val))
+def check_volume(val):
+    x = int(val)
+    if abs(x) > 150:
+        raise argparse.ArgumentTypeError('Volume out of bounds: {} not in [0, 150]'.format(val))
 
     # need -- before negatives or pactl interprets it as an arg
-    return '-- ' + val if val[0] == '-' else val
+    return '-- ' + val
 
 
 def connect(args):
@@ -95,7 +94,7 @@ if __name__ == '__main__':
     subparser_connect = command_subparser.add_parser('connect', help='open a vnc instance to view the TV screen')
 
     subparser_volume = command_subparser.add_parser('volume', help='set the volume on the TV using PulseAudio')
-    subparser_volume.add_argument('amount', type=volume_in_range, nargs='?',
+    subparser_volume.add_argument('amount', type=check_volume, nargs='?',
                                   help='volume in percent between 0% and 150%.'
                                        ' +/- a relative value is also allowed.')
 

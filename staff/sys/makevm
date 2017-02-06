@@ -129,21 +129,32 @@ def get_ssh_connection(mac, user, password):
         time.sleep(1)
 
 
+def get_net_iface(ssh):
+    """Return the first available ethernet interface on the newly created VM.
+    In current versions of systemd/udev, they are supposed to be named starting
+    with the letters 'en', e.g. 'eno1', 'enp4s0'.
+    """
+    with ssh.open_sftp() as sftp:
+        ifaces = sftp.listdir('/sys/class/net/')
+        return next(iface for iface in ifaces if iface.startswith('en'))
+
+
 def configure_network(ssh, ipv4):
     """Set up the correct IPv4 and IPv6 static addresses."""
     ipv6 = ipv4_to_ipv6(ipv4)
+    interface = get_net_iface(ssh)
 
     lines = [
         'auto lo',
         'iface lo inet loopback',
         '',
-        'auto eth0',
-        'iface eth0 inet static',
+        'auto {}'.format(interface),
+        'iface {} inet static'.format(interface),
         '\taddress {}'.format(ipv4),
         '\tnetmask 255.255.255.0',
         '\tgateway {}'.format(OCF_GATEWAY_V4),
         '',
-        'iface eth0 inet6 static',
+        'iface {} inet6 static'.format(interface),
         '\taddress {}'.format(ipv6),
         '\tnetmask 64',
         '\tgateway {}'.format(OCF_GATEWAY_V6),

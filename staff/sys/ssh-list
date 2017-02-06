@@ -12,7 +12,7 @@ from ocflib.infra.ldap import ldap_ocf
 
 def main(argv=None):
     parser = argparse.ArgumentParser(
-        description='Execute SSH commands in parallel.',
+        description='Execute SSH commands on many hosts in parallel.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=dedent(
             '''\
@@ -21,8 +21,8 @@ def main(argv=None):
 
             Example usage:
 
-                {arg0} desktop -- -i uptime
-                {arg0} all -- -i 'hostname && /sbin/ifconfig && uname -a'
+                {arg0} desktop -i uptime
+                {arg0} all -i 'hostname && /sbin/ifconfig && uname -a'
 
             The -i flag will print stdout and stderr from each host; feel free to
             omit it if viewing this output is not necessary.
@@ -32,7 +32,8 @@ def main(argv=None):
         ),
     )
     parser.add_argument('host_class', type=str, choices=('all', 'desktop', 'server'))
-    parser.add_argument('args', type=str, nargs='+', metavar='PSSH-ARG')
+    parser.add_argument('args', type=str, nargs=argparse.REMAINDER, metavar='PSSH-ARGS',
+                        help='arguments to pass to parallel-ssh')
 
     args = parser.parse_args(argv)
     ldap_filter = {

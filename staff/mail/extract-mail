@@ -18,6 +18,7 @@ def get_messages(mbox, uid):
         if any(search in r for r in received):
             yield message
 
+
 if __name__ == '__main__':
     if len(sys.argv) != 2:
         print('usage: {} username'.format(sys.argv[0]), file=sys.stderr)

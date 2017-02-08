@@ -207,5 +207,6 @@ def main():
     elif args.idtype == 'group':
         show_signatories_by_group_name(' '.join(args.name))
 
+
 if __name__ == '__main__':
     main()

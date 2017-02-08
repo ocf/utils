@@ -59,6 +59,7 @@ def set_economode(setting, hostname, username, password):
                 sys.stderr.write('\n')
                 raise
 
+
 if __name__ == '__main__':
     if len(sys.argv) > 1:
         if sys.argv[1] == 'on':

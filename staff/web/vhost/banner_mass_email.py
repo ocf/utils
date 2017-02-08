@@ -65,6 +65,7 @@ def send_mass_mail(target_log, dry_run):
         for user, site in username_site_pairs:
             print(user)
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Check if vhost banner and '
                                      'disclaimer exist')

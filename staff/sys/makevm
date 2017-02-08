@@ -296,5 +296,6 @@ def _main(args):
 
     print('{} is now minimally configured. You should now sign the puppet cert.'.format(args.hostname))
 
+
 if __name__ == '__main__':
     _main(sys.argv[1:])

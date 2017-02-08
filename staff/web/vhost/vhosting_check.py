@@ -90,6 +90,7 @@ def check_vhosting():
                 error_file.writelines(site)
                 error_file.writelines(str(e) + '\n\n')
 
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Check if vhost banner and disclaimer exist')
     args = parser.parse_args()

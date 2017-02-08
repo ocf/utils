@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 # Small utility to just get the weather from wttr.in, since wego is kind of
 # annoying to set up and install
-
 import argparse
-import requests
 import sys
+
+import requests
+
 
 def get_weather(location):
     # ugly but need to fake the user agent to match curl,
@@ -16,6 +17,7 @@ def get_weather(location):
     else:
         print('location not found')
 
+
 def main(args):
     parser = argparse.ArgumentParser(description='Lookup the current weather')
     parser.add_argument('-l', '--location',
@@ -23,6 +25,7 @@ def main(args):
                         help='specify name of location to look up the weather')
     parsed_args = parser.parse_args(args=args)
     get_weather(parsed_args.location)
+
 
 DEFAULT_LOCATION = 'Berkeley'
 # we can always make one of our own using wego, but too lazy to set up right now

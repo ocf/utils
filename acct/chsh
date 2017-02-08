@@ -30,7 +30,7 @@ while line != '':
         l.modify_s(dn, ldif)
         l.unbind_s()
         print(
-            'Shell successfully changed, typically it takes a while for the changes to propagate to all our machines',  # noqa
+            'Shell successfully changed, typically it takes a while for the changes to propagate to all our machines'  # noqa
         )
         exit()
     line = etcshells.readline()

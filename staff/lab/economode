@@ -7,6 +7,7 @@ import sys
 import lxml.html
 import requests
 
+
 # TODO: get this from ocflib instead once logjam dies
 PRINTERS = ['papercut', 'pagefault']
 
@@ -31,7 +32,6 @@ class Printer:
 
     def log_in(self, password):
         """Logs in to the printer and returns whether that succeeded."""
-
         resp = self.session.post('https://' + self.server +
                                  '/hp/device/SignIn/Index',
                                  data={'agentIdSelect': 'hp_EmbeddedPin_v1',
@@ -86,6 +86,7 @@ class Printer:
 
 
 def main():
+    requests.packages.urllib3.disable_warnings()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('setting', choices=('on', 'off'), help='economode setting')
     args = parser.parse_args()

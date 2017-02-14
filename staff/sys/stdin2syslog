@@ -2,7 +2,7 @@
 """Write stdin logs to OCF's remote syslog server.
 
 You can use arbitrary stream names (without configuring them before); each
-stream will show up at syslog:/var/log/remote/<stream>.
+stream will show up at syslog:/var/log/remote/<stream>.log.
 """
 import argparse
 import re

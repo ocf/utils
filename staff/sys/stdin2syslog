@@ -5,12 +5,13 @@ You can use arbitrary stream names (without configuring them before); each
 stream will show up at syslog:/var/log/remote/<stream>.log.
 """
 import argparse
+import os
 import re
 import subprocess
 import sys
 
 
-VALID_STREAM_NAME = re.compile('^[a-z0-9\-_]+$')
+LOGGER_ARGS = ('logger', '-T', '-n', 'syslog', '-P', '514', '-t')
 
 
 class LoggingFailure(Exception):
@@ -22,14 +23,21 @@ def write_line(stream, line):
 
     This might make sense to move to ocflib some day.
     """
-    if not VALID_STREAM_NAME.match(stream):
-        raise ValueError('Bad stream name: {}'.format(stream))
-
-    ret = subprocess.call((
-        'logger', '-T', '-n', 'syslog', '-P', '514', '-t', stream, '--', line,
-    ))
+    ret = subprocess.call(LOGGER_ARGS + (stream, '--', line))
     if ret != 0:
         raise LoggingFailure('logger exited nonzero: {}'.format(ret))
+
+
+def valid_stream(stream):
+    if not re.match('^[a-z0-9\-_]+$', stream):
+        raise ValueError('Bad stream name: {}'.format(stream))
+    else:
+        return stream
+
+
+def is_jessie():
+    with open('/etc/os-release') as f:
+        return 'jessie' in f.read()
 
 
 def main(argv=None):
@@ -37,12 +45,17 @@ def main(argv=None):
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument('stream')
+    parser.add_argument('stream', type=valid_stream)
     args = parser.parse_args(argv)
 
-    for line in sys.stdin:
-        line = line.rstrip('\n')
-        write_line(args.stream, line)
+    # On post-jessie, logger supports reading logs from stdin directly.
+    # TODO: remove once we drop jessie
+    if not is_jessie():
+        os.execvp('logger', LOGGER_ARGS + (args.stream,))
+    else:
+        for line in sys.stdin:
+            line = line.rstrip('\n')
+            write_line(args.stream, line)
 
 
 if __name__ == '__main__':

@@ -59,8 +59,7 @@ def check_volume(val):
     if abs(x) > 150:
         raise argparse.ArgumentTypeError('Volume out of bounds: {} not in [0, 150]'.format(val))
 
-    # need -- before negatives or pactl interprets it as an arg
-    return '-- ' + val
+    return val
 
 
 def connect(args):

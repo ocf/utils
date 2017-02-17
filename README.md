@@ -1,5 +1,6 @@
 utils
 =====
+[![Build Status](https://jenkins.ocf.berkeley.edu/buildStatus/icon?job=utils/master)](https://jenkins.ocf.berkeley.edu/job/utils/job/master/)
 
 `utils` is a repository of scripts used by the [Open Computing Facility][ocf]
 at the University of California, Berkeley.

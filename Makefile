@@ -1,4 +1,9 @@
 .PHONY: test
-test:
-	pre-commit install
-	pre-commit run --all-files
+test: venv
+	venv/bin/pre-commit install
+	venv/bin/pre-commit run --all-files
+
+venv: Makefile
+	vendor/venv-update \
+		venv= venv -ppython3 \
+		install= pre-commit

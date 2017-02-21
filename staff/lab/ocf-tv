@@ -48,8 +48,8 @@ def volume(args):
     if args.amount is not None:
         cmd += 'pactl set-sink-volume 0 {}%; '.format(args.amount)
 
-    # prints 9th line after match, which has volume info
-    cmd += "pactl list sinks | awk '/Sink #0/{nr[NR+9]}; NR in nr' | cut -d' ' -f 6;"
+    # prints the 5th field in the 9th line after match, which has volume info
+    cmd += "pactl list sinks | awk '/Sink #0/ { target = NR + 9 }; NR == target { print $5 }'"
 
     return call(('ssh', args.host, cmd))
 

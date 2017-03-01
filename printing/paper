@@ -61,7 +61,7 @@ def refund(args):
     except FileNotFoundError:
         print(red('Could not find the file for staff credentials.'))
         print(red('Are you running this on supernova?'))
-        sys.exit(1)
+        return 1
 
     with get_connection(**credentials) as c:
         add_refund(c, refund)
@@ -94,10 +94,10 @@ def main(argv=None):
 
     if not user_exists(args.user):
         print(bold(red("The user {} doesn't exist.".format(args.user))))
-        sys.exit(1)
+        return 1
 
-    commands[args.command](args)
+    return commands[args.command](args)
 
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())

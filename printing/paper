@@ -4,6 +4,7 @@ import json
 import sys
 from datetime import datetime
 
+from ocflib.account.search import user_exists
 from ocflib.account.search import user_is_group
 from ocflib.misc.shell import bold
 from ocflib.misc.shell import green
@@ -90,6 +91,10 @@ def main(argv=None):
         args = parser.parse_args(['view'])
     else:
         args = parser.parse_args(argv)
+
+    if not user_exists(args.user):
+        print(bold(red("The user {} doesn't exist.".format(args.user))))
+        sys.exit(1)
 
     commands[args.command](args)
 

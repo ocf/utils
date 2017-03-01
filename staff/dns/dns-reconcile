@@ -7,6 +7,7 @@ in the OCF subnet returned by the OCF nameserver.
 Requires python3-dnspython
 """
 import random
+import sys
 
 from dns import query
 from dns import resolver
@@ -68,4 +69,4 @@ def main(argv=None):
 
 
 if __name__ == '__main__':
-    exit(main())
+    sys.exit(main())

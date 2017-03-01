@@ -10,11 +10,11 @@ USER_INFO_BAK = '/tmp/User_Info.bak.' + getpass.getuser()
 
 if len(sys.argv) < 3:
     print('Usage: note -u username [note]')
-    exit(1)
+    sys.exit(1)
 
 if len(sys.argv) == 3:
     print('No user_info note was provided')
-    exit(2)
+    sys.exit(2)
 
 user = sys.argv[2].strip()
 
@@ -22,13 +22,13 @@ try:
     pwd.getpwnam(user)
 except KeyError:
     print('User does not exist in LDAP')
-    exit(3)
+    sys.exit(3)
 
 try:
     file = open(USER_INFO, 'r')
 except IOError:
     print('Could not open User_Info file for reading')
-    exit(4)
+    sys.exit(4)
 
 # clean lines up
 lines = file.readlines()
@@ -69,13 +69,13 @@ try:
     shutil.copy(USER_INFO, USER_INFO_BAK)
 except shutil.Error:
     print('Could not open backup for writing')
-    exit(6)
+    sys.exit(6)
 
 try:
     tmpfile = open(USER_INFO, 'w')
 except IOError:
     print('Could not open file for writing')
-    exit(5)
+    sys.exit(5)
 
 for l in lines:
     tmpfile.write(l.replace('0000-00-00', ''))

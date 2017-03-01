@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+from __future__ import print_function
+
 import getpass
 import os
 import sys
@@ -9,7 +11,7 @@ import ldap.sasl as sasl
 
 if len(sys.argv) < 2:
     print('Usage: chsh shell')
-    exit()
+    sys.exit()
 
 shell = sys.argv[1]
 etcshells = open('/etc/shells', 'r')
@@ -29,9 +31,8 @@ while line != '':
         ldif = modlist.modifyModlist(old, new)
         l.modify_s(dn, ldif)
         l.unbind_s()
-        print(
-            'Shell successfully changed, typically it takes a while for the changes to propagate to all our machines'  # noqa
-        )
-        exit()
+        print('Shell successfully changed, typically it takes a while for the '
+              'changes to propagate to all our machines')
+        sys.exit()
     line = etcshells.readline()
 print('The shell you chose is not valid, please chose another shell')

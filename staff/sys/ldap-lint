@@ -13,6 +13,7 @@ Currently checks the Hosts OU for:
 """
 from ipaddress import ip_address
 from operator import itemgetter
+import sys
 
 import dns
 from ocflib.constants import OCF_LDAP_HOSTS
@@ -121,4 +122,4 @@ def main():
 
 
 if __name__ == '__main__':
-    exit(main())
+    sys.exit(main())

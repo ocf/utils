@@ -138,7 +138,7 @@ if __name__ == '__main__':
 
     if os.geteuid() != 0:
         print(bold(red('You are not root.')))
-        exit(1)
+        sys.exit(1)
 
     resp = input(bold('We will copy {vm} from {host} to {here}. Continue? [yN] '.format(
         vm=vm,
@@ -147,7 +147,7 @@ if __name__ == '__main__':
     )))
     if resp != 'y':
         print(red('Cancelled.'))
-        exit(0)
+        sys.exit(0)
 
     password = getpass(bold('Enter password for root: '))
 

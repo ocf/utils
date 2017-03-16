@@ -7,6 +7,14 @@ import time
 from subprocess import call
 from subprocess import Popen
 
+# occasionally the pulseaudio sink on tornado changes
+# and this script breaks. If that happens, find the new
+# sink (login to tornado, export PULSE_AUDIO=localhost,
+# then do something like pactl list | grep 'Sink #' -A 10
+# and update this with the result. If you get one that says
+# "dummy output" then you forgot to export the env variable.
+
+PACTL_SINK = 2
 
 def unused_port():
     def used(port):
@@ -46,11 +54,11 @@ def volume(args):
     cmd = 'export PULSE_SERVER=localhost; '
 
     if args.amount is not None:
-        cmd += 'pactl set-sink-volume 0 {}%; '.format(args.amount)
+        cmd += 'pactl set-sink-volume {} {}%; '.format(PACTL_SINK, args.amount)
 
     # prints the 5th field in the 9th line after match, which has volume info
-    cmd += "pactl list sinks | awk '/Sink #0/ { target = NR + 9 }; NR == target { print $5 }'"
-
+    cmd += "pactl list sinks | awk '/Sink #{}/ {{ target = NR + 9 }}; NR == target {{ print $5 }}'".format(PACTL_SINK)
+    
     return call(('ssh', args.host, cmd))
 
 

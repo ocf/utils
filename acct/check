@@ -155,11 +155,10 @@ if [ -n "$User_Info" ]; then
 fi
 
 # list signatories for group account
-if [ -n "$callinkOid" ]; then
-    echo
-    echo "Signatories for group:";
-    echo "$(python3 -c "from ocflib.ucb.groups import signatories_for_group; print('\n'.join(map(lambda obj: obj['name'], signatories_for_group($callinkOid).values())));")"
-fi
+echo 
+echo "Signatories/Signatory for:"
+signat user $user
+    
 
 # check user crontab, probably requires root privileges
 crontab=$(crontab -lu $user 2> /dev/null | sed '/^[ ]*$/d')

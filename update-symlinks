@@ -4,7 +4,7 @@
 find bin -type l -delete
 find sbin -type l -delete
 
-find . -type f -executable -not -path './staff/*' -not -path './.git/*' -not -path './vendor/*' | \
+find . -type f -executable -not -path './staff/*' -not -path './.git/*' -not -path './vendor/*' -not -path './venv/*' | \
     while read p; do
         ln -s "../${p:2}" "bin/$(basename "$p")"
     done

@@ -8,7 +8,6 @@ import lxml.html
 import requests
 
 
-# TODO: get this from ocflib instead once logjam dies
 PRINTERS = ['papercut', 'pagefault']
 
 

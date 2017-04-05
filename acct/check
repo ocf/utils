@@ -154,6 +154,12 @@ if [ -n "$User_Info" ]; then
   echo "-------------------------------------------------------------------------------"
 fi
 
+# list signatories for group account
+echo 
+echo "Signatories/Signatory for:"
+signat user $user
+    
+
 # check user crontab, probably requires root privileges
 crontab=$(crontab -lu $user 2> /dev/null | sed '/^[ ]*$/d')
 if [ -n "$crontab" ]; then

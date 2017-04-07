@@ -16,7 +16,7 @@ from operator import itemgetter
 import sys
 
 import dns
-from ocflib.constants import OCF_LDAP_HOSTS
+from ocflib.infra.ldap import OCF_LDAP_HOSTS
 from ocflib.infra.ldap import ldap_ocf
 from ocflib.misc.shell import bold
 from ocflib.misc.shell import red

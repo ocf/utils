@@ -7,7 +7,7 @@ from subprocess import check_call
 from subprocess import check_output
 
 from lxml import etree
-from ocflib.constants import MAIL_ROOT
+from ocflib.misc.mail import MAIL_ROOT
 from ocflib.infra.hosts import hosts_by_filter
 from ocflib.misc.mail import send_mail
 

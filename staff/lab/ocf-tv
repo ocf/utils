@@ -14,7 +14,7 @@ from subprocess import Popen
 # and update this with the result. If you get one that says
 # "dummy output" then you forgot to export the env variable.
 
-PACTL_SINK = 2
+PACTL_SINK = 0
 
 def unused_port():
     def used(port):

@@ -29,8 +29,6 @@ from ocflib.misc.shell import green
 MAC_KVM_PREFIX = (0x52, 0x54, 0x00)
 MAC_BYTES = 6
 
-devnull = open(os.devnull, 'w')
-
 
 def exec_cmd(cmd):
     """Executes the given shell command with some pretty colors. Script
@@ -66,7 +64,7 @@ def create_vm(name, memory, vcpus, os_type, os_variant, network, mac):
     # try to print info about the domain to see if it already exists
     # we expect this command to fail
     try:
-        subprocess.check_call('virsh dominfo {}'.format(name), shell=True, stderr=devnull)
+        subprocess.check_call('virsh dominfo {}'.format(name), shell=True, stderr=subprocess.DEVNULL)
         print("Can't create new vm, domain {} already exists.".format(name))
         sys.exit(2)
     except subprocess.CalledProcessError:
@@ -99,7 +97,7 @@ def get_ip(mac):
     while True:
         try:
             subprocess.check_call('sudo -u nobody nmap -sn {}'.format(OCF_SUBNET_V4),
-                                  stdout=devnull, shell=True)
+                                  stdout=subprocess.DEVNULL, shell=True)
             cmd = "arp -an | grep '{}'".format(mac)
             result = subprocess.check_output(cmd, shell=True).decode('utf-8').strip()
             return result.split(' ')[1][1:-1]

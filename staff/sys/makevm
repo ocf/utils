@@ -25,6 +25,7 @@ from ocflib.infra.net import OCF_GATEWAY_V6
 from ocflib.infra.net import OCF_SUBNET_V4
 from ocflib.misc.shell import bold
 from ocflib.misc.shell import green
+from ocflib.misc.shell import yellow
 
 MAC_KVM_PREFIX = (0x52, 0x54, 0x00)
 MAC_BYTES = 6
@@ -58,7 +59,7 @@ def generate_mac_addr():
     return ':'.join('{:02x}'.format(random_byte(i)) for i in range(MAC_BYTES))
 
 
-def create_vm(name, memory, vcpus, os_type, os_variant, network, mac):
+def create_vm(name, memory, vcpus, os_type, os_variant, network, mac, skip_config):
     """Creates a new VM."""
 
     # try to print info about the domain to see if it already exists
@@ -70,11 +71,14 @@ def create_vm(name, memory, vcpus, os_type, os_variant, network, mac):
     except subprocess.CalledProcessError:
         pass  # all good
 
-    cmd = 'virt-install -r {} --pxe --os-type={} --os-variant={} ' + \
-        '--disk {},cache=none --vcpus={} --network {},mac={} --graphics vnc --serial pty --name {}'
+    cmd = 'virt-install -r {} --pxe --os-type {} --os-variant {} ' \
+        '--disk {},cache=none --vcpus {} --network {},mac={} --graphics vnc --serial pty --name {} --wait {}'
     cmd = cmd.format(memory, os_type, os_variant, '/dev/vg/' + name,
-                     vcpus, network, mac, name)
+                     vcpus, network, mac, name, 0 if skip_config else -1)
 
+    if not skip_config:
+        print('If virt-viewer opens up', bold(yellow('please make sure to close it')),
+              'when the install is complete, or else the VM configuration cannot continue.')
     exec_cmd(cmd)
 
 
@@ -178,6 +182,9 @@ def confirm(prompt='Continue?', default=False):
 
 
 def _main(args):
+    with open('/etc/debian_version', 'r') as f:
+        is_jessie = f.read().startswith('8.')
+
     parser = argparse.ArgumentParser(
         description='Create and configure new VMs using libvirt CLI tools',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -191,7 +198,7 @@ def _main(args):
     parser.add_argument('--os-type', type=str, default='linux',
                         help='os type')
     # strangely, there is no debianjessie :(
-    parser.add_argument('--os-variant', type=str, default='debianwheezy',
+    parser.add_argument('--os-variant', type=str, default=('debianwheezy' if is_jessie else 'debian9'),
                         help='os variant')
     parser.add_argument('--network', type=str, default='bridge=br0',
                         help='network configuration')
@@ -263,17 +270,11 @@ def _main(args):
 
     create_disk(args.hostname, args.storage)
     create_vm(args.hostname, args.memory, args.vcpus, args.os_type, args.os_variant,
-              args.network, mac)
+              args.network, mac, args.skip_config)
 
     if args.skip_config:
         print('VM created, skipping configuration. Have fun!')
         sys.exit(0)
-
-    print('VM created, waiting for it to finish installing and shut down...')
-    wait_for_shutdown(args.hostname)
-
-    print('Installation successful, starting VM...')
-    start_vm(args.hostname)
 
     print('Connecting to VM via SSH...')
     client = get_ssh_connection(mac, args.preseed_user, args.preseed_password)

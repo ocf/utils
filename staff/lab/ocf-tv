@@ -32,7 +32,6 @@ def unused_port():
 
     return port
 
-
 def wait_for_port(host, port, timeout=5, ssh_proc=None):
     spent = 0
     while True:
@@ -48,7 +47,13 @@ def wait_for_port(host, port, timeout=5, ssh_proc=None):
         if spent > timeout:
             raise TimeoutError('Timed out after {} seconds.'.format(timeout))
 
+def check_volume(val):
+    x = int(val)
+    if abs(x) > 150:
+        raise argparse.ArgumentTypeError('Volume out of bounds: {} not in [0, 150]'.format(val))
 
+    return val
+        
 def volume(args):
     cmd = 'export PULSE_SERVER=localhost; '
 
@@ -60,20 +65,16 @@ def volume(args):
     
     return subprocess.call(('ssh', args.host, cmd))
 
-
-def check_volume(val):
-    x = int(val[:-1]) if val.endswith('%') else int(val)
-    if abs(x) > 150:
-        raise argparse.ArgumentTypeError('Volume out of bounds: {} not in [0, 150]'.format(val))
-
-    return val
+def mute(args):
+    cmd = 'PULSE_SERVER=localhost pactl set-sink-mute {} toggle'.format(PACTL_SINK)
+    return subprocess.call(('ssh', args.host, cmd))
 
 def get_tunnel_sink():
     try:
         sink_name = subprocess.check_output("pactl list sinks | awk '/Name: tunnel/ { print $2 }'", shell=True)
         return str(sink_name.strip(), 'ascii')
     except:
-        print('Failed to get the tunnel sink. Did you start the tunnel?')
+        print('Failed to get the sink for the tunnel. Did you start it?')
         sys.exit(1)
 
 def start_audio_tunnel(args = None):
@@ -117,12 +118,11 @@ def connect(args):
         proc.terminate()
         proc.wait()
 
-
 if __name__ == '__main__':
     commands = {
         'connect': connect,
         'volume': volume,
-        'mute': volume,
+        'mute': mute,
         'stop-tunnel': stop_audio_tunnel,
         'tunnel-audio': transfer_audio,
     }
@@ -142,11 +142,8 @@ if __name__ == '__main__':
                                   help='volume in percent between 0% and 150%.'
                                        ' +/- a relative value is also allowed.')
 
-    subparser_mute = command_subparser.add_parser('mute', help='mute the TV')
-    # hack so volume() can be reused
-    subparser_mute.add_argument('--amount', default=0, help=argparse.SUPPRESS)
-
-    #subparser_tunnel = command_subparser.add_parser('start-tunnel', help='tunnel audio to PulseAudio on the TV')
+    subparser_mute = command_subparser.add_parser('mute', help='toggle mute on the TV')
+    
     subparser_stop_tunnel = command_subparser.add_parser('stop-tunnel', help='Stop tunneling audio to the TV')
     subparser_transfer_audio = command_subparser.add_parser('tunnel-audio', help='Start the PulseAudio tunnel to the TV and transfer all local sink inputs to the tunnel')
 

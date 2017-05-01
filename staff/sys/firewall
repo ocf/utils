@@ -1,9 +1,10 @@
 #!/bin/bash
-# Download and launch Java firewall config client
-cd $(mktemp -d)
-curl -sL http://contrib.ocf.berkeley.edu/jre-8u101-linux-x64.tar.gz | tar xfz -
-curl https://firewall.ocf.berkeley.edu/admin/public/startup.jnlp > startup.jnlp
+set -euo pipefail
 
-# Because java deals with certificates in a really terrible way
-echo "https://firewall.ocf.berkeley.edu" > ~/.java/deployment/security/exception.sites
-jre*/bin/javaws startup.jnlp
+TMPDIR="$(mktemp -d)"
+trap 'cd / && rm -rf "$TMPDIR"' EXIT
+cd "$TMPDIR"
+
+# Download and launch Java firewall config client
+curl https://firewall.ocf.berkeley.edu/admin/public/startup.jnlp > startup.jnlp
+javaws startup.jnlp

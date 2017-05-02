@@ -38,14 +38,30 @@ import paramiko
 from ocflib.misc.shell import bold
 from ocflib.misc.shell import green
 from ocflib.misc.shell import red
+from ocflib.misc.shell import yellow
 
 
 HostAndVm = namedtuple('HostAndVm', ['host', 'vm'])
 
 client = None
 
+log_verbosity = 0
 
-def exec_command(cmd, ignore_status_code=False):
+
+def log_command(cmd, verbosity=0):
+    if log_verbosity >= verbosity:
+        if isinstance(cmd, str):
+            print(yellow(cmd))
+        else:
+            print(yellow(' '.join(cmd)))
+
+    return cmd
+
+
+def exec_command(cmd, ignore_status_code=False, verbosity=0):
+    if log_verbosity >= verbosity:
+        print('(remote) ' + yellow(cmd))
+
     stdin, stdout, stderr = client.exec_command(cmd)
 
     if not ignore_status_code:
@@ -60,7 +76,7 @@ def copy_disk_image(oldpath, newpath, num_bytes):
     _, stdout, _ = exec_command('sh -c "dd if=' + oldpath + ' bs=32M | pigz"', ignore_status_code=True)
 
     proc = Popen(
-        'gunzip | pv -s ' + str(num_bytes) + ' | dd of=' + newpath + ' bs=32M',
+        log_command('gunzip | pv -s ' + str(num_bytes) + ' | dd of=' + newpath + ' bs=32M'),
         stdin=PIPE,
         shell=True,
     )
@@ -74,10 +90,18 @@ def copy_disk_image(oldpath, newpath, num_bytes):
     proc.stdin.close()
     proc.wait()
 
+    rc = stdout.channel.recv_exit_status()
+    if rc != 0:
+        print(bold(red('Got status code {} on remote host, but checking disks anyways.'.format(rc))))
+
+    rc = proc.returncode
+    if rc != 0:
+        print(bold(red('Got status code {} on local host, but checking disks anyways.'.format(rc))))
+
 
 def verify_disks(oldpath, newpath):
-    proc = Popen(['openssl', 'sha1', newpath], stdout=PIPE)
-    _, stdout, _ = exec_command('openssl sha1 ' + oldpath)
+    proc = Popen(log_command(['openssl', 'sha1', newpath], verbosity=1), stdout=PIPE)
+    _, stdout, _ = exec_command('openssl sha1 ' + oldpath, verbosity=1)
 
     original = stdout.read().decode('ascii').strip()
     print(bold('Original SHA1 (on remote server): ') + original)
@@ -86,7 +110,8 @@ def verify_disks(oldpath, newpath):
     print(bold('New SHA1 (on this server): ') + copied)
 
     # Pull out the hash string since file names may not match
-    if original.split()[1] != copied.split()[1]:
+    p = re.compile('^SHA1\([a-z0-9\-/]+\)= ([0-9a-f]+)$')
+    if p.match(original).group(1) != p.match(copied).group(1):
         print(bold(red('Hashes do not match, something went wrong!')))
         sys.exit(1)
     else:
@@ -96,7 +121,7 @@ def verify_disks(oldpath, newpath):
 def shut_down_vm(vm):
     while True:
         _, _, _ = exec_command('virsh shutdown ' + vm, ignore_status_code=True)
-        _, stdout, _ = exec_command('virsh list')
+        _, stdout, _ = exec_command('virsh list', verbosity=1)
 
         # strip both header lines
         stdout.readline()
@@ -110,17 +135,16 @@ def shut_down_vm(vm):
 
 
 def get_lv_size(lvpath):
-    _, stdout, _ = exec_command('blockdev --getsize64 ' + lvpath)
+    _, stdout, _ = exec_command('blockdev --getsize64 ' + lvpath, verbosity=1)
     return int(stdout.read().strip())
 
 
 def get_definition(vm):
-    _, stdout, _ = exec_command('virsh dumpxml ' + vm)
+    _, stdout, _ = exec_command('virsh dumpxml ' + vm, verbosity=1)
     return stdout.read()
 
 
 def get_lv_path(vm):
-    _, stdout, _ = exec_command('virsh dumpxml ' + vm)
     tree = ElementTree.fromstring(get_definition(vm).decode('utf-8'))
     return tree.find('./devices/disk/source').get('dev')
 
@@ -136,12 +160,16 @@ def main():
 
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('host_and_vm', metavar='host:vm', type=host_and_vm, help='Host and VM name to transfer.')
-    parser.add_argument('--vg', nargs='?', default='vg', help='Sets the destination volume group on the new host.')
+    parser.add_argument('--vg', default='vg', help='Sets the destination volume group on the new host.')
+    parser.add_argument('-v', '--verbose', action='store_true', help='Enables verbose output.')
 
     args = parser.parse_args()
     host = args.host_and_vm.host
     vm = args.host_and_vm.vm
     dest_vg = args.vg
+
+    global log_verbosity
+    log_verbosity = 1 if args.verbose else 0
 
     dest_lvpath = '/dev/{vg}/{vm}'.format(vg=dest_vg, vm=vm)
 
@@ -173,13 +201,13 @@ def main():
     num_bytes = get_lv_size(src_lvpath)
 
     print(bold('Creating logical volume here...'))
-    check_call(['lvcreate', '-L', str(num_bytes) + 'B', '-n', vm, dest_vg])
+    check_call(log_command(['lvcreate', '-L', str(num_bytes) + 'B', '-n', vm, dest_vg]))
 
     print(bold('Copying virsh definition...'))
     f = NamedTemporaryFile(mode='wb', delete=False)
-    f.write(get_definition(vm).replace(bytes(src_lvpath, 'ascii'), bytes(dest_lvpath, 'ascii')))
+    f.write(get_definition(vm).replace(src_lvpath.encode('ascii'), dest_lvpath.encode('ascii')))
     f.close()
-    check_call(['virsh', 'define', f.name])
+    check_call(log_command(['virsh', 'define', f.name]))
 
     print(bold('Copying disk image...'))
     copy_disk_image(src_lvpath, dest_lvpath, num_bytes)

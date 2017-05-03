@@ -14,15 +14,11 @@ It performs the steps:
   4) Checksums the entire disk on old and new to ensure a match.
   5) Imports the domain definition from old to new.
 
-After the transfer completes and you've verified the guest works on the new
-host, you should do on the *old* host:
+It makes the assumption that the destination LVM volume belongs at
+/dev/{vg}/{hostname}. The source volume is read from virsh, while the
+destination volume group can be specified as an argument, e.g.
 
-    $ virsh undefine guestname
-    $ lvremove /dev/vg/guestname
-
-It makes a couple assumptions:
-  - We use the volume group /dev/vg on both the old and new host.
-  - VMs are at /dev/vg/${hostname} on both old and new host.
+    $ sudo migrate-vm jaws:supernova --vg vg-nvme
 """
 import argparse
 import os
@@ -36,32 +32,51 @@ from subprocess import check_call
 from subprocess import PIPE
 from subprocess import Popen
 from tempfile import NamedTemporaryFile
+from xml.etree import ElementTree
 
 import paramiko
 from ocflib.misc.shell import bold
 from ocflib.misc.shell import green
 from ocflib.misc.shell import red
+from ocflib.misc.shell import yellow
 
 
 HostAndVm = namedtuple('HostAndVm', ['host', 'vm'])
 
+client = None
 
-def exec_command(cmd, ignore_status_code=False):
-    print(bold(cmd))
+log_verbosity = 0
+
+
+def log_command(cmd, verbosity=0):
+    if log_verbosity >= verbosity:
+        if isinstance(cmd, str):
+            print(yellow(cmd))
+        else:
+            print(yellow(' '.join(cmd)))
+
+    return cmd
+
+
+def exec_command(cmd, ignore_status_code=False, verbosity=0):
+    if log_verbosity >= verbosity:
+        print('(remote) ' + yellow(cmd))
+
     stdin, stdout, stderr = client.exec_command(cmd)
 
-    exit_status = stdout.channel.recv_exit_status()
-    if exit_status != 0 and not ignore_status_code:
-        raise RuntimeError(bold(red('Command exited nonzero ({}): {}'.format(exit_status, cmd))))
+    if not ignore_status_code:
+        exit_status = stdout.channel.recv_exit_status()
+        if exit_status != 0:
+            raise RuntimeError(bold(red('Command exited nonzero ({}): {}'.format(exit_status, cmd))))
 
     return stdin, stdout, stderr
 
 
-def copy_disk_image(vm, num_bytes):
-    _, stdout, _ = client.exec_command('sh -c "dd if=/dev/vg/' + vm + ' bs=32M | pigz"')
+def copy_disk_image(oldpath, newpath, num_bytes):
+    _, stdout, _ = exec_command('sh -c "dd if=' + oldpath + ' bs=32M | pigz"', ignore_status_code=True)
 
     proc = Popen(
-        'gunzip | pv -s ' + str(num_bytes) + ' | dd of=/dev/vg/' + vm + ' bs=32M',
+        log_command('gunzip | pv -s ' + str(num_bytes) + ' | dd of=' + newpath + ' bs=32M'),
         stdin=PIPE,
         shell=True,
     )
@@ -75,10 +90,18 @@ def copy_disk_image(vm, num_bytes):
     proc.stdin.close()
     proc.wait()
 
+    rc = stdout.channel.recv_exit_status()
+    if rc != 0:
+        print(bold(red('Got status code {} on remote host, but checking disks anyways.'.format(rc))))
 
-def verify_disks(vm):
-    proc = Popen(['openssl', 'sha1', '/dev/vg/' + vm], stdout=PIPE)
-    _, stdout, _ = client.exec_command('openssl sha1 /dev/vg/' + vm)
+    rc = proc.returncode
+    if rc != 0:
+        print(bold(red('Got status code {} on local host, but checking disks anyways.'.format(rc))))
+
+
+def verify_disks(oldpath, newpath):
+    proc = Popen(log_command(['openssl', 'sha1', newpath], verbosity=1), stdout=PIPE)
+    _, stdout, _ = exec_command('openssl sha1 ' + oldpath, verbosity=1)
 
     original = stdout.read().decode('ascii').strip()
     print(bold('Original SHA1 (on remote server): ') + original)
@@ -86,7 +109,9 @@ def verify_disks(vm):
     copied = proc.stdout.read().decode('ascii').strip()
     print(bold('New SHA1 (on this server): ') + copied)
 
-    if original != copied:
+    # Pull out the hash string since file names may not match
+    p = re.compile('^SHA1\([a-z0-9\-/]+\)= ([0-9a-f]+)$')
+    if p.match(original).group(1) != p.match(copied).group(1):
         print(bold(red('Hashes do not match, something went wrong!')))
         sys.exit(1)
     else:
@@ -94,10 +119,9 @@ def verify_disks(vm):
 
 
 def shut_down_vm(vm):
-
     while True:
         _, _, _ = exec_command('virsh shutdown ' + vm, ignore_status_code=True)
-        _, stdout, _ = exec_command('virsh list')
+        _, stdout, _ = exec_command('virsh list', verbosity=1)
 
         # strip both header lines
         stdout.readline()
@@ -107,20 +131,25 @@ def shut_down_vm(vm):
             break
 
         print('waiting for shutdown...')
-        time.sleep(1)
+        time.sleep(3)
 
 
-def get_lv_size(vm):
-    _, stdout, _ = exec_command('blockdev --getsize64 /dev/vg/' + vm)
+def get_lv_size(lvpath):
+    _, stdout, _ = exec_command('blockdev --getsize64 ' + lvpath, verbosity=1)
     return int(stdout.read().strip())
 
 
 def get_definition(vm):
-    _, stdout, _ = exec_command('virsh dumpxml ' + vm)
+    _, stdout, _ = exec_command('virsh dumpxml ' + vm, verbosity=1)
     return stdout.read()
 
 
-if __name__ == '__main__':
+def get_lv_path(vm):
+    tree = ElementTree.fromstring(get_definition(vm).decode('utf-8'))
+    return tree.find('./devices/disk/source').get('dev')
+
+
+def main():
     def host_and_vm(host_and_vm):
         m = re.match(r'^([a-z0-9\-]+):([a-z0-9\-]+)$', host_and_vm)
         if not m:
@@ -131,18 +160,27 @@ if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument('host_and_vm', metavar='host:vm', type=host_and_vm, help='Host and VM name to transfer.')
+    parser.add_argument('--vg', default='vg', help='Sets the destination volume group on the new host.')
+    parser.add_argument('-v', '--verbose', action='store_true', help='Enables verbose output.')
 
     args = parser.parse_args()
     host = args.host_and_vm.host
     vm = args.host_and_vm.vm
+    dest_vg = args.vg
+
+    global log_verbosity
+    log_verbosity = 1 if args.verbose else 0
+
+    dest_lvpath = '/dev/{vg}/{vm}'.format(vg=dest_vg, vm=vm)
 
     if os.geteuid() != 0:
         print(bold(red('You are not root.')))
         sys.exit(1)
 
-    resp = input(bold('We will copy {vm} from {host} to {here}. Continue? [yN] '.format(
+    resp = input(bold('We will copy {vm} from {host} to volume group {vg} on {here}. Continue? [yN] '.format(
         vm=vm,
         host=host,
+        vg=dest_vg,
         here=socket.gethostname(),
     )))
     if resp != 'y':
@@ -151,6 +189,7 @@ if __name__ == '__main__':
 
     password = getpass(bold('Enter password for root: '))
 
+    global client
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     client.connect(host, username='root', password=password)
@@ -158,22 +197,27 @@ if __name__ == '__main__':
     print(bold('Shutting down VM on the host...'))
     shut_down_vm(vm)
 
-    num_bytes = get_lv_size(vm)
+    src_lvpath = get_lv_path(vm)
+    num_bytes = get_lv_size(src_lvpath)
 
     print(bold('Creating logical volume here...'))
-    check_call(['lvcreate', '-L', str(num_bytes) + 'B', '-n', vm, '/dev/vg'])
+    check_call(log_command(['lvcreate', '-L', str(num_bytes) + 'B', '-n', vm, dest_vg]))
 
     print(bold('Copying virsh definition...'))
     f = NamedTemporaryFile(mode='wb', delete=False)
-    f.write(get_definition(vm))
+    f.write(get_definition(vm).replace(src_lvpath.encode('ascii'), dest_lvpath.encode('ascii')))
     f.close()
-    check_call(['virsh', 'define', f.name])
+    check_call(log_command(['virsh', 'define', f.name]))
 
     print(bold('Copying disk image...'))
-    copy_disk_image(vm, num_bytes)
+    copy_disk_image(src_lvpath, dest_lvpath, num_bytes)
 
     print(bold('Verifying disk copied...'))
-    verify_disks(vm)
+    verify_disks(src_lvpath, dest_lvpath)
 
     print(bold(green('All done!')))
     print(bold('After verifying, you should undefine the host and delete the LV on the old host.'))
+
+
+if __name__ == '__main__':
+    main()

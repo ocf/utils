@@ -87,15 +87,6 @@ def get_running_vms():
     return [line.split()[1] for line in output.splitlines()[2:-1]]
 
 
-def wait_for_shutdown(name):
-    while name in get_running_vms():
-        time.sleep(1)
-
-
-def start_vm(name):
-    exec_cmd('virsh start {}'.format(name))
-
-
 def get_ip(mac):
     """Get IP address for the given MAC address. This needs some work."""
     while True:

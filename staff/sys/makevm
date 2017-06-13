@@ -153,10 +153,10 @@ def configure_network(ssh, ipv4):
         '\tgateway {}'.format(OCF_GATEWAY_V6),
     ]
 
-    ssh.exec_command("echo -n \"\" > /etc/network/interfaces")
+    ssh.exec_command('echo -n "" > /etc/network/interfaces')
 
     for line in lines:
-        ssh.exec_command("echo \"{}\" >> /etc/network/interfaces".format(line))
+        ssh.exec_command('echo "{}" >> /etc/network/interfaces'.format(line))
 
 
 def confirm(prompt='Continue?', default=False):

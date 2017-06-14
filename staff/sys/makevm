@@ -10,6 +10,7 @@ import argparse
 import os.path
 import random
 import re
+import shlex
 import socket
 import subprocess
 import sys
@@ -159,20 +160,20 @@ def configure_network(ssh, ipv4):
 
 
 def wait_drop_into_shell(ip, user, key_file):
-    client = paramiko.SSHClient()
-    client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
     # wait for the VM to be live
-    print('Waiting for VM to finish rebooting...')
+    print('Waiting for VM to finish rebooting...', end='', flush=True)
     while True:
         try:
-            client.connect(ip, username=user, key_filename=key_file, timeout=1)
+            socket.create_connection((ip, 'ssh'), timeout=1).close()
+            break
         except (socket.timeout, socket.error):
-            continue
-        else:
-            print('You should now run puppet. You are now being dropped into a shell.')
-            os.execvp('ssh', ['ssh', '-o', 'UserKnownHostsFile=/dev/null', '-o', 'StrictHostKeyChecking=no',
-                              '-i', key_file, '-l', user, ip])
+            print('.', end='', flush=True)
+            time.sleep(1)
+
+    print()
+    print('You should now run puppet. You will now be dropped into a shell.')
+    exec_cmd('ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i {} -l {} {}'
+             .format(shlex.quote(key_file), shlex.quote(user), ip))
 
 
 def confirm(prompt='Continue?', default=False):

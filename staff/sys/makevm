@@ -111,14 +111,9 @@ def get_ssh_connection(mac, user, key_file):
             print('Trying IP: {}'.format(ip))
 
             client.connect(ip, username=user, key_filename=key_file, timeout=1)
-        except (socket.timeout, socket.error):
-            continue
-        else:
-            print()
             return client
-        print('.', end='')
-        sys.stdout.flush()
-        time.sleep(1)
+        except (socket.timeout, socket.error):
+            pass
 
 
 def get_net_iface(ssh):

@@ -40,7 +40,7 @@ binary in this repo.
 
 * [Use `/bin/bash` over `/bin/sh`][use-bin-bash] unless your script is for some
   alien environment where there is no bash. Don't be afraid to use bashisms.
-* Typically add `set -eu -o pipefail`, especially for any complicated scripts.
+* Typically add `set -euo pipefail`, especially for any complicated scripts.
   This (a) stops on errors, (b) errors on accessing undefined variables, and (c)
   errors on failures in the middle of a pipeline. Together these make Bash into
   something resembling a passable programming language.

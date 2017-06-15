@@ -10,9 +10,11 @@ import argparse
 import os.path
 import random
 import re
+import shlex
 import socket
 import subprocess
 import sys
+import textwrap
 import time
 from ipaddress import ip_address
 from ipaddress import IPv4Address
@@ -100,7 +102,7 @@ def get_ip(mac):
             time.sleep(1)
 
 
-def get_ssh_connection(mac, user, password):
+def get_ssh_connection(mac, user, key_file):
     client = paramiko.SSHClient()
     client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
 
@@ -111,7 +113,7 @@ def get_ssh_connection(mac, user, password):
             ip = get_ip(mac)
             print('Trying IP: {}'.format(ip))
 
-            client.connect(ip, username=user, password=password, timeout=1)
+            client.connect(ip, username=user, key_filename=key_file, timeout=1)
         except (socket.timeout, socket.error):
             continue
         else:
@@ -137,26 +139,45 @@ def configure_network(ssh, ipv4):
     ipv6 = ipv4_to_ipv6(ipv4)
     interface = get_net_iface(ssh)
 
-    lines = [
-        'auto lo',
-        'iface lo inet loopback',
-        '',
-        'auto {}'.format(interface),
-        'iface {} inet static'.format(interface),
-        '\taddress {}'.format(ipv4),
-        '\tnetmask 255.255.255.0',
-        '\tgateway {}'.format(OCF_GATEWAY_V4),
-        '',
-        'iface {} inet6 static'.format(interface),
-        '\taddress {}'.format(ipv6),
-        '\tnetmask 64',
-        '\tgateway {}'.format(OCF_GATEWAY_V6),
-    ]
+    content = textwrap.dedent(
+        """\
+        auto lo
+        iface lo inet loopback
 
-    ssh.exec_command('echo -n "" > /etc/network/interfaces')
+        auto {iface}
+        iface {iface} inet static
+        \taddress {ipv4}
+        \tnetmask 255.255.255.0
+        \tgateway {gateway_v4}
 
-    for line in lines:
-        ssh.exec_command('echo "{}" >> /etc/network/interfaces'.format(line))
+        iface {iface} inet6 static
+        \taddress {ipv6}
+        \tnetmask 64
+        \tgateway {gateway_v6}
+        """.format(iface=interface, ipv4=ipv4, gateway_v4=OCF_GATEWAY_V4,
+                   ipv6=ipv6, gateway_v6=OCF_GATEWAY_V6))
+
+    stdin, _, _ = ssh.exec_command("cat > /etc/network/interfaces")
+    stdin.write(content)
+    stdin.close()
+    stdin.channel.shutdown(2)
+
+
+def wait_drop_into_shell(ip, user, key_file):
+    # wait for the VM to be live
+    print('Waiting for VM to finish rebooting...', end='', flush=True)
+    while True:
+        try:
+            socket.create_connection((ip, 'ssh'), timeout=1).close()
+            break
+        except (socket.timeout, socket.error):
+            print('.', end='', flush=True)
+            time.sleep(1)
+
+    print()
+    print('You should now run puppet. You will now be dropped into a shell.')
+    exec_cmd('ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i {} -l {} {}'
+             .format(shlex.quote(key_file), shlex.quote(user), ip))
 
 
 def confirm(prompt='Continue?', default=False):
@@ -195,8 +216,8 @@ def _main(args):
                         help='network configuration')
     parser.add_argument('--preseed-user', type=str, default='root',
                         help='user created in preseed')
-    parser.add_argument('--preseed-password', type=str, default='r00tme',
-                        help='password for user created in preseed')
+    parser.add_argument('--preseed-ssh-key', type=str, default='/opt/share/kvm/makevm-ssh-key',
+                        help='SSH private key for user created in preseed')
     parser.add_argument('--skip-config', action='store_true', default=False,
                         help="don't configure the new VM")
     parser.add_argument('hostname', type=str,
@@ -268,7 +289,7 @@ def _main(args):
         sys.exit(0)
 
     print('Connecting to VM via SSH...')
-    client = get_ssh_connection(mac, args.preseed_user, args.preseed_password)
+    client = get_ssh_connection(mac, args.preseed_user, args.preseed_ssh_key)
 
     print('Setting hostname to {}...'.format(args.hostname))
     client.exec_command('echo {} > /etc/hostname'.format(args.hostname))
@@ -280,7 +301,8 @@ def _main(args):
     print('Restarting VM...')
     client.exec_command('shutdown -r now')
 
-    print('{} is now minimally configured. You should now sign the puppet cert.'.format(args.hostname))
+    print('{} is now minimally configured.'.format(args.hostname))
+    wait_drop_into_shell(args.ip, args.preseed_user, args.preseed_ssh_key)
 
 
 if __name__ == '__main__':

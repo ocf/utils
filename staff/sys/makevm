@@ -14,6 +14,7 @@ import shlex
 import socket
 import subprocess
 import sys
+import textwrap
 import time
 from ipaddress import ip_address
 from ipaddress import IPv4Address
@@ -138,25 +139,28 @@ def configure_network(ssh, ipv4):
     ipv6 = ipv4_to_ipv6(ipv4)
     interface = get_net_iface(ssh)
 
-    lines = [
-        'auto lo',
-        'iface lo inet loopback',
-        '',
-        'auto {}'.format(interface),
-        'iface {} inet static'.format(interface),
-        '\taddress {}'.format(ipv4),
-        '\tnetmask 255.255.255.0',
-        '\tgateway {}'.format(OCF_GATEWAY_V4),
-        '',
-        'iface {} inet6 static'.format(interface),
-        '\taddress {}'.format(ipv6),
-        '\tnetmask 64',
-        '\tgateway {}'.format(OCF_GATEWAY_V6),
-    ]
+    content = textwrap.dedent(
+        """\
+        auto lo
+        iface lo inet loopback
 
-    ssh.exec_command('> /etc/network/interfaces')
-    for line in lines:
-        ssh.exec_command("echo '{}' >> /etc/network/interfaces".format(line))
+        auto {iface}
+        iface {iface} inet static
+        \taddress {ipv4}
+        \tnetmask 255.255.255.0
+        \tgateway {gateway_v4}
+
+        iface {iface} inet6 static
+        \taddress {ipv6}
+        \tnetmask 64
+        \tgateway {gateway_v6}
+        """.format(iface=interface, ipv4=ipv4, gateway_v4=OCF_GATEWAY_V4,
+                   ipv6=ipv6, gateway_v6=OCF_GATEWAY_V6))
+
+    stdin, _, _ = ssh.exec_command("cat > /etc/network/interfaces")
+    stdin.write(content)
+    stdin.close()
+    stdin.channel.shutdown(2)
 
 
 def wait_drop_into_shell(ip, user, key_file):

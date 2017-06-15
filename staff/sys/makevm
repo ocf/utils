@@ -5,7 +5,6 @@
 #  - python3-paramiko
 #  - nmap
 #
-# TODO: replace shell=True subprocess invocations
 import argparse
 import os.path
 import random
@@ -33,12 +32,12 @@ MAC_KVM_PREFIX = (0x52, 0x54, 0x00)
 MAC_BYTES = 6
 
 
-def exec_cmd(cmd):
+def exec_cmd(*args):
     """Executes the given shell command with some pretty colors. Script
     exits if the command exits with a non-zero status code."""
 
-    print(bold(green('$ ' + cmd)))
-    subprocess.check_call(cmd, shell=True, stdout=sys.stdout)
+    print(bold(green('$ ' + ' '.join(map(shlex.quote, args)))))
+    subprocess.check_call(args)
 
 
 def create_disk(name, size):
@@ -49,8 +48,7 @@ def create_disk(name, size):
         print("Use 'lvremove /dev/vg/{}' if you want to destroy it.".format(name))
         sys.exit(2)
 
-    cmd = 'lvcreate -L {}GB --name {} vg'.format(size, name)
-    exec_cmd(cmd)
+    exec_cmd('lvcreate', '-L', str(size) + 'GB', '--name', name, 'vg')
 
 
 def generate_mac_addr():
@@ -67,25 +65,24 @@ def create_vm(name, memory, vcpus, os_type, os_variant, network, mac, skip_confi
     # try to print info about the domain to see if it already exists
     # we expect this command to fail
     try:
-        subprocess.check_call('virsh dominfo {}'.format(name), shell=True, stderr=subprocess.DEVNULL)
+        subprocess.check_call(['virsh', 'dominfo', name], stderr=subprocess.DEVNULL)
         print("Can't create new vm, domain {} already exists.".format(name))
         sys.exit(2)
     except subprocess.CalledProcessError:
         pass  # all good
 
-    cmd = 'virt-install -r {} --pxe --os-type {} --os-variant {} ' \
-        '--disk {},cache=none --vcpus {} --network {},mac={} --graphics vnc --serial pty --name {} --wait {}'
-    cmd = cmd.format(memory, os_type, os_variant, '/dev/vg/' + name,
-                     vcpus, network, mac, name, 0 if skip_config else -1)
-
     if not skip_config:
         print('If virt-viewer opens up', bold(yellow('please make sure to close it')),
               'when the install is complete, or else the VM configuration cannot continue.')
-    exec_cmd(cmd)
+
+    exec_cmd('virt-install', '-r', str(memory), '--pxe', '--os-type', os_type,
+             '--os-variant', os_variant, '--disk', '/dev/vg/' + name + ',cache=none',
+             '--vcpus', str(vcpus), '--network', network + ',mac=' + mac, '--graphics', 'vnc',
+             '--serial', 'pty', '--name', name, '--wait', '0' if skip_config else '-1')
 
 
 def get_running_vms():
-    output = subprocess.check_output('virsh list', shell=True).decode('utf-8')
+    output = subprocess.check_output(['virsh', 'list']).decode('utf-8')
     return [line.split()[1] for line in output.splitlines()[2:-1]]
 
 
@@ -93,8 +90,8 @@ def get_ip(mac):
     """Get IP address for the given MAC address. This needs some work."""
     while True:
         try:
-            subprocess.check_call('sudo -u nobody nmap -sn {}'.format(OCF_SUBNET_V4),
-                                  stdout=subprocess.DEVNULL, shell=True)
+            subprocess.check_call(['sudo', '-u', 'nobody', 'nmap', '-sn', str(OCF_SUBNET_V4)],
+                                  stdout=subprocess.DEVNULL)
             cmd = "arp -an | grep '{}'".format(mac)
             result = subprocess.check_output(cmd, shell=True).decode('utf-8').strip()
             return result.split(' ')[1][1:-1]
@@ -157,7 +154,7 @@ def configure_network(ssh, ipv4):
         """.format(iface=interface, ipv4=ipv4, gateway_v4=OCF_GATEWAY_V4,
                    ipv6=ipv6, gateway_v6=OCF_GATEWAY_V6))
 
-    stdin, _, _ = ssh.exec_command("cat > /etc/network/interfaces")
+    stdin, _, _ = ssh.exec_command('cat > /etc/network/interfaces')
     stdin.write(content)
     stdin.close()
     stdin.channel.shutdown(2)
@@ -176,8 +173,8 @@ def wait_drop_into_shell(ip, user, key_file):
 
     print()
     print('You should now run puppet. You will now be dropped into a shell.')
-    exec_cmd('ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i {} -l {} {}'
-             .format(shlex.quote(key_file), shlex.quote(user), ip))
+    exec_cmd('ssh', '-o', 'UserKnownHostsFile=/dev/null', '-o', 'StrictHostKeyChecking=no',
+             '-i', key_file, '-l', user, ip)
 
 
 def confirm(prompt='Continue?', default=False):

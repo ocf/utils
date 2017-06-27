@@ -122,7 +122,7 @@ $(cat "$sorryFile")
 Feel free to reply to this message.
 Please do not share your password with anyone or over email.
 
-$(python3 -c 'import ocflib.misc as misc; print(misc.MAIL_SIGNATURE)')
+$(python3 -c 'import ocflib.misc.mail as mail; print(mail.MAIL_SIGNATURE)')
 EOF
 
 if [ -z $SORRY_KRB5CCNAME ]; then

@@ -48,7 +48,7 @@ echo "  for student groups: callinkoid, mail"
 echo "Press enter to continue, or Ctrl-C to abort"
 read dummy
 
-rootstaffer=`/usr/bin/whoami | /usr/bin/cut -d" " -f1`
+rootstaffer="$SUDO_USER"
 
 if [ x"$rootstaffer" = x"root" -o -z $rootstaffer ]
 then

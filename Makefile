@@ -6,4 +6,4 @@ test: venv
 venv: Makefile
 	vendor/venv-update \
 		venv= venv -ppython3 \
-		install= pre-commit
+		install= -r requirements-dev.txt

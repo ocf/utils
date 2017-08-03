@@ -40,7 +40,7 @@ def main():
     parser.add_argument('-u', '--user', required=True, help='The username')
     parser.add_argument('-t', '--topic',
                         help='The topic of the note. Common topics include: '
-                        + ', '.join(TOPICS.values()))
+                             + ', '.join(TOPICS.values()))
     parser.add_argument('note', nargs=argparse.REMAINDER,
                         help='The note to add')
     args = parser.parse_args()

@@ -41,5 +41,4 @@
         description: Check Shell Syntax on ALL staged files with user friendly messages and colors
         entry: shell-lint.sh
         language: script
-        exclude: ^.deactivate.sh$
         types: [executable, shell]

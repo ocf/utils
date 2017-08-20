@@ -145,7 +145,7 @@ echo
 paper view "$user"
 
 # check User_Info entries
-User_Info=$([ -f "$User_Info_file" ] && grep ^"$user": "$User_Info_file" | cut -d: -f2-)
+User_Info=$([ -f "$User_Info_file" ] && grep "^$user": "$User_Info_file" | cut -d: -f2-)
 if [ -n "$User_Info" ]; then
   echo
   echo "User_Info entr(y|ies):"

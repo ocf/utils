@@ -1,10 +1,10 @@
 #!/bin/bash -e
-[ "$#" -ne 1 ] && (echo 'Bad arguments, trying evince...'; exec evince $@)
-[ -f "$1" ] || (echo 'File does not exist, trying evince...'; exec evince $@)
+[ "$#" -ne 1 ] && (echo 'Bad arguments, trying evince...'; exec evince "$@")
+[ -f "$1" ] || (echo 'File does not exist, trying evince...'; exec evince "$@")
 
-size=$(du "$1") || (echo 'Cannot get size, trying evince...'; exec evince $@)
+size=$(du "$1") || (echo 'Cannot get size, trying evince...'; exec evince "$@")
 size=$(cut -f1 <<< "$size")
-[ "$size" -lt 5120 ] || (echo 'Too large, trying evince...'; exec evince $@)
+[ "$size" -lt 5120 ] || (echo 'Too large, trying evince...'; exec evince "$@")
 
 echo 'Rasterizing PDF...'
 tmp=$(mktemp --suffix='.pdf')
@@ -12,7 +12,7 @@ tmp=$(mktemp --suffix='.pdf')
 if ! convert -density 250 "$1" "$tmp"; then
     rm "$tmp"
     echo 'Convert failed, trying evince...'
-    exec evince $@
+    exec evince "$@"
 fi
 
 echo 'Done rasterizing, now opening with evince...'

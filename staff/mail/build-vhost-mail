@@ -11,24 +11,24 @@ uncomment() {
   egrep -v '^[[:space:]]*(#|$)' "$1"
 }
 
-vhost_users="`uncomment "$INPUT_FILE" | cut -d' ' -f1`"
+vhost_users="$(uncomment "$INPUT_FILE" | cut -d' ' -f1)"
 
 # exit if invalid users
-if ! getent passwd $vhost_users > /dev/null; then
+if ! getent passwd "$vhost_users" > /dev/null; then
   echo "Error: Invalid vhost users." && \
   echo "Please fix $INPUT_FILE and try again." && \
   exit 1
 fi
 
 # print and exit if sorried users
-if getent passwd $vhost_users | grep sorry; then
+if getent passwd "$vhost_users" | grep sorry; then
   echo "Error: Above vhost users are sorried."
   echo "Please fix $INPUT_FILE and try again."
   exit 1
 fi
 
 # print and exit if vhost users over quota
-if echo $vhost_users | grep -Fx -f - /var/mail/etc/quota; then
+if echo "$vhost_users" | grep -Fx -f - /var/mail/etc/quota; then
   echo "Error: Above vhost users are over quota."
   echo "Please fix $INPUT_FILE and try again."
   exit 1

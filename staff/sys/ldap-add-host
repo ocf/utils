@@ -22,7 +22,7 @@ environment: production"
 
 echo "$record"
 echo "======================"
-read -p "Add new record? [yN] " choice
+read -rp "Add new record? [yN] " choice
 
 if [ "$choice" != "y" ] && [ "$choice" != "yes" ]; then
     echo "Aborted."

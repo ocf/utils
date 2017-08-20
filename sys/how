@@ -9,7 +9,7 @@
 set -e
 
 usage(){
-  echo "Usage: '`basename $0` [PAGER] COMMAND'"
+  echo "Usage: '$(basename "$0") [PAGER] COMMAND'"
   echo "PAGER is the program you use to view or edit (or run) files"
   echo "If ommitted, PAGER is less."
 }
@@ -32,7 +32,7 @@ elif [ $# -eq 2 ]; then
 fi
 
 # find file in PATH
-file="`which "$COMMAND"`"
+file="$(which "$COMMAND")"
 
 # if file does not exist, command does not exist
 if [ -z "$file" ]; then
@@ -44,13 +44,13 @@ fi
 echo "Program found: $file"
 
 # find filetype of file
-filetype=`file -i "$file" | awk '{print $2}' | cut -f 1 -d ';'`
+filetype=$(file -i "$file" | awk '{print $2}' | cut -f 1 -d ';')
 
 if echo "$filetype" | grep -q 'symlink$'; then
 
   # follow symlinks multiple levels to final target and determine type
-  target="`readlink -mn $file`"
-  targettype=`file -bi "$target" | cut -d';' -f1`
+  target="$(readlink -mn "$file")"
+  targettype=$(file -bi "$target" | cut -d';' -f1)
 
   # if chase is installed list chain of symlinks or report
   #if [ -x /usr/bin/chase ]; then
@@ -63,7 +63,7 @@ if echo "$filetype" | grep -q 'symlink$'; then
   echo "Final target@: $target"
 
   # if target is a symlink, it is broken
-  if [ $targettype = 'application/x-symlink' ]; then
+  if [ "$targettype" = 'application/x-symlink' ]; then
     echo "Error: $target is a dangling symlink." 1>&2
     exit 4
   fi
@@ -78,14 +78,14 @@ fi
 echo "MIME filetype: $targettype"
 
 # check for and report binary files
-if [ -z `echo $targettype | grep ^text` ]; then
+if echo "$targettype" | grep -q ^text; then
   echo "Error: Command '$COMMAND' does not refer to a script." 1>&2
   file -b "$target" 1>&2
   exit 2
 fi
 
 # check if pager exists
-if [ -z `which "$PAGER"` ]; then
+if [ -z "$(which "$PAGER")" ]; then
   echo "Error: Pager '$PAGER' could not be found (or not executable) in your PATH." 1>&2
   exit 1
 fi

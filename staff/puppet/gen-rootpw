@@ -10,7 +10,7 @@ echo "This will update the root password for ALL OCF MACHINES."
 echo "    YOU PROBABLY SHOULD NOT BE RUNNING THIS COMMAND."
 echo "########################################################"
 echo
-read -p "Are you sure you want to do this? [yN] " answer
+read -rp "Are you sure you want to do this? [yN] " answer
 
 if [ "$answer" != "y" ]; then
     echo "Wise choice."

@@ -3,106 +3,93 @@
 #Script for unsorrying OCF user accounts, adapted for ldap/kerberos
 #gfs, 3-24-08
 
-LDAPMODIFY=`which ldapmodify`
-KINIT=`which kinit`
-KDESTROY=`which kdestroy`
+LDAPMODIFY=$(which ldapmodify)
+KINIT=$(which kinit)
+KDESTROY=$(which kdestroy)
 
 defaultshell=/bin/bash
 
 # tests for root
-if [[ `/usr/bin/id -u` -ne 0 ]]
-then echo "You must be root to run this"
-exit 2
+if [[ $(/usr/bin/id -u) -ne 0 ]]; then
+    echo "You must be root to run this"
+    exit 2
 fi
 
 
 #usage block
-if [[ $1 = "" ]]
-then
-echo "Usage: $0 [user to be unsorried]"
-exit 0
+if [[ $1 = "" ]]; then
+    echo "Usage: $0 [user to be unsorried]"
+    exit 0
 fi
 
 sorriedUser=$1
 
-if [ -z "`getent passwd $sorriedUser`" ]; then
-  echo "User $sorriedUser does not exist"
-  exit 3
+if [ -z "$(getent passwd "$sorriedUser")" ]; then
+    echo "User $sorriedUser does not exist"
+    exit 3
 fi
 
-userdir=`ldapsearch -x uid=$sorriedUser | grep homeDirectory | cut -d' ' -f2`
+userdir=$(ldapsearch -x uid="$sorriedUser" | grep homeDirectory | cut -d' ' -f2)
 
 #nohome directory case
-if [[ $userdir == "" ]]
-then echo "Could not find the home directory for user $sorriedUser"
-exit 2
+if [[ $userdir == "" ]]; then
+    echo "Could not find the home directory for user $sorriedUser"
+    exit 2
 fi
 
-if [[ ! -e $userdir/.sorry ]]
-then echo "WARNING: User has no .sorry file"
+if [[ ! -e $userdir/.sorry ]]; then
+    echo "WARNING: User has no .sorry file"
 fi
 
 echo "Please ensure that following attributes in LDAP are UP-TO-DATE."
 echo "  for individuals   : calnetuid,  mail"
 echo "  for student groups: callinkoid, mail"
 echo "Press enter to continue, or Ctrl-C to abort"
-read dummy
+read -r _
 
 rootstaffer="$SUDO_USER"
 
-if [ x"$rootstaffer" = x"root" -o -z $rootstaffer ]
-then
-        echo "The sorry.log is much more useful when it logs who you are"
-        echo "rather than simply 'root'. Please enter your username:"
-        read rootstaffer
+if [ x"$rootstaffer" = x"root" ] || [ -z "$rootstaffer" ]; then
+    echo "The sorry.log is much more useful when it logs who you are"
+    echo "rather than simply 'root'. Please enter your username:"
+    read -r rootstaffer
 fi
 
-echo You are $rootstaffer
+echo "You are $rootstaffer"
 
-$KINIT ${rootstaffer}/admin
+$KINIT "${rootstaffer}/admin"
 if [ $? -ne 0 ]; then
     echo "kinit failed, bailing out!"
     exit 1
 fi
 
-#stealing luns's sed madness from makehttp wrapper
-httpdir=`echo $sorriedUser | sed -e 's%\(\(.\)\)%/services/http/users/\2/\1%'`
-#ftpdir=`echo $sorriedUser | sed -e 's%\(\(.\)\)%/services/ftp/users/\2/\1%'`
-#mysqldir=/services/mysql/data/$sorriedUser
+# stealing luns's sed madness from makehttp wrapper
+httpdir="${sorriedUser//\(\(.\)\)/\/services\/http\/users\/\2/\1}"
 
 echo ""
 echo "Changing user's shell back to normal"
-if [[ -e $userdir/.oldshell ]]
-then
-    shell=`cat $userdir/.oldshell | rev | cut -d/ -f1 | rev`
-    if [[ "$shell" == "tcsh" ]]
-    then
+if [[ -e $userdir/.oldshell ]]; then
+    shell=$(rev "$userdir/.oldshell" | cut -d/ -f1 | rev)
+    if [[ "$shell" == "tcsh" ]]; then
         newshell="/bin/tcsh"
-    elif [[ "$shell" == "zsh" ]]
-    then
+    elif [[ "$shell" == "zsh" ]]; then
         newshell="/bin/zsh"
-    elif [[ "$shell" == "csh" ]]
-    then
+    elif [[ "$shell" == "csh" ]]; then
         newshell="/bin/tcsh"
-    elif [[ "$shell" == "ksh" ]]
-    then
+    elif [[ "$shell" == "ksh" ]]; then
         newshell="/bin/bash"
-    elif [[ "$shell" == "bash" ]]
-    then
+    elif [[ "$shell" == "bash" ]]; then
         newshell="/bin/bash"
     else
         newshell=$defaultshell
     fi
 else
-echo ".oldshell file not found, setting shell to $defaultshell"
-newshell=$defaultshell
+    echo ".oldshell file not found, setting shell to $defaultshell"
+    newshell=$defaultshell
 fi
 
 echo ""
 echo "Restoring ownership of passwd entry"
-
-#echo ""
-#echo "Reenabling SMB account"
 
 $LDAPMODIFY -H ldaps://ldap.ocf.berkeley.edu <<EOF
 dn: uid=$sorriedUser,ou=People,dc=OCF,dc=Berkeley,dc=EDU
@@ -114,56 +101,29 @@ replace: gidNumber
 gidNumber: 1000
 EOF
 
-#-
-#replace: sambaAcctFlags
-#sambaAcctFlags: [U          ]
-
-#restoring permission to 755
-chmod 755 $userdir
-
+# restoring permission to 755
+chmod 755 "$userdir"
 
 echo ""
 echo "Restoring services directory permissions:"
-
-if [[ -d $httpdir ]]
-then chmod 755 $httpdir
+if [[ -d $httpdir ]]; then
+    chmod 755 "$httpdir"
 fi
-
-#if [[ -d $ftpdir ]]
-#then chmod 755 $ftpdir
-#fi
-
-#if [[ -d $mysqldir ]]
-#then chmod 755 $mysqldir
-#fi
-
-#echo "Enabling mail for user"
-#grep -v ^$1\$ /var/mail/etc/sorry > /var/mail/etc/sorry.$$
-#chmod 644 /var/mail/etc/sorry.$$
-#chown root:sys /var/mail/etc/sorry.$$
-#mv /var/mail/etc/sorry.$$ /var/mail/etc/sorry
 
 echo ""
 echo "Removing .sorry and .oldshell files"
 
-rm $userdir/.sorry
-rm $userdir/.oldshell
+rm "$userdir/.sorry"
+rm "$userdir/.oldshell"
 
 echo ""
 echo "Final system check:"
-finger -m $sorriedUser
-ldapsearch -x uid=$sorriedUser
-ls -la $userdir
-ls -ld $httpdir
-#ls -ld $ftpdir
-#ls -ld $mysqldir
+finger -m "$sorriedUser"
+ldapsearch -x uid="$sorriedUser"
+ls -la "$userdir"
+ls -ld "$httpdir"
 
-#echo ""
-#echo ""
-#echo "For immediate mail enabling log in to sandstorm and run"
-#echo "  sudo nscd -i passwd && /etc/postfix/ocfconfig/update-sorried.sh"
-
-echo `/bin/date` + $rootstaffer $sorriedUser >> /opt/acct/sorry.log
+echo "$(/bin/date) + $rootstaffer $sorriedUser" >> /opt/acct/sorry.log
 
 $KDESTROY
 

@@ -1,48 +1,46 @@
 #!/bin/bash
 # Script for sorrying OCF user accounts
 
-LDAPSEARCH=`which ldapsearch`
-LDAPMODIFY=`which ldapmodify`
-KINIT=`which kinit`
-KDESTROY=`which kdestroy`
+LDAPSEARCH=$(which ldapsearch)
+LDAPMODIFY=$(which ldapmodify)
+KINIT=$(which kinit)
+KDESTROY=$(which kdestroy)
 #KRB5CCNAME=/root/krb5cc_sorry
 #export KRB5CCNAME
 
-#check to see if running as root
-if [ `/usr/bin/id -u` != 0 ]
-then echo "You must be root to run this."
-exit 2
+# check to see if running as root
+if [ "$(/usr/bin/id -u)" != 0 ]; then
+    echo "You must be root to run this."
+    exit 2
 fi
 
-if [ x$1 = x -o x$2 = x ]; then
-echo "Usage: $0 [user to be sorried] [sorry reason file]"
-exit 0
+if [ x"$1" = x ] || [ x"$2" = x ]; then
+    echo "Usage: $0 [user to be sorried] [sorry reason file]"
+    exit 0
 fi
 
 sorriedUser=$1
 
-if [ -z "`getent passwd $sorriedUser`" ]; then
-  echo "User $sorriedUser does not exist"
-  exit 3
+if [ -z "$(getent passwd "$sorriedUser")" ]; then
+    echo "User $sorriedUser does not exist"
+    exit 3
 fi
 
 sorryFile=$2
-userdir=`ldapsearch -x uid=$sorriedUser | grep homeDirectory | cut -d' ' -f2`
-
-httpdir=`echo $sorriedUser | sed -e 's%\(\(.\)\)%/services/http/users/\2/\1%'`
+userdir=$(ldapsearch -x uid="$sorriedUser" | grep homeDirectory | cut -d' ' -f2)
+httpdir="${sorriedUser//\(\(.\)\)/\/services\/http\/users\/\2/\1}"
 
 rootstaffer="$SUDO_USER"
 
-if [ x"$rootstaffer" = x"root" -o -z $rootstaffer ]
-then
+if [ x"$rootstaffer" = x"root" ] || [ -z "$rootstaffer" ]; then
     echo "The sorry.log is much more useful when it logs who you are"
     echo "rather than simply 'root'. Please enter your username:"
-    read rootstaffer
+    read -r rootstaffer
 fi
 
-if [ -z $SORRY_KRB5CCNAME ]; then
-    echo You are $rootstaffer
-    $KINIT ${rootstaffer}/admin
+if [ -z "$SORRY_KRB5CCNAME" ]; then
+    echo "You are $rootstaffer"
+    $KINIT "${rootstaffer}/admin"
     if [ $? -ne 0 ]; then
         echo "kinit failed, bailing out!"
         exit 1
@@ -50,7 +48,7 @@ if [ -z $SORRY_KRB5CCNAME ]; then
 else
     echo "SORRY_KRB5CCNAME set in environment."
     echo "Assuming this file contains current admin credentials."
-    KRB5CCNAME=$SORRY_KRB5CCNAME
+    KRB5CCNAME="$SORRY_KRB5CCNAME"
     export KRB5CCNAME
 fi
 
@@ -59,15 +57,15 @@ sorryshell=/opt/share/utils/bin/sorried
 echo ""
 echo "Copying sorry file and making .oldshell file"
 
-oldshell=`$LDAPSEARCH -x "(uid=$sorriedUser)" loginShell | grep "^loginShell:" | cut -d" " -f2`
+oldshell=$($LDAPSEARCH -x "(uid=$sorriedUser)" loginShell | grep "^loginShell:" | cut -d" " -f2)
 
-if [[ ! -f .oldshell ]]
-then
-echo $oldshell > $userdir/.oldshell
+if [[ ! -f .oldshell ]]; then
+    echo "$oldshell" > "$userdir/.oldshell"
 fi
-cp $sorryFile $userdir/.sorry
-chmod 400 $userdir/.sorry
-chown $sorriedUser:ocf $userdir/.sorry
+
+cp "$sorryFile" "$userdir/.sorry"
+chmod 400 "$userdir/.sorry"
+chown "$sorriedUser:ocf" "$userdir/.sorry"
 
 echo ""
 echo "Changing user's shell to a sorry shell"
@@ -83,26 +81,26 @@ gidNumber: 2390
 EOF
 
 echo "Changing permissions on httpdir to 000"
-if [[ -d $httpdir ]]
-then chmod 000 $httpdir
+if [[ -d "$httpdir" ]]; then
+    chmod 000 "$httpdir"
 fi
 
 echo ""
 echo "Changing permissions on home directory to 500"
-chmod 500 $userdir
+chmod 500 "$userdir"
 
 echo ""
 echo ""
 echo ""
 echo "Final system check"
-ldapsearch -x uid=$sorriedUser
+ldapsearch -x uid="$sorriedUser"
 ldapsearch -x cn=sorry | tail
-finger -m $sorriedUser
-ls -la $userdir
-ls -ld $httpdir
+finger -m "$sorriedUser"
+ls -la "$userdir"
+ls -ld "$httpdir"
 
-#logging
-echo `/bin/date` - $rootstaffer $sorriedUser >> /opt/acct/sorry.log
+# logging
+echo "$(/bin/date) - $rootstaffer $sorriedUser" >> /opt/acct/sorry.log
 
 # Notify user by email if email address is available.
 email_from='Open Computing Facility <help@ocf.berkeley.edu>'
@@ -125,7 +123,7 @@ Please do not share your password with anyone or over email.
 $(python3 -c 'import ocflib.misc.mail as mail; print(mail.MAIL_SIGNATURE)')
 EOF
 
-if [ -z $SORRY_KRB5CCNAME ]; then
+if [ -z "$SORRY_KRB5CCNAME" ]; then
     $KDESTROY
 fi
 

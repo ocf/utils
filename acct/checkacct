@@ -11,6 +11,7 @@ while [ $# -ne 0 ]; do
     SEARCHQUERY="$SEARCHQUERY (|(uid=*$1*)(cn=*$1*))"
     shift
 done
-for username in `ldapsearch -LLL -x "(&$SEARCHQUERY)" uid | grep '^uid' | cut -f2 -d' '`; do
-    finger -m $username | head -1
+
+for username in $(ldapsearch -LLL -x "(&$SEARCHQUERY)" uid | grep '^uid' | cut -f2 -d' '); do
+    finger -m "$username" | head -1
 done

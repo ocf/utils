@@ -9,13 +9,13 @@
 set -e
 
 usage(){
-  echo "Usage: '$(basename "$0") [PAGER] COMMAND'"
-  echo "PAGER is the program you use to view or edit (or run) files"
-  echo "If ommitted, PAGER is less."
+  echo "Usage: '$(basename "$0") COMMAND'"
+  echo
+  echo "Displays the source code of the script run when COMMAND is executed."
 }
 
 # process arguments and respond if needed
-if [ $# -ne 2 ] && [ $# -ne 1 ]; then
+if [ $# -ne 1 ]; then
   echo 'Error: Incorrect number of arguments.' 1>&2
   echo
   usage
@@ -23,18 +23,17 @@ if [ $# -ne 2 ] && [ $# -ne 1 ]; then
 elif [ "$1" = '-h' ] || [ "$1" = '--help' ]; then
   usage
   exit
-elif [ $# -eq 1 ]; then
-  PAGER=less
-  COMMAND="$1"
-elif [ $# -eq 2 ]; then
-  PAGER="$1"
-  COMMAND="$2"
 fi
 
-# find file in PATH
-file="$(which "$COMMAND")"
+if [ -z "$PAGER" ]; then
+  PAGER=less
+fi
+COMMAND="$1"
 
-# if file does not exist, command does not exist
+# find file in PATH
+file=$(which "$COMMAND" || true)
+
+# if file does not exist/is broken symlink/is not executable, command does not exist
 if [ -z "$file" ]; then
   echo "Error: Command '$COMMAND' could not be found (and executable) in your PATH." 1>&2
   exit 2
@@ -43,43 +42,24 @@ fi
 # print file location
 echo "Program found: $file"
 
-# find filetype of file
-filetype=$(file -i "$file" | awk '{print $2}' | cut -f 1 -d ';')
-
-if echo "$filetype" | grep -q 'symlink$'; then
-
-  # follow symlinks multiple levels to final target and determine type
-  target="$(readlink -mn "$file")"
-  targettype=$(file -bi "$target" | cut -d';' -f1)
-
-  # if chase is installed list chain of symlinks or report
-  #if [ -x /usr/bin/chase ]; then
-  #  chase --verbose $file | sed 1d -e $d
-  #else
-  #  echo "Info: install chase for a full symlink chain."
-  #fi
-
-  # print final target of symlink chain
+# follow any symlinks
+if [ -L "$file" ]; then
+  target=$(readlink -en "$file")
   echo "Final target@: $target"
-
-  # if target is a symlink, it is broken
-  if [ "$targettype" = 'application/x-symlink' ]; then
-    echo "Error: $target is a dangling symlink." 1>&2
-    exit 4
-  fi
-
 else
-  # otherwise, file in PATH is the target file
   target="$file"
-  targettype=$filetype
 fi
+
+# find filetype of file
+targettype=$(file -i "$target" | awk '{print $2}' | cut -f 1 -d ';')
 
 # report filetype
 echo "MIME filetype: $targettype"
 
 # check for and report binary files
-if echo "$targettype" | grep -q ^text; then
+if ! ( echo "$targettype" | grep -q ^text ); then
   echo "Error: Command '$COMMAND' does not refer to a script." 1>&2
+  echo "Its type is: " 1>&2
   file -b "$target" 1>&2
   exit 2
 fi

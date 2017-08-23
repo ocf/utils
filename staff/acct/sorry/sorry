@@ -28,7 +28,11 @@ fi
 
 sorryFile=$2
 userdir=$(ldapsearch -x uid="$sorriedUser" | grep homeDirectory | cut -d' ' -f2)
-httpdir="${sorriedUser//\(\(.\)\)/\/services\/http\/users\/\2/\1}"
+
+# Rewriting this to use bash variable substitution is annoying and confusing, so
+# just use sed instead and ignore the shellcheck warning
+# shellcheck disable=SC2001
+httpdir=$(echo "$sorriedUser" | sed -e 's%\(\(.\)\)%/services/http/users/\2/\1%')
 
 rootstaffer="$SUDO_USER"
 

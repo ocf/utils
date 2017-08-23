@@ -186,12 +186,10 @@ def confirm(prompt='Continue?', default=False):
 
 
 def _main(args):
-    with open('/etc/debian_version', 'r') as f:
-        is_jessie = f.read().startswith('8.')
-
     parser = argparse.ArgumentParser(
         description='Create and configure new VMs using libvirt CLI tools',
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
 
     parser.add_argument('-m', '--memory', type=int, default=4096,
                         help='amount of memory (in MB)')
@@ -201,9 +199,7 @@ def _main(args):
                         help='amount of disk storage (in GB)')
     parser.add_argument('--os-type', type=str, default='linux',
                         help='os type')
-    # strangely, there is no debianjessie :(
-    parser.add_argument('--os-variant', type=str, default=('debianwheezy' if is_jessie else 'debian9'),
-                        help='os variant')
+    parser.add_argument('--os-variant', type=str, default='debian9')
     parser.add_argument('--network', type=str, default='bridge=br0',
                         help='network configuration')
     parser.add_argument('--preseed-user', type=str, default='root',

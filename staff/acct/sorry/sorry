@@ -14,12 +14,17 @@ if [ "$(/usr/bin/id -u)" != 0 ]; then
     exit 2
 fi
 
-if [ x"$1" = x ] || [ x"$2" = x ]; then
+if [ -z "$1" ] || [ -z "$2" ]; then
     echo "Usage: $0 [user to be sorried] [sorry reason file]"
     exit 0
 fi
 
 sorriedUser=$1
+
+if [[ ! "$sorriedUser" =~ ^[a-z]+ ]]; then
+    echo "$sorriedUser is an invalid username"
+    exit 3
+fi
 
 if [ -z "$(getent passwd "$sorriedUser")" ]; then
     echo "User $sorriedUser does not exist"
@@ -32,11 +37,11 @@ userdir=$(ldapsearch -x uid="$sorriedUser" | grep homeDirectory | cut -d' ' -f2)
 # Rewriting this to use bash variable substitution is annoying and confusing, so
 # just use sed instead and ignore the shellcheck warning
 # shellcheck disable=SC2001
-httpdir=$(echo "$sorriedUser" | sed -e 's%\(\(.\)\)%/services/http/users/\2/\1%')
+httpdir=$(echo "$sorriedUser" | sed -E 's%([a-z])[a-z]*%/services/http/users/\1/\0%')
 
 rootstaffer="$SUDO_USER"
 
-if [ x"$rootstaffer" = x"root" ] || [ -z "$rootstaffer" ]; then
+if [ "$rootstaffer" = "root" ] || [ -z "$rootstaffer" ]; then
     echo "The sorry.log is much more useful when it logs who you are"
     echo "rather than simply 'root'. Please enter your username:"
     read -r rootstaffer
@@ -74,6 +79,7 @@ chown "$sorriedUser:ocf" "$userdir/.sorry"
 echo ""
 echo "Changing user's shell to a sorry shell"
 
+sorrygid=$(getent group sorry | cut -d : -f 3)
 $LDAPMODIFY -H ldaps://ldap.ocf.berkeley.edu <<EOF
 dn: uid=$sorriedUser,ou=People,dc=OCF,dc=Berkeley,dc=EDU
 changetype: modify
@@ -81,7 +87,7 @@ replace: loginShell
 loginShell: $sorryshell
 -
 replace: gidNumber
-gidNumber: 2390
+gidNumber: $sorrygid
 EOF
 
 echo "Changing permissions on httpdir to 000"

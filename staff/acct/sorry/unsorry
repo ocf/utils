@@ -9,20 +9,25 @@ KDESTROY=$(which kdestroy)
 
 defaultshell=/bin/bash
 
-# tests for root
-if [[ $(/usr/bin/id -u) -ne 0 ]]; then
+# test for root
+if [ "$(/usr/bin/id -u)" != 0 ]; then
     echo "You must be root to run this"
     exit 2
 fi
 
 
-#usage block
-if [[ $1 = "" ]]; then
+# usage block
+if [ -z "$1" ]; then
     echo "Usage: $0 [user to be unsorried]"
     exit 0
 fi
 
 sorriedUser=$1
+
+if [[ ! "$sorriedUser" =~ ^[a-z]+ ]]; then
+    echo "$sorriedUser is an invalid username"
+    exit 3
+fi
 
 if [ -z "$(getent passwd "$sorriedUser")" ]; then
     echo "User $sorriedUser does not exist"
@@ -31,13 +36,13 @@ fi
 
 userdir=$(ldapsearch -x uid="$sorriedUser" | grep homeDirectory | cut -d' ' -f2)
 
-#nohome directory case
-if [[ $userdir == "" ]]; then
+# no home directory case
+if [ -z "$userdir" ]; then
     echo "Could not find the home directory for user $sorriedUser"
     exit 2
 fi
 
-if [[ ! -e $userdir/.sorry ]]; then
+if [ ! -e "$userdir/.sorry" ]; then
     echo "WARNING: User has no .sorry file"
 fi
 
@@ -49,7 +54,7 @@ read -r _
 
 rootstaffer="$SUDO_USER"
 
-if [ x"$rootstaffer" = x"root" ] || [ -z "$rootstaffer" ]; then
+if [ "$rootstaffer" = "root" ] || [ -z "$rootstaffer" ]; then
     echo "The sorry.log is much more useful when it logs who you are"
     echo "rather than simply 'root'. Please enter your username:"
     read -r rootstaffer
@@ -63,22 +68,24 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# stealing luns's sed madness from makehttp wrapper
-httpdir="${sorriedUser//\(\(.\)\)/\/services\/http\/users\/\2/\1}"
+# Rewriting this to use bash variable substitution is annoying and confusing, so
+# just use sed instead and ignore the shellcheck warning
+# shellcheck disable=SC2001
+httpdir=$(echo "$sorriedUser" | sed -E 's%([a-z])[a-z]*%/services/http/users/\1/\0%')
 
 echo ""
 echo "Changing user's shell back to normal"
-if [[ -e $userdir/.oldshell ]]; then
+if [ -e "$userdir/.oldshell" ]; then
     shell=$(rev "$userdir/.oldshell" | cut -d/ -f1 | rev)
-    if [[ "$shell" == "tcsh" ]]; then
+    if [ "$shell" = "tcsh" ]; then
         newshell="/bin/tcsh"
-    elif [[ "$shell" == "zsh" ]]; then
+    elif [ "$shell" = "zsh" ]; then
         newshell="/bin/zsh"
-    elif [[ "$shell" == "csh" ]]; then
+    elif [ "$shell" = "csh" ]; then
         newshell="/bin/tcsh"
-    elif [[ "$shell" == "ksh" ]]; then
+    elif [ "$shell" = "ksh" ]; then
         newshell="/bin/bash"
-    elif [[ "$shell" == "bash" ]]; then
+    elif [ "$shell" = "bash" ]; then
         newshell="/bin/bash"
     else
         newshell=$defaultshell
@@ -91,6 +98,7 @@ fi
 echo ""
 echo "Restoring ownership of passwd entry"
 
+ocfgid=$(getent group ocf | cut -d : -f 3)
 $LDAPMODIFY -H ldaps://ldap.ocf.berkeley.edu <<EOF
 dn: uid=$sorriedUser,ou=People,dc=OCF,dc=Berkeley,dc=EDU
 changetype: modify
@@ -98,7 +106,7 @@ replace: loginShell
 loginShell: $newshell
 -
 replace: gidNumber
-gidNumber: 1000
+gidNumber: $ocfgid
 EOF
 
 # restoring permission to 755
@@ -106,7 +114,7 @@ chmod 755 "$userdir"
 
 echo ""
 echo "Restoring services directory permissions:"
-if [[ -d $httpdir ]]; then
+if [ -d "$httpdir" ]; then
     chmod 755 "$httpdir"
 fi
 

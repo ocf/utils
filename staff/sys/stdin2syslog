@@ -2,13 +2,12 @@
 set -euo pipefail
 
 if [ $# -lt 1 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
-    echo "Usage: $0 stream
-
-Write stdin logs to OCF's remote syslog server.
-
-You can use arbitrary stream names (without configuring them before); each
-stream will show up at syslog:/var/log/remote/<stream>.log.
-"
+    echo "Usage: $0 stream"
+    echo
+    echo "Write stdin logs to OCF's remote syslog server."
+    echo
+    echo "You can use arbitrary stream names (without configuring them before); each"
+    echo "stream will show up at syslog:/var/log/remote/<stream>.log."
     exit 1
 fi
 

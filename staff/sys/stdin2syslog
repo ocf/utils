@@ -1,49 +1,22 @@
-#!/usr/bin/env python3
-"""Write stdin logs to OCF's remote syslog server.
+#!/bin/bash
+set -euo pipefail
+
+if [ $# -lt 1 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+    echo "Usage: $0 stream
+
+Write stdin logs to OCF's remote syslog server.
 
 You can use arbitrary stream names (without configuring them before); each
 stream will show up at syslog:/var/log/remote/<stream>.log.
-"""
-import argparse
-import re
-import subprocess
-import sys
+"
+    exit 1
+fi
 
+stream="$1"
 
-VALID_STREAM_NAME = re.compile('^[a-z0-9\-_]+$')
+grep -qE '^[a-z0-9_][-a-z0-9_]+$' <<< "$stream" || {
+    echo "$0: invalid stream name."
+    exit 2
+}
 
-
-class LoggingFailure(Exception):
-    pass
-
-
-def write_line(stream, line):
-    """Write a line to a stream.
-
-    This might make sense to move to ocflib some day.
-    """
-    if not VALID_STREAM_NAME.match(stream):
-        raise ValueError('Bad stream name: {}'.format(stream))
-
-    ret = subprocess.call((
-        'logger', '-d', '-n', 'syslog', '-P', '514', '-t', stream, '--', line,
-    ))
-    if ret != 0:
-        raise LoggingFailure('logger exited nonzero: {}'.format(ret))
-
-
-def main(argv=None):
-    parser = argparse.ArgumentParser(
-        description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
-    parser.add_argument('stream')
-    args = parser.parse_args(argv)
-
-    for line in sys.stdin:
-        line = line.rstrip('\n')
-        write_line(args.stream, line)
-
-
-if __name__ == '__main__':
-    exit(main())
+exec logger -d -n syslog -P 514 -t "$stream"

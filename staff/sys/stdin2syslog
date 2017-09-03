@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-if [ $# -lt 1 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+if [ $# -ne 1 ] || [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
     echo "Usage: $0 stream"
     echo
     echo "Write stdin logs to OCF's remote syslog server."

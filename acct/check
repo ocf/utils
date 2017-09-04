@@ -1,4 +1,6 @@
 #!/bin/sh
+# shellcheck shell=sh
+
 # Look up user for relevant account information.
 
 # specify location of User_Info file
@@ -7,6 +9,8 @@ User_Info_file='/home/s/st/staff/User_Info'
 vhost_file='/home/s/st/staff/vhost/vhost.conf'
 # specify location of vhost-app file
 vhost_app_file='/home/s/st/staff/vhost/vhost-app.conf'
+# specify location of vhost-mail file
+vhost_mail_file='/home/s/st/staff/vhost/vhost-mail.conf'
 # specify location of wtmp files
 wtmp_files='/var/log/wtmp /var/log/wtmp.1'
 # default number of logins to display from wtmp files
@@ -122,6 +126,7 @@ if [ -n "$calnetuid" ]; then
   fi
 fi
 
+
 # check virtual hosting config
 if [ -f "$vhost_file" ] && vhost=$(grep -E "^[#[:space:]]*$user[![:space:]]" "$vhost_file"); then
   echo
@@ -132,17 +137,68 @@ if [ -f "$vhost_file" ] && vhost=$(grep -E "^[#[:space:]]*$user[![:space:]]" "$v
 fi
 
 # check apphosting config
-if [ -f "$vhost_app_file" ] && vhost=$(grep -E "^[#[:space:]]*$user[![:space:]]" "$vhost_app_file"); then
+if [ -f "$vhost_app_file" ] && vhost_app=$(grep -E "^[#[:space:]]*$user[![:space:]]" "$vhost_app_file"); then
   echo
   echo "Virtual apphosts:"
   echo "-------------------------------------------------------------------------------"
-  echo "$vhost"
+  echo "$vhost_app"
   echo "-------------------------------------------------------------------------------"
 fi
+
+# check virtual mail config
+if [ -f "$vhost_mail_file" ] && vhost_mail=$(grep -E "^[#[:space:]]*$user[![:space:]]" "$vhost_mail_file"); then
+  echo
+  echo "Virtual mail:"
+  echo "-------------------------------------------------------------------------------"
+  echo "$vhost_mail"
+  echo "-------------------------------------------------------------------------------"
+fi
+
+
+# check dns entries
+expand_fqdns()
+{
+  while read -r entry; do
+    if [ -z "$entry" ]; then
+      continue
+    fi
+    
+    username=$(echo "$entry" | cut -d' ' -f1)
+    domain=$(echo "$entry" | cut -d' ' -f2)
+
+    # shellcheck disable=SC2143,SC2086,SC2063
+    if [ "$domain" = "-" ]; then
+      echo "$username.berkeley.edu"
+    elif [ "$(echo $domain | grep -E '*\.[a-z]+$')" ]; then
+      echo "$domain"
+    else
+      echo "$domain.berkeley.edu"
+    fi
+  done
+}
+
+# shellcheck disable=SC2028
+fqdns=$(echo "$vhost\n$vhost_app\n$vhost_mail" | grep -v '#' | expand_fqdns)
+
+if [ -n "$fqdns" ]; then
+  echo
+  echo "DNS records for $user:"
+  echo "-------------------------------------------------------------------------------"
+
+  # shellcheck disable=SC2028
+  echo "$fqdns" | sort -d | uniq | while read -r fqdn; do
+    dns=$(dig A "$fqdn" AAAA "$fqdn" MX "$fqdn" CNAME "$fqdn" 2>&1 | grep -E "^$fqdn" | sort -d | uniq)
+    echo "$dns"
+  done
+
+  echo "-------------------------------------------------------------------------------"
+fi
+
 
 # check print quota
 echo
 paper view "$user"
+
 
 # check User_Info entries
 User_Info=$([ -f "$User_Info_file" ] && grep "^$user": "$User_Info_file" | cut -d: -f2-)

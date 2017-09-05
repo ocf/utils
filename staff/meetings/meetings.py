@@ -47,7 +47,7 @@ def get_semester():
     month = now.month
     day = now.day
 
-    AUG = 9
+    AUG = 8
     MAY = 5
     # a reasonable approximation for semesters
     if month > AUG or (month == AUG and day > 20):

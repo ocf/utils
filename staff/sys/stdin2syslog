@@ -18,4 +18,4 @@ grep -qE '^[a-z0-9_][-a-z0-9_]+$' <<< "$stream" || {
     exit 2
 }
 
-exec logger -d -n syslog -P 514 -t "$stream"
+exec logger -T -n syslog -P 514 -t "$stream"

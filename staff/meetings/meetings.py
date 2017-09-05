@@ -5,6 +5,7 @@ from math import ceil
 from os import chmod
 from os import listdir
 from os import makedirs
+from os import umask
 from os.path import exists
 from os.path import expanduser
 from os.path import join
@@ -69,7 +70,11 @@ def get_minutes_path(choice, semester=get_semester()):
         raise ValueError('argument must be from get_minutes_choices()')
     path = join(path, semester)
     if not exists(path):
-        makedirs(path)
+        prev_umask = umask(0)
+        try:
+            makedirs(path, mode=0o2775)
+        finally:
+            umask(prev_umask)
     return path
 
 
@@ -98,7 +103,7 @@ def get_bod_membership(semester=get_semester()):
 def get_minutes(folder):
     """Gets the minutes contained in a folder
 
-    Returns the files in a folder that are the format ####.##.## exactly.
+    Returns the files in a folder that are the format ####-##-## exactly.
     This is done to excluse extra files that are uploaded like pdfs and
     membership file
 
@@ -133,12 +138,13 @@ def new_semester():
     new_file = get_bod_membership_file()
     old_file = get_bod_membership_file(semester=last_sem)
     copyfile(old_file, new_file)
+    chmod(new_file, 0o664)
 
 
 def minutes_setup(notes, choice):
     if not exists(notes):
         copyfile(get_template(choice), notes)
-        chmod(notes, 0o664)
+        chmod(notes, 0o644)
     with open(notes, 'r') as f:
         s = Template(f.read())
     subs = {'username': getuser(), 'start_time': strftime('%H:%M')}

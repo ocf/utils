@@ -4,13 +4,59 @@
 This script opens up an editor for taking minutes in the appropriate file.
 It also performs setup and teardown operations, particularly in the case of BoD minutes.
 """
+import getpass
 import os
+import shutil
 import subprocess
 import sys
+import time
+from os.path import join
+from string import Template
 
 from ocflib.misc.shell import get_editor
 
+import bod
 import meetings
+
+
+def minutes_setup(choice, semester, filename):
+    notes = join(meetings.get_minutes_path(choice, semester=semester),
+                 filename)
+
+    # Create minutes file from template if it doesn't exist
+    if not os.path.exists(notes):
+        shutil.copyfile(meetings.get_template(choice), notes)
+        os.chmod(notes, 0o644)
+
+    with open(notes, 'r') as f:
+        s = Template(f.read())
+
+    # Substitute values
+    subs = {'username': getpass.getuser(), 'start_time': time.strftime('%H:%M')}
+    if choice == 'bod':
+        subs['quorum'] = str(bod.quorum())
+    s = s.safe_substitute(subs)
+
+    # Write out file with substituted values
+    with open(notes, 'w') as f:
+        f.write(s)
+
+
+def minutes_done(choice, semester, filename):
+    notes = join(meetings.get_minutes_path(choice, semester=semester),
+                 filename)
+
+    # Substitute in ending values
+    with open(notes, 'r') as f:
+        s = Template(f.read())
+    s = s.safe_substitute(end_time=time.strftime('%H:%M'))
+
+    # Write out file with substituted values
+    with open(notes, 'w') as f:
+        f.write(s)
+
+    if choice == 'bod':
+        bod.update_membership()
 
 
 def main():
@@ -23,11 +69,13 @@ def main():
         print('Invalid choice.')
         return 1
 
+    semester = meetings.get_semester()
     filename = meetings.get_minutes_file()
-    filepath = os.path.join(meetings.get_minutes_path(choice), filename)
-    meetings.minutes_setup(filepath, choice)
+    filepath = join(meetings.get_minutes_path(choice, semester=semester),
+                    filename)
+    minutes_setup(choice, semester, filename)
     subprocess.call([get_editor(), filepath])
-    meetings.minutes_done(filepath, choice)
+    minutes_done(choice, semester, filename)
 
 
 if __name__ == '__main__':

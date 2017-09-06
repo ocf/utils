@@ -14,8 +14,8 @@ def ls(args):
     pairs = meetings.ls(args.state).items()
     pairs = sorted(pairs, key=meetings.membership_key, reverse=True)
     for user, status in pairs:
-        # max acct length is 16
-        print('{:16}  {}'.format(user, status))
+        # current max acct length is 16
+        print('{}  {}'.format(user.ljust(16), status))
 
 
 def danger(args):

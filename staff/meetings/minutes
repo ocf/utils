@@ -1,40 +1,34 @@
 #!/usr/bin/env python3
-import os
-from subprocess import call
-from sys import exit
+"""Script for recording meeting minutes.
 
-import meetings
+This script opens up an editor for taking minutes in the appropriate file.
+It also performs setup and teardown operations, particularly in the case of BoD minutes.
+"""
+import os
+import subprocess
+import sys
+
 from ocflib.misc.shell import get_editor
 
-# note that bod (which is stored in public_html, as they are publicly
-# readable) is symlinked in this folder
-
-# bod template file
+import meetings
 
 
 def main():
-
-    path = os.path.expanduser('~staff/minutes')
-    options = os.listdir(path)
+    options = meetings.get_minutes_choices()
 
     print('What are you taking notes for?')
     print('Options:', ', '.join(options))
-
-    choice = input()
+    choice = input('Enter choice: ')
     if choice not in options:
-        return(0)
+        print('Invalid choice.')
+        return 1
 
-    path = os.path.join(path, choice)
-
-    name = meetings.get_minutes_file()
-
-    notes = os.path.join(meetings.get_minutes_path(choice), name)
-
-    meetings.minutes_setup(notes, choice)
-
-    call([get_editor(), notes])
-    meetings.minutes_done(notes, choice)
+    filename = meetings.get_minutes_file()
+    filepath = os.path.join(meetings.get_minutes_path(choice), filename)
+    meetings.minutes_setup(filepath, choice)
+    subprocess.call([get_editor(), filepath])
+    meetings.minutes_done(filepath, choice)
 
 
 if __name__ == '__main__':
-    exit(main())
+    sys.exit(main())

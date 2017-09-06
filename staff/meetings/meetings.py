@@ -1,18 +1,14 @@
+import getpass
+import os
+import os.path
 import re
+import shutil
+import time
 from collections import defaultdict
 from datetime import datetime
-from getpass import getuser
 from math import ceil
-from os import chmod
-from os import listdir
-from os import makedirs
-from os import umask
-from os.path import exists
-from os.path import expanduser
 from os.path import join
-from shutil import copyfile
 from string import Template
-from time import strftime
 
 
 # Max length of usernames
@@ -25,7 +21,7 @@ def get_minutes_folder():
     Note that bod (which is stored in public_html, as they are readable on the
     Web) is symlinked in this folder.
     """
-    return expanduser('~staff/minutes')
+    return os.path.expanduser('~staff/minutes')
 
 
 def ls(state='all'):
@@ -54,14 +50,14 @@ def quorum():
 def get_template(choice):
     """Returns the path to the template for the given meeting type."""
     minutes_folder = get_minutes_folder()
-    if exists(join(minutes_folder, choice, 'template')):
+    if os.path.exists(join(minutes_folder, choice, 'template')):
         return join(minutes_folder, choice, 'template')
     return join(minutes_folder, 'template')
 
 
 def get_minutes_choices():
     """Returns the choices available for meeting type."""
-    return listdir(get_minutes_folder())
+    return os.listdir(get_minutes_folder())
 
 
 def get_semester():
@@ -95,21 +91,21 @@ def get_minutes_path(choice, semester=get_semester()):
     """Gets the path to the minutes directory for the given type and semester.
     """
     path = join(get_minutes_folder(), choice)
-    if not exists(path):
+    if not os.path.exists(path):
         raise ValueError('argument must be from get_minutes_choices()')
     path = join(path, semester)
-    if not exists(path):
-        prev_umask = umask(0)
+    if not os.path.exists(path):
+        prev_umask = os.umask(0)
         try:
-            makedirs(path, mode=0o2775)
+            os.makedirs(path, mode=0o2775)
         finally:
-            umask(prev_umask)
+            os.umask(prev_umask)
     return path
 
 
 def get_minutes_file():
     """Gets the filename for the current minutes."""
-    return strftime('%Y-%m-%d')
+    return time.strftime('%Y-%m-%d')
 
 
 def get_bod_membership_file(semester=get_semester()):
@@ -130,7 +126,7 @@ def get_bod_membership(semester=get_semester()):
     """
     status = defaultdict(int)
     path = get_bod_membership_file(semester=semester)
-    if not exists(path):
+    if not os.path.exists(path):
         new_semester()
     with open(path) as f:
         for line in f:
@@ -154,7 +150,7 @@ def get_minutes(folder):
 
     """
     pattern = re.compile('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
-    return sorted(i for i in listdir(folder) if pattern.match(i))
+    return sorted(i for i in os.listdir(folder) if pattern.match(i))
 
 
 def get_attendance(path):
@@ -199,21 +195,21 @@ def new_semester():
     """
     new_file = get_bod_membership_file()
     old_file = get_bod_membership_file(semester=get_prev_semester())
-    copyfile(old_file, new_file)
-    chmod(new_file, 0o664)
+    shutil.copyfile(old_file, new_file)
+    os.chmod(new_file, 0o664)
 
 
 def minutes_setup(notes, choice):
     # Create minutes file from template if it doesn't exist
-    if not exists(notes):
-        copyfile(get_template(choice), notes)
-        chmod(notes, 0o644)
+    if not os.path.exists(notes):
+        shutil.copyfile(get_template(choice), notes)
+        os.chmod(notes, 0o644)
 
     with open(notes, 'r') as f:
         s = Template(f.read())
 
     # Substitute values
-    subs = {'username': getuser(), 'start_time': strftime('%H:%M')}
+    subs = {'username': getpass.getuser(), 'start_time': time.strftime('%H:%M')}
     if choice == 'bod':
         subs['quorum'] = str(quorum())
     s = s.safe_substitute(subs)
@@ -227,7 +223,7 @@ def minutes_done(notes, choice):
     # Substitute in ending values
     with open(notes, 'r') as f:
         s = Template(f.read())
-    s = s.safe_substitute(end_time=strftime('%H:%M'))
+    s = s.safe_substitute(end_time=time.strftime('%H:%M'))
 
     # Write out file with substituted values
     with open(notes, 'w') as f:

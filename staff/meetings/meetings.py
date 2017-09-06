@@ -15,6 +15,10 @@ from string import Template
 from time import strftime
 
 
+# Max length of usernames
+USERNAME_LEN = 16
+
+
 def get_minutes_folder():
     return expanduser('~staff/minutes')
 
@@ -89,6 +93,14 @@ def get_bod_membership_file(semester=get_semester()):
 
 
 def get_bod_membership(semester=get_semester()):
+    """Get the membership status for every BoD attendee for the given semester.
+
+    Args:
+        semester: The specified semester. Defaults to the current semester.
+
+    Returns:
+        A dictionary of (attendee, state) mappings.
+    """
     status = defaultdict(int)
     path = get_bod_membership_file(semester=semester)
     if not exists(path):
@@ -129,14 +141,24 @@ def attendance(path):
     return attended
 
 
+def get_prev_semester(semester=get_semester()):
+    """Returns the path for the semester before the given semester.
+
+    >>> get_prev_semester('2017/Fall')
+    '2017/Spring'
+    >>> get_prev_semester('2017/Spring')
+    '2016/Fall'
+    """
+    year, sem = semester.split('/')
+    if sem == 'Spring':
+        return join(str(int(year) - 1), 'Fall')
+    else:
+        return join(year, 'Spring')
+
+
 def new_semester():
-    year, semester = get_semester().split('/')
-    sem_map = {'Spring': 'Fall', 'Fall': 'Spring'}
-    year_map = {'Spring': -1, 'Fall': 0}
-    last_sem = join(str(int(year) + year_map[semester]),
-                    sem_map[semester])
     new_file = get_bod_membership_file()
-    old_file = get_bod_membership_file(semester=last_sem)
+    old_file = get_bod_membership_file(semester=get_prev_semester())
     copyfile(old_file, new_file)
     chmod(new_file, 0o664)
 
@@ -165,48 +187,60 @@ def minutes_done(notes, choice):
         update_membership()
 
 
-def membership_key(p):
-    """implements reverse lexicographic order to sort user, membership status pairs"""
-    special = {'offbod': 'bod', 'bod': 'offbod'}
-    u, s = p
-    if s in special:
-        s = special[s]
-    return s + u
-
-
-def update_membership(semester=get_semester()):
-    minutes = get_minutes(get_bod_minutes_path(semester=semester))
+def update_membership():
     cur_status = get_bod_membership()
-    new_status = defaultdict(int)
-    last_attended = defaultdict(lambda: '1989-02-16')
-    minutes_path = get_bod_minutes_path(semester=semester)
-    for m in minutes:
-        users = attendance(join(minutes_path, m))
-        for user in users:
-            last_attended[user] = m
-            new_status[user] += 1
+    bod_members = {member for member, status in cur_status.items()
+                   if status == 'bod'}
 
-    special = {k: v for k, v in cur_status.items() if type(v) is not int}
-    for user in {k: v for k, v in special.items() if v == 'offbod'}:
-        special[user] = 'bod'
-    new_status.update(special)
-    eligible = {k: v for k, v in new_status.items() if type(v) is int and
-                v >= 4 and last_attended[k] == minutes[-1]}
+    minutes_path = get_bod_minutes_path()
+    minutes_files = get_minutes(minutes_path)
+    if minutes_files:
+        print(join(minutes_path, minutes_files[-1]))
+        attendees_today = attendance(join(minutes_path, minutes_files[-1]))
 
-    for user in eligible:
-        print(user + ' is eligible to join bod, would they like to join? (y/n)')
-        ans = input()
-        if ans == 'y' or ans == 'yes':
-            new_status[user] = 'bod'
+    # Start new status dict. Begin by adding all BoD members.
+    new_status = {member: status for member, status in cur_status.items()
+                  if status == 'bod'}
 
-    bod = {k: v for k, v in new_status.items() if v == 'bod'}
-    if len(minutes) > 0:
-        cutoff = minutes[-1]
-        for user in bod:
-            if last_attended[user] < cutoff:
-                new_status[user] = 'offbod'
-    new_status = sorted(['{:16}  {}'.format(k, str(v)) for k, v in new_status.items()],
-                        key=lambda x: membership_key(x.split()), reverse=True)
+    # Add new members to BoD
+    guests = attendees_today - bod_members
+    for attendee in guests:
+        reply = input(attendee + ' is not on BoD. Would they like to join? '
+                      '(y/n) ')
+        if reply == 'y' or reply == 'yes':
+            new_status[attendee] = 'bod'
 
-    with open(get_bod_membership_file(semester=semester), 'w') as f:
-        f.write('\n'.join(new_status) + '\n')
+    # Kick people off BoD if they haven't come to the previous 2 meetings
+    # (including the current one)
+    if len(minutes_files) >= 2:
+        print(join(minutes_path, minutes_files[-2]))
+        attended_last_meeting = attendance(join(minutes_path,
+                                                minutes_files[-2]))
+    else:
+        last_semester_minutes_path = get_bod_minutes_path(get_prev_semester())
+        last_semester_minutes = get_minutes(last_semester_minutes_path)
+        assert len(last_semester_minutes) > 1, \
+            'Expecting at least one BoD meeting last semester'
+        attended_last_meeting = attendance(join(last_semester_minutes_path,
+                                                last_semester_minutes[-1]))
+
+    print(attendees_today)
+    print(attended_last_meeting)
+    for non_attendee in bod_members - (attendees_today | attended_last_meeting):
+        print(non_attendee, 'is being kicked off bod')
+        del new_status[non_attendee]
+
+    # Write out new status
+    def membership_key(p):
+        special = {'bod': 0, 'offbod': 1}
+        u, s = p
+        if s in special:
+            s = special[s]
+        return (s, u)
+    sorted_new_status = sorted(new_status.items(), key=membership_key)
+    str_new_status = ''.join('{}  {}\n'.format(attendee.ljust(USERNAME_LEN),
+                                               status)
+                             for attendee, status in sorted_new_status)
+
+    with open(get_bod_membership_file(), 'w') as f:
+        f.write(str_new_status)

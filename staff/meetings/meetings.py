@@ -104,6 +104,40 @@ def get_minutes(folder):
     return sorted(i for i in os.listdir(folder) if pattern.match(i))
 
 
+def get_prev_meeting(choice, semester, minutes_filename):
+    """Gets the semester and minutes filename of the previous meeting.
+
+    Args:
+        choice: the meeting type
+        semester: the directory name (as given by ``meetings.get_semester()``)
+                  for the semester in which the meeting took place
+        minutes_filename: the filename of the file containing the minutes for
+                          the meeting
+
+    Returns:
+        A tuple of (semester of previous meeting, filename of previous meeting
+        minutes)
+
+    """
+    minutes = get_minutes(get_minutes_path(choice, semester=semester))
+    try:
+        i = minutes.index(minutes_filename)
+    except IndexError:
+        raise ValueError('The minutes file "{}" was not found'
+                         .format(minutes_filename))
+
+    if i > 0:
+        semester_prev = semester
+        prev_meeting_file = minutes[i - 1]
+    else:
+        semester_prev = get_prev_semester(semester=semester)
+        prev_minutes = get_minutes(get_minutes_path(choice,
+                                                    semester=semester_prev))
+        prev_meeting_file = prev_minutes[-1]
+
+    return (semester_prev, prev_meeting_file)
+
+
 def get_attendance(path):
     """Returns the set of attendees for the given meeting.
 

@@ -3,34 +3,33 @@ import argparse
 import sys
 from os.path import join
 
+import bod
 import meetings
 
 
+def get_last_meeting():
+    """Returns a (semester, filename) pair for the most recent meeting."""
+    if not hasattr(get_last_meeting, 'cached_val'):
+        meeting_lst = meetings.get_minutes(bod.get_bod_minutes_path())
+        get_last_meeting.cached_val = (meetings.get_semester(), meeting_lst[-1])
+    return get_last_meeting.cached_val
+
+
 def quorum(args):
-    print(meetings.quorum())
+    print(bod.quorum(*get_last_meeting()))
 
 
 def ls(args):
-    pairs = meetings.ls(args.state).items()
-    pairs = sorted(pairs, key=meetings.membership_key, reverse=True)
-    for user, status in pairs:
-        # current max acct length is 16
-        print('{}  {}'.format(user.ljust(16), status))
+    for director in sorted(bod.ls(*get_last_meeting())):
+        print(director)
 
 
 def danger(args):
-    path = meetings.get_bod_minutes_path()
-    minutes = meetings.get_minutes(path)
-    if len(minutes) > 0:
-        bod = set(meetings.ls(state='bod'))
-        attended_last_meeting = set(meetings.attendance(join(path, minutes[-1])))
-        for user in bod - attended_last_meeting:
-            print(user)
+    on_bod = bod.ls(*get_last_meeting())
+    at_last_meeting = set(bod.get_attending_directors(*get_last_meeting()))
 
-
-def update(args):
-    """update membership file based on minutes in current semester"""
-    meetings.update_membership()
+    for director in sorted(on_bod - at_last_meeting):
+        print(director)
 
 
 if __name__ == '__main__':
@@ -40,19 +39,14 @@ if __name__ == '__main__':
         # lists people in "danger" of being kicked off
         # i.e. people who missed last meeting on bod
         'danger': danger,
-        'update': update,
     }
 
     parser = argparse.ArgumentParser(description='View bod composition and information')
     subparser = parser.add_subparsers(dest='command', help='command to run')
     subparser_danger = subparser.add_parser('danger', help='users in danger of being kicked off bod')
-    subparser_update = subparser.add_parser('update', help='update membership file')
     subparser_ls = subparser.add_parser('ls', help='list users and their bod eligibility state')
     subparser_quorum = subparser.add_parser('quorum', help='current bod quorum')
-    subparser_ls.add_argument('state', nargs='?', default='all',
-                              choices=['all', 'bod', 'offbod'],
-                              help='group of users to list'
-                              )
+
     if len(sys.argv) == 1:
         parser.print_help()
     else:

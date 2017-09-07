@@ -34,7 +34,7 @@ def minutes_setup(choice, semester, filename):
     # Substitute values
     subs = {'username': getpass.getuser(), 'start_time': time.strftime('%H:%M')}
     if choice == 'bod':
-        subs['quorum'] = str(bod.quorum())
+        subs['quorum'] = str(bod.quorum(semester, filename))
     s = s.safe_substitute(subs)
 
     # Write out file with substituted values
@@ -56,7 +56,7 @@ def minutes_done(choice, semester, filename):
         f.write(s)
 
     if choice == 'bod':
-        bod.update_membership()
+        bod.split_attendance(semester, filename)
 
 
 def main():

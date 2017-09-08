@@ -6,13 +6,12 @@ import collections
 import getpass
 import pwd
 import re
-import shutil
 import sys
+import tempfile
 from datetime import date
 
 
 USER_INFO = '/home/s/st/staff/User_Info'
-USER_INFO_BAK = '/tmp/User_Info.bak.' + getpass.getuser()
 
 TOPICS = collections.OrderedDict([
     (r'\bban(ned)?\b', 'ban'),
@@ -77,9 +76,12 @@ def main():
     lines.sort()
 
     try:
-        shutil.copy(USER_INFO, USER_INFO_BAK)
-    except shutil.Error:
-        print('Could not open backup for writing')
+        with tempfile.NamedTemporaryFile(prefix='User_Info.bak.{}.'
+                                         .format(getpass.getuser())) as tmpfile:
+            with open(USER_INFO, 'rb') as fin:
+                tmpfile.write(fin.read())
+    except IOError as e:
+        print('Could not write backup:', e.strerror)
         return 6
 
     try:
@@ -90,7 +92,7 @@ def main():
         print('Could not write to User_Info:', e.strerror)
         return 5
 
-    print('Note saved, a backup was saved in ' + USER_INFO_BAK)
+    print('Note saved, a backup was saved in ' + tmpfile.name)
 
 
 if __name__ == '__main__':

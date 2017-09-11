@@ -125,7 +125,6 @@ if [ -n "$calnetuid" ]; then
   fi
 fi
 
-
 # check virtual hosting config
 if [ -f "$vhost_file" ] && vhost=$(grep -E "^[#[:space:]]*$user[![:space:]]" "$vhost_file"); then
   echo
@@ -153,30 +152,26 @@ if [ -f "$vhost_mail_file" ] && vhost_mail=$(grep -E "^[#[:space:]]*$user[![:spa
   echo "-------------------------------------------------------------------------------"
 fi
 
-
 # check dns entries
 expand_fqdns()
 {
   while read -r entry; do
-    if [ -z "$entry" ]; then
-      continue
-    fi
-    
-    username=$(echo "$entry" | cut -d' ' -f1)
-    domain=$(echo "$entry" | cut -d' ' -f2)
+    if [ -n "$entry" ]; then
+      username=$(echo "$entry" | cut -d' ' -f1)
+      domain=$(echo "$entry" | cut -d' ' -f2)
 
-    # shellcheck disable=SC2143,SC2086,SC2063
-    if [ "$domain" = "-" ]; then
-      echo "$username.berkeley.edu"
-    elif [ "$(echo $domain | grep -E '*\.[a-z]+$')" ]; then
-      echo "$domain"
-    else
-      echo "$domain.berkeley.edu"
+      if [ "$domain" = "-" ]; then
+        echo "$username.berkeley.edu"
+      elif echo "$domain" | grep -qE '.+\.[a-z]+$'; then
+        echo "$domain"
+      else
+        echo "$domain.berkeley.edu"
+      fi
     fi
   done
 }
 
-fqdns=$(printf "%s\n%s\n%s" "$vhost" "$vhost_app" "$vhost_mail" | grep -v '#' | expand_fqdns)
+fqdns=$(printf "%s\n%s\n%s\n" "$vhost" "$vhost_app" "$vhost_mail" | grep -v '#' | expand_fqdns)
 
 if [ -n "$fqdns" ]; then
   echo

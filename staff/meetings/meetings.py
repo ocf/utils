@@ -1,48 +1,38 @@
-from collections import defaultdict
+import os
+import os.path
+import re
+import time
 from datetime import datetime
-from getpass import getuser
-from math import ceil
-from os import chmod
-from os import listdir
-from os import makedirs
-from os import umask
-from os.path import exists
-from os.path import expanduser
 from os.path import join
-from re import compile
-from shutil import copyfile
-from string import Template
-from time import strftime
 
 
 def get_minutes_folder():
-    return expanduser('~staff/minutes')
+    """Returns the path to the folder containing minutes.
+
+    Note that bod (which is stored in public_html, as they are readable on the
+    Web) is symlinked in this folder.
+    """
+    return os.path.expanduser('~staff/minutes')
 
 
-def ls(state='all'):
-    states = get_bod_membership()
-    if state != 'all':
-        states = {k: v for k, v in states.items() if v == state}
-    return states
-
-
-def quorum():
-    bod = ls(state='bod')
-    return int(ceil(2 / 3 * len(bod)))
+def get_minutes_choices():
+    """Returns the choices available for meeting type."""
+    return os.listdir(get_minutes_folder())
 
 
 def get_template(choice):
+    """Returns the path to the template for the given meeting type."""
     minutes_folder = get_minutes_folder()
-    if exists(join(minutes_folder, choice, 'template')):
+    if os.path.exists(join(minutes_folder, choice, 'template')):
         return join(minutes_folder, choice, 'template')
     return join(minutes_folder, 'template')
 
 
-def get_minutes_choices():
-    return listdir(get_minutes_folder())
-
-
 def get_semester():
+    """Returns the directory name for the current semester
+
+    For example: 2017/Fall
+    """
     now = datetime.now()
     year = now.year
     month = now.month
@@ -60,44 +50,40 @@ def get_semester():
     return join(str(year), sem)
 
 
-def get_bod_minutes_path(semester=get_semester()):
-    return get_minutes_path('bod', semester=semester)
+def get_prev_semester(semester=get_semester()):
+    """Returns the path for the semester before the given semester.
+
+    >>> get_prev_semester('2017/Fall')
+    '2017/Spring'
+    >>> get_prev_semester('2017/Spring')
+    '2016/Fall'
+    """
+    year, sem = semester.split('/')
+    if sem == 'Spring':
+        return join(str(int(year) - 1), 'Fall')
+    else:
+        return join(year, 'Spring')
 
 
 def get_minutes_path(choice, semester=get_semester()):
+    """Gets the path to the minutes directory for the given type and semester.
+    """
     path = join(get_minutes_folder(), choice)
-    if not exists(path):
+    if not os.path.exists(path):
         raise ValueError('argument must be from get_minutes_choices()')
     path = join(path, semester)
-    if not exists(path):
-        prev_umask = umask(0)
+    if not os.path.exists(path):
+        prev_umask = os.umask(0)
         try:
-            makedirs(path, mode=0o2775)
+            os.makedirs(path, mode=0o2775)
         finally:
-            umask(prev_umask)
+            os.umask(prev_umask)
     return path
 
 
 def get_minutes_file():
-    return strftime('%Y-%m-%d')
-
-
-def get_bod_membership_file(semester=get_semester()):
-    folder = get_bod_minutes_path(semester=semester)
-    path = join(folder, 'membership')
-    return path
-
-
-def get_bod_membership(semester=get_semester()):
-    status = defaultdict(int)
-    path = get_bod_membership_file(semester=semester)
-    if not exists(path):
-        new_semester()
-    with open(path) as f:
-        for line in f:
-            user, state = line.split()
-            status[user] = state
-    return status
+    """Gets the filename for the current minutes."""
+    return time.strftime('%Y-%m-%d')
 
 
 def get_minutes(folder):
@@ -114,11 +100,54 @@ def get_minutes(folder):
         list: The sorted list of minutes files in the folder
 
     """
-    pattern = compile('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
-    return sorted([i for i in listdir(folder) if pattern.match(i)])
+    pattern = re.compile('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+    return sorted(i for i in os.listdir(folder) if pattern.match(i))
 
 
-def attendance(path):
+def get_prev_meeting(choice, semester, minutes_filename):
+    """Gets the semester and minutes filename of the previous meeting.
+
+    Args:
+        choice: the meeting type
+        semester: the directory name (as given by ``meetings.get_semester()``)
+                  for the semester in which the meeting took place
+        minutes_filename: the filename of the file containing the minutes for
+                          the meeting
+
+    Returns:
+        A tuple of (semester of previous meeting, filename of previous meeting
+        minutes)
+
+    """
+    minutes = get_minutes(get_minutes_path(choice, semester=semester))
+    try:
+        i = minutes.index(minutes_filename)
+    except IndexError:
+        raise ValueError('The minutes file "{}" was not found'
+                         .format(minutes_filename))
+
+    if i > 0:
+        semester_prev = semester
+        prev_meeting_file = minutes[i - 1]
+    else:
+        semester_prev = get_prev_semester(semester=semester)
+        prev_minutes = get_minutes(get_minutes_path(choice,
+                                                    semester=semester_prev))
+        prev_meeting_file = prev_minutes[-1]
+
+    return (semester_prev, prev_meeting_file)
+
+
+def get_attendance(path):
+    """Returns the set of attendees for the given meeting.
+
+    Args:
+        path: path to the minutes file for the desired meeting
+
+    Returns:
+        A set containing the usernames of everyone who attended that meeting
+
+    """
     attended = set()
     with open(path) as f:
         lines = f.read().splitlines()
@@ -127,86 +156,3 @@ def attendance(path):
             attended.add(lines[i])
             i += 1
     return attended
-
-
-def new_semester():
-    year, semester = get_semester().split('/')
-    sem_map = {'Spring': 'Fall', 'Fall': 'Spring'}
-    year_map = {'Spring': -1, 'Fall': 0}
-    last_sem = join(str(int(year) + year_map[semester]),
-                    sem_map[semester])
-    new_file = get_bod_membership_file()
-    old_file = get_bod_membership_file(semester=last_sem)
-    copyfile(old_file, new_file)
-    chmod(new_file, 0o664)
-
-
-def minutes_setup(notes, choice):
-    if not exists(notes):
-        copyfile(get_template(choice), notes)
-        chmod(notes, 0o644)
-    with open(notes, 'r') as f:
-        s = Template(f.read())
-    subs = {'username': getuser(), 'start_time': strftime('%H:%M')}
-    if choice == 'bod':
-        subs['quorum'] = str(quorum())
-    s = s.safe_substitute(subs)
-    with open(notes, 'w') as f:
-        f.write(s)
-
-
-def minutes_done(notes, choice):
-    with open(notes, 'r') as f:
-        s = Template(f.read())
-    s = s.safe_substitute(end_time=strftime('%H:%M'))
-    with open(notes, 'w') as f:
-        f.write(s)
-    if choice == 'bod':
-        update_membership()
-
-
-def membership_key(p):
-    """implements reverse lexicographic order to sort user, membership status pairs"""
-    special = {'offbod': 'bod', 'bod': 'offbod'}
-    u, s = p
-    if s in special:
-        s = special[s]
-    return s + u
-
-
-def update_membership(semester=get_semester()):
-    minutes = get_minutes(get_bod_minutes_path(semester=semester))
-    cur_status = get_bod_membership()
-    new_status = defaultdict(int)
-    last_attended = defaultdict(lambda: '1989-02-16')
-    minutes_path = get_bod_minutes_path(semester=semester)
-    for m in minutes:
-        users = attendance(join(minutes_path, m))
-        for user in users:
-            last_attended[user] = m
-            new_status[user] += 1
-
-    special = {k: v for k, v in cur_status.items() if type(v) is not int}
-    for user in {k: v for k, v in special.items() if v == 'offbod'}:
-        special[user] = 'bod'
-    new_status.update(special)
-    eligible = {k: v for k, v in new_status.items() if type(v) is int and
-                v >= 4 and last_attended[k] == minutes[-1]}
-
-    for user in eligible:
-        print(user + ' is eligible to join bod, would they like to join? (y/n)')
-        ans = input()
-        if ans == 'y' or ans == 'yes':
-            new_status[user] = 'bod'
-
-    bod = {k: v for k, v in new_status.items() if v == 'bod'}
-    if len(minutes) > 0:
-        cutoff = minutes[-1]
-        for user in bod:
-            if last_attended[user] < cutoff:
-                new_status[user] = 'offbod'
-    new_status = sorted(['{:16}  {}'.format(k, str(v)) for k, v in new_status.items()],
-                        key=lambda x: membership_key(x.split()), reverse=True)
-
-    with open(get_bod_membership_file(semester=semester), 'w') as f:
-        f.write('\n'.join(new_status) + '\n')

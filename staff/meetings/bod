@@ -16,7 +16,7 @@ def get_last_meeting():
 
 
 def quorum(args):
-    print(bod.quorum(*get_last_meeting()))
+    print(bod.quorum_next(*get_last_meeting()))
 
 
 def ls(args):

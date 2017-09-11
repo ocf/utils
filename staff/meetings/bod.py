@@ -15,7 +15,21 @@ def quorum(semester, minutes_filename):
                           the meeting
 
     """
-    bod = ls(*meetings.get_prev_meeting('bod', semester, minutes_filename))
+    return quorum_next(*meetings.get_prev_meeting('bod', semester,
+                                                  minutes_filename))
+
+
+def quorum_next(semester, minutes_filename):
+    """Returns the quorum for the BoD meeting after the specified one.
+
+    Args:
+        semester: the directory name (as given by ``meetings.get_semester()``)
+                  for the semester in which the meeting took place
+        minutes_filename: the filename of the file containing the minutes for
+                          the meeting
+
+    """
+    bod = ls(semester, minutes_filename)
     return int(ceil(2 / 3 * len(bod)))
 
 

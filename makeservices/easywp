@@ -1,0 +1,38 @@
+#!/bin/bash
+
+php_defines() {
+    sed -i "s/$1/$2/" "$WPCONFIG"
+}
+
+WEBROOT=$HOME/public_html
+WPCONFIG=wp-config.php
+USER=$(whoami)
+
+# Create symlink to webroot
+makehttp
+cd "$WEBROOT"
+rm -rf *
+
+# Get SQL password
+SQLPASS=$(echo "yes" | makemysql | tail -n 1 | grep -Po '(?<=: )([0-9a-zA-Z]){24,}$')
+[ -z "$SQLPASS" ] && exit 1
+
+# Install WordPress
+wp core download
+cp wp-config-sample.php "$WPCONFIG"
+
+# dos2unix
+sed -i 's/\r//' "$WPCONFIG"
+
+# Modify the config file with correct info
+php_defines 'database_name_here' "$USER"
+php_defines 'username_here' "$USER"
+php_defines 'password_here' "$SQLPASS"
+php_defines 'localhost' 'mysql'
+php_defines 'utf8' 'utf8mb4'
+
+# Grab auth keys and salts from WP API
+sed -i '/put your unique phrase here/d' "$WPCONFIG"
+echo >> "$WPCONFIG"
+curl -sS -X GET https://api.wordpress.org/secret-key/1.1/salt/ >> "$WPCONFIG"
+

@@ -7,40 +7,61 @@
 # out with the requisite information. Further configuration can be 
 # done by the user from a browser.  
 #
-# WARNING: This script should generally be run on a account without
-#          an existing website or database!
-#
 
-set -euxo pipefail
+set -euo pipefail
 shopt -s dotglob
 
-WEBROOT=$HOME/public_html
-WPCONFIG=wp-config.php
-USER=$(whoami)
+echo -e "\033[31mWARNING: This script should generally be run on a fresh account!\033[00m"
+echo -e "A user with an existing website or database will have their files 
+backed up, but their database password will change and the WordPress 
+install may clutter or try to migrate tables.\n"
+
+read -rp "Are you sure you want to continue? [Y/n] " idunno
+idunno=${idunno,,}
+if ! [[ "$idunno" =~ ^(yes|y|^$) ]]; then
+    echo "Ok, bye!"
+    exit 0
+fi
+
+webroot=$HOME/public_html
+user=$(whoami)
 
 # Create symlink to webroot
 makehttp
-cd "$WEBROOT"
+cd "$webroot"
 
-# If user has files, move them to a new location. 
-if [ -n "$(ls -A)" ]; then
-    TS=$(date +"%Y-%m-%d_%H:%M:%S")
-    BACKUP="$HOME/webroot-$TS"
-    mkdir -p "$BACKUP"
-    echo "Webroot not empty. Moving current files to $BACKUP..." 
-    mv ./* "$BACKUP"
+# Check if user has files and let user decide what they want to do. 
+if [[ -n "$(ls -A)" ]]; then
+    echo
+    echo -e "There are currently files in webroot!\n"
+    read -rp "Do you want to back these files up? [Y/n/x] " whoknows
+
+    whoknows=${whoknows,,}
+    if [[ "$whoknows" =~ ^(yes|y|^$) ]]; then
+        ts=$(date +"%Y-%m-%d_%H:%M:%S")
+        backup="$HOME/webroot-$ts"
+        mkdir -p "$backup"
+        echo "Moving current files to $backup ..." 
+        mv ./* "$backup"
+    elif [[ "$whoknows" =~ ^(no|n) ]]; then
+        echo "Ok, say goodbye to your website."
+        rm -rf ./*
+    else
+        echo "Ok, bye!"
+        exit 0
+    fi
 fi
 
 # Get SQL password
-echo "Resetting database..."
-SQLPASS=$(echo "yes" | makemysql | tail -n 1 | grep -Po '(?<=: )([0-9a-zA-Z]){24,}$')
-if [ -z "$SQLPASS" ]; then
-    echo "  Error: Could not retrieve database password. Run makemysql to see the issue."
+echo "Resetting database password..."
+sqlpass=$(echo "yes" | makemysql | tail -n 1 | grep -Po '(?<=: )([0-9a-zA-Z]){24,}$')
+if [[ -z "$sqlpass" ]]; then
+    echo -e "\033[31mError:\033[00m Could not retrieve database password. Run makemysql to see the issue."
     exit 1
 fi
-echo "SQL set up and the password can be found in $WPCONFIG ..."
+echo "SQL set up and the password can be found in wp-config.php ..."
 
 # Install WordPress and create config file
 wp core download
-wp config create --dbname="$USER" --dbuser="$USER" --dbpass="$SQLPASS" --dbhost=mysql --dbcharset=utf8mb4 
-echo "WordPress installed successful. Go to https://www.ocf.berkeley.edu/~$USER to finish the setup process."
+wp config create --dbname="$user" --dbuser="$user" --dbpass="$sqlpass" --dbhost=mysql --dbcharset=utf8mb4 
+echo "WordPress install successful. Go to https://www.ocf.berkeley.edu/~$user to finish the setup process."

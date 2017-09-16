@@ -4,6 +4,9 @@ import argparse
 import getpass
 import sys
 
+from ocflib.misc.shell import bold
+from ocflib.misc.shell import green
+from ocflib.misc.shell import red
 import lxml.html
 import requests
 import urllib3
@@ -101,12 +104,12 @@ def main():
         sys.stdout.flush()
         with Printer(printer_name) as printer:
             if not printer.log_in(password):
-                print('Error: the password is not correct. Try again.')
+                print(red('Error:'), 'the password is not correct. Try again.')
                 return 1
             if printer.change_economode(args.setting.title()):
-                print('OK')
+                print(green('OK'))
             else:
-                print('Failure')
+                print(red('Failure'))
                 return 1
 
 

@@ -6,6 +6,7 @@ import sys
 
 import lxml.html
 import requests
+import urllib3
 
 
 PRINTERS = ['papercut', 'pagefault']
@@ -85,10 +86,11 @@ class Printer:
 
 
 def main():
-    requests.packages.urllib3.disable_warnings()
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('setting', choices=('on', 'off'), help='economode setting')
     args = parser.parse_args()
+
+    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
     # Prompt for password
     password = getpass.getpass('Enter printer password: ')

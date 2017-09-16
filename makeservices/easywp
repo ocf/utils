@@ -1,5 +1,19 @@
 #!/bin/bash
 
+# Creates symlink to user's webroot. If the symlink exists and files
+# are present in webroot, they are backed up in the user's home directory.
+# A user's database is created or, if it already exists, the password 
+# is reset. WordPress is installed and the wp-config file is filled
+# out with the requisite information. Further configuration can be 
+# done by the user from a browser.  
+#
+# WARNING: This script should generally be run on a account without
+#          an existing website or database!
+#
+
+set -euxo pipefail
+shopt -s dotglob
+
 php_defines() {
     sed -i "s/$1/$2/" "$WPCONFIG"
 }
@@ -11,11 +25,24 @@ USER=$(whoami)
 # Create symlink to webroot
 makehttp
 cd "$WEBROOT"
-rm -rf *
+
+# If user has files, move them to a new location. 
+if [ -n "$(ls -A)" ]; then
+    TS=$(date +"%Y-%m-%d_%H:%M:%S")
+    BACKUP="$HOME/webroot-$TS"
+    mkdir -p "$BACKUP"
+    echo "Webroot not empty. Moving current files to $BACKUP..." 
+    mv ./* "$BACKUP"
+fi
 
 # Get SQL password
+echo "Resetting database..."
 SQLPASS=$(echo "yes" | makemysql | tail -n 1 | grep -Po '(?<=: )([0-9a-zA-Z]){24,}$')
-[ -z "$SQLPASS" ] && exit 1
+if [ -z "$SQLPASS" ]; then
+    echo "  Error: Could not retrieve database password. Run makemysql to see the issue."
+    exit 1
+fi
+echo "SQL set up and the password can be found in $WPCONFIG ..."
 
 # Install WordPress
 wp core download
@@ -36,3 +63,4 @@ sed -i '/put your unique phrase here/d' "$WPCONFIG"
 echo >> "$WPCONFIG"
 curl -sS -X GET https://api.wordpress.org/secret-key/1.1/salt/ >> "$WPCONFIG"
 
+echo "WordPress installed successful. Go to https://www.ocf.berkeley.edu/~$USER to finish the setup process."

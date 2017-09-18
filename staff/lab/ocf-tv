@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
 import argparse
+import getpass
 import random
 import socket
+import subprocess
 import sys
 import time
-import subprocess
+
+from ocflib.accounts.util import is_staff
 
 # occasionally the pulseaudio sink on tornado changes
 # and this script breaks. If that happens, find the new
@@ -119,6 +122,11 @@ def connect(args):
         proc.wait()
 
 if __name__ == '__main__':
+
+    if not is_staff(getpass.getuser()):
+        print("You must be staff to run this script.")
+        sys.exit(1)
+
     commands = {
         'connect': connect,
         'volume': volume,

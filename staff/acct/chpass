@@ -22,7 +22,7 @@ def change_password(user, password):
     while True:
         try:
             root_password = getpass.getpass(
-                'Enter admin password: '.format(root_principal))
+                'Enter root password: '.format(root_principal))
             print(green('[OK]') + ' Changing password...')
             change_password_with_staffer(
                 user,

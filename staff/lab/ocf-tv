@@ -7,7 +7,7 @@ import subprocess
 import sys
 import time
 
-from ocflib.accounts.util import is_staff
+from ocflib.account.utils import is_staff
 
 # occasionally the pulseaudio sink on tornado changes
 # and this script breaks. If that happens, find the new

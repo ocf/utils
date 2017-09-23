@@ -106,7 +106,7 @@ def get_ssh_connection(mac, user, key_file):
     # wait for the VM to be live
     while True:
         try:
-            print('Determining IP for VM...')
+            print('Searching for autoconfigured IP for VM...')
             ip = get_ip(mac)
             print('Trying IP: {}'.format(ip))
 

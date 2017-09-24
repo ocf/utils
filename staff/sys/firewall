@@ -6,5 +6,5 @@ trap 'cd / && rm -rf "$TMPDIR"' EXIT
 cd "$TMPDIR"
 
 # Download and launch Java firewall config client
-curl https://firewall.ocf.berkeley.edu/admin/public/startup.jnlp > startup.jnlp
+curl --insecure https://firewall.ocf.berkeley.edu/admin/public/startup.jnlp > startup.jnlp
 javaws startup.jnlp

@@ -4,6 +4,7 @@
 This script opens up an editor for taking minutes in the appropriate file.
 It also performs setup and teardown operations, particularly in the case of BoD minutes.
 """
+import argparse
 import getpass
 import os
 import shutil
@@ -62,12 +63,22 @@ def minutes_done(choice, semester, filename):
 def main():
     options = meetings.get_minutes_choices()
 
-    print('What are you taking notes for?')
-    print('Options:', ', '.join(options))
-    choice = input('Enter choice: ')
-    if choice not in options:
-        print('Invalid choice.')
-        return 1
+    parser = argparse.ArgumentParser(description='Record standardized meeting minutes')
+    parser.add_argument('meeting_type', metavar='MEETING-TYPE', nargs='?',
+                        choices=options,
+                        help='Which meeting you are recording minutes for. '
+                             'If not specified, you will be prompted for one.')
+
+    args = parser.parse_args()
+    if args.meeting_type:
+        choice = args.meeting_type
+    else:
+        print('What are you taking notes for?')
+        print('Options:', ', '.join(options))
+        choice = input('Enter choice: ')
+        if choice not in options:
+            print('Invalid choice.')
+            return 1
 
     semester = meetings.get_semester()
     filename = meetings.get_minutes_file()

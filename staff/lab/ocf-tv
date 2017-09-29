@@ -1,22 +1,13 @@
 #!/usr/bin/env python3
 import argparse
-import getpass
 import random
 import socket
 import subprocess
 import sys
 import time
 
-from ocflib.account.utils import is_staff
-
-# occasionally the pulseaudio sink on tornado changes
-# and this script breaks. If that happens, find the new
-# sink (login to tornado, export PULSE_AUDIO=localhost,
-# then do something like pactl list | grep 'Sink #' -A 10
-# and update this with the result. If you get one that says
-# "dummy output" then you forgot to export the env variable.
-
-PACTL_SINK = 0
+TV_SINK = 'alsa_output.pci-0000_00_03.0.hdmi-stereo'
+TUNNEL_NAME = 'ocf-tv-remote'
 
 def unused_port():
     def used(port):
@@ -50,90 +41,94 @@ def wait_for_port(host, port, timeout=5, ssh_proc=None):
         if spent > timeout:
             raise TimeoutError('Timed out after {} seconds.'.format(timeout))
 
-def check_volume(val):
-    x = int(val)
-    if abs(x) > 150:
-        raise argparse.ArgumentTypeError('Volume out of bounds: {} not in [0, 150]'.format(val))
-
-    return val
-        
-def volume(args):
-    cmd = 'export PULSE_SERVER=localhost; '
-
-    if args.amount is not None:
-        cmd += 'pactl set-sink-volume {} {}%; '.format(PACTL_SINK, args.amount)
-
-    # prints the 5th field in the 9th line after match, which has volume info
-    cmd += "pactl list sinks | awk '/Sink #{}/ {{ target = NR + 9 }}; NR == target {{ print $5 }}'".format(PACTL_SINK)
-    
-    return subprocess.call(('ssh', args.host, cmd))
-
-def mute(args):
-    cmd = 'PULSE_SERVER=localhost pactl set-sink-mute {} toggle'.format(PACTL_SINK)
-    return subprocess.call(('ssh', args.host, cmd))
-
-def get_tunnel_sink():
-    try:
-        sink_name = subprocess.check_output("pactl list sinks | awk '/Name: tunnel/ { print $2 }'", shell=True)
-        return str(sink_name.strip(), 'ascii')
-    except:
-        print('Failed to get the sink for the tunnel. Did you start it?')
-        sys.exit(1)
-
-def start_audio_tunnel(args = None):
-    try:
-        # shell=True not good but not using user input
-        loaded = subprocess.check_call('pactl list modules | grep module-zeroconf-discover', shell=True,  stdout=subprocess.DEVNULL)
-    except:
-        output = subprocess.call(('pactl', 'load-module', 'module-zeroconf-discover'), stdout=subprocess.DEVNULL)
-        if output is 1:
-            print("Can't load zeroconf module, exiting...")
-            sys.exit(1)
-            
-    # set tv as the default sink, sometimes avahi needs some time to discover it
-    time.sleep(0.2)
-    sink_name = get_tunnel_sink()
-    output = subprocess.call(('pactl', 'set-default-sink', sink_name))    
-    
-def stop_audio_tunnel(args = None):
-    # once the module is unloaded, the default sink automatically reverts,
-    # and doesn't become the tunnel again until explicitly set
-    output = subprocess.call(('pactl', 'unload-module', 'module-zeroconf-discover'))
-    if output is 1:
-        print("failed to unload module-zeroconf-discover")
-        sys.exit(1)
-
-def transfer_audio(args = None):
-    start_audio_tunnel()
-    tunnel = get_tunnel_sink()
-    cmd = "pacmd list-sink-inputs | awk '/index: / { print $2 }' | xargs -I {} pacmd move-sink-input {} "
-    subprocess.call(cmd + tunnel, shell=True)
-            
-def connect(args):
-    port = unused_port()
-    proc = subprocess.Popen(['ssh', '-N', '-o', 'ExitOnForwardFailure=yes',
+def ssh_to_tv(host_port, remote_port):
+    return subprocess.Popen(['ssh', '-N', '-o', 'ExitOnForwardFailure=yes',
                              '-o', 'BatchMode=yes',
-                             '-L', '{}:localhost:5900'.format(port), args.host])
+                             '-L', '{}:localhost:{}'.format(host_port, remote_port), args.host])
+
+def open_vnc(args):
+    port = unused_port()
+    proc = ssh_to_tv(port, 5900)
+    
     try:
         wait_for_port('localhost', port, ssh_proc=proc)
         subprocess.call(['xvncviewer', 'localhost:{}'.format(port)])
     finally:
         proc.terminate()
         proc.wait()
+        
+def tunnel_audio(args = None):
+    port = unused_port()
+    proc = ssh_to_tv(port, 4713)
 
+    try:
+        wait_for_port('localhost', port, ssh_proc=proc)
+        create_audio_tunnel(port)
+        input("Press enter to close the tunnel...")
+    finally:
+        close_audio_tunnel()
+        proc.terminate()
+        proc.wait()
+        
+def create_audio_tunnel(local_port = 4710):
+    """Create an explicit PulseAudio tunnel sink to the TV."""
+
+    try:
+        # unload preexisting tunnel sinks if they're there because otherwise
+        # pulse will just create a new one with the name incremented
+        ret = subprocess.call("pactl list sinks " 
+                              "| grep -qE 'Name: {}$'".format(TUNNEL_NAME),
+                              shell=True)
+        if ret is 0:
+            close_audio_tunnel()
+
+        # set up an explicit tunnel sink that points to the local end of our SSH tunnel
+        # if this succeeds, it should return a loaded module index, e.g. '25' that
+        # you can see by running `pactl list modules`
+        ret = subprocess.call(('pactl', 'load-module', 'module-tunnel-sink-new',
+                               'server=tcp:localhost:{}'.format(local_port),
+                               'sink_name=' + TUNNEL_NAME), stdout=subprocess.DEVNULL)
+        
+        ret = subprocess.call(('pactl', 'set-default-sink', TUNNEL_NAME))
+
+        # move everything that's currently playing to the new sink
+        cmd = "pacmd list-sink-inputs \
+              | awk '/index: / { print $2 }' \
+              | xargs -I {} pacmd move-sink-input {} " + TUNNEL_NAME
+                              
+        subprocess.call(cmd, shell=True)
+                              
+    except Exception as e:
+        print(e)
+        exit(1)
+
+def close_audio_tunnel():
+    return subprocess.call(('pactl', 'unload-module', 'module-tunnel-sink-new'),
+                           stdout=subprocess.DEVNULL)
+
+def volume(args):
+    cmd = 'export PULSE_SERVER=localhost; '
+
+    if args.amount is not None:
+        cmd += 'pactl set-sink-volume {} {}%; '.format(TV_SINK, args.amount)
+
+    # prints the 5th field in the 7th line after match, which has volume info
+    cmd += "pactl list sinks | awk '/Name: {}$/ {{ target = NR + 7 }}; NR == target {{ print $5 }}'".format(TV_SINK)
+    
+    return subprocess.call(('ssh', args.host, cmd))
+
+def check_volume(val):
+    x = int(val)
+    if abs(x) > 150:
+        raise argparse.ArgumentTypeError('Volume out of bounds: {} not in [0, 150]'.format(val))
+
+    return val
+
+def mute(args):
+    cmd = 'PULSE_SERVER=localhost pactl set-sink-mute {} toggle'.format(TV_SINK)
+    return subprocess.call(('ssh', args.host, cmd))
+                              
 if __name__ == '__main__':
-
-    if not is_staff(getpass.getuser()):
-        print("You must be staff to run this script.")
-        sys.exit(1)
-
-    commands = {
-        'connect': connect,
-        'volume': volume,
-        'mute': mute,
-        'stop-tunnel': stop_audio_tunnel,
-        'tunnel-audio': transfer_audio,
-    }
 
     parser = argparse.ArgumentParser(
         description='Control the OCF television.',
@@ -143,22 +138,44 @@ if __name__ == '__main__':
 
     command_subparser = parser.add_subparsers(dest='command')
 
-    subparser_connect = command_subparser.add_parser('connect', help='open a vnc instance to view the TV screen')
+    subparser_connect = command_subparser.add_parser(
+        'connect',
+        help='open a vnc instance to view the TV screen'
+    )
+    subparser_connect.set_defaults(func=open_vnc)
 
-    subparser_volume = command_subparser.add_parser('volume', help='set the volume on the TV using PulseAudio')
-    subparser_volume.add_argument('amount', type=check_volume, nargs='?',
-                                  help='volume in percent between 0% and 150%.'
-                                       ' +/- a relative value is also allowed.')
+    subparser_tunnel_audio = command_subparser.add_parser(
+        'tunnel-audio',
+        help='Create a PulseAudio tunnel to the TV and transfer'
+             'all local sink inputs to that tunnel',
+        aliases=['tunnel', 't', 'audio']
+    )
+    subparser_tunnel_audio.set_defaults(func=tunnel_audio)
 
-    subparser_mute = command_subparser.add_parser('mute', help='toggle mute on the TV')
+    subparser_volume = command_subparser.add_parser(
+        'volume',
+        help="set the volume on the TV's primary PulseAudio sink",
+        aliases=['vol', 'v']
+    )
+
+    subparser_volume.add_argument(
+        'amount',
+        type=check_volume,
+        nargs='?',
+        help='volume in percent between 0% and 150%.'
+             ' +/- a relative value is also allowed.'
+    )
+    subparser_volume.set_defaults(func=volume)
     
-    subparser_stop_tunnel = command_subparser.add_parser('stop-tunnel', help='Stop tunneling audio to the TV')
-    subparser_transfer_audio = command_subparser.add_parser('tunnel-audio', help='Start the PulseAudio tunnel to the TV and transfer all local sink inputs to the tunnel')
-
+    subparser_mute = command_subparser.add_parser(
+        'mute',
+        help="Toggle mute on the TV"
+    )
+    subparser_mute.set_defaults(func=volume)
     
     if len(sys.argv) == 1:
         args = parser.parse_args(['connect'])
     else:
         args = parser.parse_args()  # default is sys.argv
 
-    commands[args.command](args)
+    args.func(args)

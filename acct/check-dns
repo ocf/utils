@@ -1,0 +1,52 @@
+#!/usr/bin/env python3
+"""Print DNS entries for domains associated with our users"""
+
+import sys
+
+from dns import resolver
+
+from ocflib.vhost import web
+from ocflib.vhost import mail
+from ocflib.vhost import application
+
+
+def main(username):
+
+    domains = set()
+
+    for k, v in web.get_vhosts().items():
+        if v['username'] == username:
+            domains.add(k)
+            domains.update(v['aliases'])
+
+    for k, v in application.get_app_vhosts().items():
+        if v['username'] == username:
+            domains.add(k)
+            domains.update(v['aliases'])
+
+    for v in mail.get_mail_vhosts():
+        if v.user == username:
+            domains.add(v.domain)
+
+    for domain in sorted(domains):
+        try:
+            for rdata in resolver.query(domain, 'A', raise_on_no_answer=False):
+                print("{}\tIN\tA\t{}".format(domain, rdata))
+
+            for rdata in resolver.query(domain, 'AAAA', raise_on_no_answer=False):
+                print("{}\tIN\tAAAA\t{}".format(domain, rdata))
+
+            for rdata in resolver.query(domain, 'CNAME', raise_on_no_answer=False):
+                print("{}\tIN\tCNAME\t{}".format(domain, rdata))
+
+            for rdata in resolver.query(domain, 'MX', raise_on_no_answer=False):
+                print("{}\tIN\tMX\t{} {}".format(domain, rdata.preference, rdata.exchange))
+        except Exception as e:
+            print("[{}]: {}".format(domain, e))
+            
+if __name__ == '__main__':
+    if len(sys.argv) < 2:
+        print("Usage: check-dns <username>")
+
+    main(sys.argv[1])
+

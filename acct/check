@@ -153,35 +153,13 @@ if [ -f "$vhost_mail_file" ] && vhost_mail=$(grep -E "^[#[:space:]]*$user[![:spa
 fi
 
 # check dns entries
-expand_fqdns()
-{
-  while read -r entry; do
-    if [ -n "$entry" ]; then
-      username=$(echo "$entry" | cut -d' ' -f1)
-      domain=$(echo "$entry" | cut -d' ' -f2)
+dns=$(./check-dns "$user")
 
-      if [ "$domain" = "-" ]; then
-        echo "$username.berkeley.edu"
-      elif echo "$domain" | grep -qE '.+\.[a-z]+$'; then
-        echo "$domain"
-      else
-        echo "$domain.berkeley.edu"
-      fi
-    fi
-  done
-}
-
-fqdns=$(printf "%s\n%s\n%s\n" "$vhost" "$vhost_app" "$vhost_mail" | grep -v '#' | expand_fqdns)
-
-if [ -n "$fqdns" ]; then
+if [ -n "$dns" ]; then
   echo
   echo "DNS records for $user:"
   echo "-------------------------------------------------------------------------------"
-
-  echo "$fqdns" | sort -d | uniq | while read -r fqdn; do
-    dig A "$fqdn" AAAA "$fqdn" MX "$fqdn" CNAME "$fqdn" 2>&1 | grep -E "^$fqdn" | sort -d | uniq
-  done
-
+  echo "$dns"
   echo "-------------------------------------------------------------------------------"
 fi
 

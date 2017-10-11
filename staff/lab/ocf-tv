@@ -85,18 +85,18 @@ def create_audio_tunnel(local_port = 4710):
         # set up an explicit tunnel sink that points to the local end of our SSH tunnel
         # if this succeeds, it should return a loaded module index, e.g. '25' that
         # you can see by running `pactl list modules`
-        ret = subprocess.call(('pactl', 'load-module', 'module-tunnel-sink-new',
-                               'server=tcp:localhost:{}'.format(local_port),
-                               'sink_name=' + TUNNEL_NAME), stdout=subprocess.DEVNULL)
+        ret = subprocess.check_call(('pactl', 'load-module', 'module-tunnel-sink-new',
+                                     'server=tcp:localhost:{}'.format(local_port),
+                                     'sink_name=' + TUNNEL_NAME), stdout=subprocess.DEVNULL)
         
-        ret = subprocess.call(('pactl', 'set-default-sink', TUNNEL_NAME))
+        ret = subprocess.check_call(('pactl', 'set-default-sink', TUNNEL_NAME))
 
         # move everything that's currently playing to the new sink
         cmd = "pacmd list-sink-inputs \
               | awk '/index: / { print $2 }' \
               | xargs -I {} pacmd move-sink-input {} " + TUNNEL_NAME
                               
-        subprocess.call(cmd, shell=True)
+        subprocess.check_call(cmd, shell=True)
                               
     except Exception as e:
         print(e)
@@ -107,7 +107,8 @@ def close_audio_tunnel():
                            stdout=subprocess.DEVNULL)
 
 def volume(args):
-    cmd = 'export PULSE_SERVER=localhost; '
+    # remote pulse explicitly binds to only 127.0.0.1 and using localhost doesn't work anymore
+    cmd = 'export PULSE_SERVER=127.0.0.1; '
 
     if args.amount is not None:
         cmd += 'pactl set-sink-volume {} {}%; '.format(TV_SINK, args.amount)
@@ -125,7 +126,7 @@ def check_volume(val):
     return val
 
 def mute(args):
-    cmd = 'PULSE_SERVER=localhost pactl set-sink-mute {} toggle'.format(TV_SINK)
+    cmd = 'PULSE_SERVER=127.0.0.1 pactl set-sink-mute {} toggle'.format(TV_SINK)
     return subprocess.call(('ssh', args.host, cmd))
                               
 if __name__ == '__main__':
@@ -140,7 +141,7 @@ if __name__ == '__main__':
 
     subparser_connect = command_subparser.add_parser(
         'connect',
-        help='open a vnc instance to view the TV screen'
+        help='open a vnc instance to view the TV screen',
     )
     subparser_connect.set_defaults(func=open_vnc)
 
@@ -148,14 +149,14 @@ if __name__ == '__main__':
         'tunnel-audio',
         help='Create a PulseAudio tunnel to the TV and transfer'
              'all local sink inputs to that tunnel',
-        aliases=['tunnel', 't', 'audio']
+        aliases=['tunnel', 't', 'audio'],
     )
     subparser_tunnel_audio.set_defaults(func=tunnel_audio)
 
     subparser_volume = command_subparser.add_parser(
         'volume',
         help="set the volume on the TV's primary PulseAudio sink",
-        aliases=['vol', 'v']
+        aliases=['vol', 'v'],
     )
 
     subparser_volume.add_argument(
@@ -163,13 +164,13 @@ if __name__ == '__main__':
         type=check_volume,
         nargs='?',
         help='volume in percent between 0% and 150%.'
-             ' +/- a relative value is also allowed.'
+             ' +/- a relative value is also allowed.',
     )
     subparser_volume.set_defaults(func=volume)
     
     subparser_mute = command_subparser.add_parser(
         'mute',
-        help="Toggle mute on the TV"
+        help="Toggle mute on the TV",
     )
     subparser_mute.set_defaults(func=volume)
     

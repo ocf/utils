@@ -40,15 +40,16 @@ def exec_cmd(*args):
     subprocess.check_call(args)
 
 
-def create_disk(name, size):
+def create_disk(vg, name, size):
     """Creates a logical volume."""
 
-    if os.path.exists('/dev/vg/' + name):
-        print("Can't create new lv, /dev/vg/{} already exists.".format(name))
-        print("Use 'lvremove /dev/vg/{}' if you want to destroy it.".format(name))
+    path = '/dev/{}/{}'.format(vg, name)
+    if os.path.exists(path):
+        print("Can't create new lv, {} already exists.".format(path))
+        print("Use 'lvremove {}' if you want to destroy it.".format(path))
         sys.exit(2)
 
-    exec_cmd('lvcreate', '-L', str(size) + 'GB', '--name', name, 'vg')
+    exec_cmd('lvcreate', '-L', str(size) + 'GB', '--name', name, vg)
 
 
 def generate_mac_addr():
@@ -59,7 +60,7 @@ def generate_mac_addr():
     return ':'.join('{:02x}'.format(random_byte(i)) for i in range(MAC_BYTES))
 
 
-def create_vm(name, memory, vcpus, os_type, os_variant, network, mac, skip_config):
+def create_vm(name, memory, vcpus, vg, os_type, os_variant, network, mac, skip_config):
     """Creates a new VM."""
 
     # try to print info about the domain to see if it already exists
@@ -76,7 +77,7 @@ def create_vm(name, memory, vcpus, os_type, os_variant, network, mac, skip_confi
               'when the install is complete, or else the VM configuration cannot continue.')
 
     exec_cmd('virt-install', '-r', str(memory), '--pxe', '--os-type', os_type,
-             '--os-variant', os_variant, '--disk', '/dev/vg/' + name + ',cache=none',
+             '--os-variant', os_variant, '--disk', '/dev/{}/{},cache=none'.format(vg, name),
              '--vcpus', str(vcpus), '--network', network + ',mac=' + mac, '--graphics', 'vnc',
              '--serial', 'pty', '--name', name, '--wait', '0' if skip_config else '-1')
 
@@ -197,6 +198,8 @@ def _main(args):
                         help='number of vCPUs')
     parser.add_argument('-s', '--storage', type=int, default=15,
                         help='amount of disk storage (in GB)')
+    parser.add_argument('-V', '--vg', type=str, default='vg',
+                        help='LVM volume group to use for storage')
     parser.add_argument('--os-type', type=str, default='linux',
                         help='os type')
     parser.add_argument('--os-variant', type=str, default='debian9')
@@ -258,6 +261,7 @@ def _main(args):
     print('\tOS Type: {}'.format(args.os_type))
     print('\tOS Variant: {}'.format(args.os_variant))
     print('\tDisk Space: {} GB'.format(args.storage))
+    print('\tVolume Group: {}'.format(args.vg))
     print('\tMemory: {} MB'.format(args.memory))
     print('\tvCPUs: {}'.format(args.vcpus))
     print('\tNetwork: {}'.format(args.network))
@@ -268,9 +272,9 @@ def _main(args):
 
     mac = generate_mac_addr()
 
-    create_disk(args.hostname, args.storage)
-    create_vm(args.hostname, args.memory, args.vcpus, args.os_type, args.os_variant,
-              args.network, mac, args.skip_config)
+    create_disk(args.vg, args.hostname, args.storage)
+    create_vm(args.hostname, args.memory, args.vcpus, args.vg, args.os_type,
+              args.os_variant, args.network, mac, args.skip_config)
 
     if args.skip_config:
         print('VM created, skipping configuration. Have fun!')

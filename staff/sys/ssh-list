@@ -36,7 +36,7 @@ def main(argv=None):
 
     args = parser.parse_args(argv)
     ldap_filter = {
-        'all': '(cn=*)',
+        'all': '(|(type=desktop)(type=server)(type=staffvm))',
         'desktop': '(type=desktop)',
         'server': '(|(type=server)(type=staffvm))',
     }[args.host_class]

@@ -10,6 +10,13 @@ from ocflib.infra.ldap import ldap_ocf, OCF_LDAP_HOSTS
 
 
 def main(argv=None):
+    LDAP_FILTERS = {
+        'all': ('(&(cn=*)(!(type=dhcp))(!(type=ipmi))(!(type=printer))(!(type=switch))'
+                '(!(type=vip))(!(type=wifi)))'),
+        'desktop': '(type=desktop)',
+        'server': '(|(type=server)(type=staffvm))',
+    }
+
     parser = argparse.ArgumentParser(
         description='Execute SSH commands on many hosts in parallel.',
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -30,20 +37,14 @@ def main(argv=None):
             '''.format(arg0=(argv or sys.argv)[0]),
         ),
     )
-    parser.add_argument('host_class', type=str, choices=('all', 'desktop', 'server'))
+    parser.add_argument('host_class', type=str, choices=LDAP_FILTERS.keys())
     parser.add_argument('args', type=str, nargs=argparse.REMAINDER, metavar='PSSH-ARGS',
                         help='arguments to pass to parallel-ssh')
 
     args = parser.parse_args(argv)
-    ldap_filter = {
-        'all': ('(&(cn=*)(!(type=dhcp))(!(type=ipmi))(!(type=printer))(!(type=switch))'
-                '(!(type=vip))(!(type=wifi)))'),
-        'desktop': '(type=desktop)',
-        'server': '(|(type=server)(type=staffvm))',
-    }[args.host_class]
 
     with ldap_ocf() as c:
-        c.search(OCF_LDAP_HOSTS, ldap_filter, attributes=['cn'])
+        c.search(OCF_LDAP_HOSTS, LDAP_FILTERS[args.host_class], attributes=['cn'])
         hosts = {result['attributes']['cn'][0] for result in c.response}
 
     with tempfile.NamedTemporaryFile(mode='w') as f:

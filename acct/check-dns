@@ -1,52 +1,54 @@
 #!/usr/bin/env python3
-"""Print DNS entries for domains associated with our users."""
+"""Print DNS entries for domains we are configured to host for our users."""
 
 import sys
 
 from dns import resolver
-
 from ocflib.vhost import web
 from ocflib.vhost import mail
 from ocflib.vhost import application
 
+def _query(domain, record):
+    return resolver.query(domain, record, raise_on_no_answer=False)
 
 def main(username):
 
     domains = set()
 
-    for k, v in web.get_vhosts().items():
-        if v['username'] == username:
-            domains.add(k)
-            domains.update(v['aliases'])
+    for primary_domain, vhost_config in web.get_vhosts().items():
+        if vhost_config['username'] == username:
+            domains.add(primary_domain)
+            domains.update(vhost_config['aliases'])
 
-    for k, v in application.get_app_vhosts().items():
-        if v['username'] == username:
-            domains.add(k)
-            domains.update(v['aliases'])
+    for primary_domain, vhost_config in application.get_app_vhosts().items():
+        if vhost_config['username'] == username:
+            domains.add(primary_domain)
+            domains.update(vhost_config['aliases'])
 
-    for v in mail.get_mail_vhosts():
-        if v.user == username:
-            domains.add(v.domain)
+    for vhost in mail.get_mail_vhosts():
+        if vhost.user == username:
+            domains.add(vhost.domain)
 
     for domain in sorted(domains):
         try:
-            for rdata in resolver.query(domain, 'A', raise_on_no_answer=False):
+            for rdata in _query(domain, 'A'):
                 print("{}\tIN\tA\t{}".format(domain, rdata))
 
-            for rdata in resolver.query(domain, 'AAAA', raise_on_no_answer=False):
+            for rdata in _query(domain, 'AAAA'):
                 print("{}\tIN\tAAAA\t{}".format(domain, rdata))
 
-            for rdata in resolver.query(domain, 'CNAME', raise_on_no_answer=False):
+            for rdata in _query(domain, 'CNAME'):
                 print("{}\tIN\tCNAME\t{}".format(domain, rdata))
 
-            for rdata in resolver.query(domain, 'MX', raise_on_no_answer=False):
+            for rdata in _query(domain, 'MX'):
                 print("{}\tIN\tMX\t{} {}".format(domain, rdata.preference, rdata.exchange))
-        except Exception as e:
-            print("[{}]: {}".format(domain, e))
+        except resolver.NXDOMAIN as n:
+            print("[{}]: {}".format(domain, n))
             
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
+    if len(sys.argv) != 2:
         print("Usage: check-dns <username>")
+        exit(1)
 
     exit(main(sys.argv[1]))
 

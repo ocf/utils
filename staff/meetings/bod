@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 import argparse
+from datetime import date
+from datetime import datetime
+from datetime import timedelta
+import functools
 import sys
 from os.path import join
 
@@ -7,26 +11,45 @@ import bod
 import meetings
 
 
-def get_last_meeting():
-    """Returns a (semester, filename) pair for the most recent meeting."""
-    if not hasattr(get_last_meeting, 'cached_val'):
-        meeting_lst = meetings.get_minutes(bod.get_bod_minutes_path())
-        get_last_meeting.cached_val = (meetings.get_semester(), meeting_lst[-1])
-    return get_last_meeting.cached_val
+@functools.lru_cache(maxsize=None)
+def get_last_meeting(date):
+    """Gets the last meeting on or before the given date.
+
+    Args:
+        date: a datetime.date object
+
+    Returns:
+        A (semester, filename) pair for the most recent meeting on or before
+        the given date.
+    """
+    return meetings.get_prev_meeting('bod', meetings.get_semester(date),
+                                     date + timedelta(days=1))
 
 
 def quorum(args):
-    print(bod.quorum_next(*get_last_meeting()))
+    print(bod.quorum_next(*get_last_meeting(args.date)))
 
 
 def ls(args):
-    for director in sorted(bod.ls(*get_last_meeting())):
+    for director in sorted(bod.ls(*get_last_meeting(args.date))):
         print(director)
 
 
+def parse_meeting_time(str_meeting_time):
+    try:
+        day = datetime.strptime(str_meeting_time, '%Y-%m-%d').date()
+        if day < date(2017, 8, 20):
+            raise argparse.ArgumentTypeError(str_meeting_time + ' is out of '
+                                             'range for this script')
+        return day
+    except ValueError:
+        raise argparse.ArgumentTypeError(str_meeting_time + ' is not a valid '
+                                         'date in YYYY-MM-DD format')
+
+
 def danger(args):
-    on_bod = bod.ls(*get_last_meeting())
-    at_last_meeting = set(bod.get_attending_directors(*get_last_meeting()))
+    on_bod = bod.ls(*get_last_meeting(args.date))
+    at_last_meeting = set(bod.get_attending_directors(*get_last_meeting(args.date)))
 
     for director in sorted(on_bod - at_last_meeting):
         print(director)
@@ -42,10 +65,16 @@ if __name__ == '__main__':
     }
 
     parser = argparse.ArgumentParser(description='View bod composition and information')
-    subparser = parser.add_subparsers(dest='command', help='command to run')
-    subparser_danger = subparser.add_parser('danger', help='users in danger of being kicked off bod')
-    subparser_ls = subparser.add_parser('ls', help='list users and their bod eligibility state')
-    subparser_quorum = subparser.add_parser('quorum', help='current bod quorum')
+    parser.add_argument('command', choices=commands.keys(),
+                        help=('Which command to run. Can be "quorum" to list '
+                              'the quorum, "ls" to list members of BoD, or '
+                              '"danger" to list directors who have missed the '
+                              'last BoD meeting.'))
+    parser.add_argument('date', type=parse_meeting_time, nargs='?',
+                        default=date.today(),
+                        help=('Display info for the given date rather than '
+                              'today. The date should be given in YYYY-MM-DD '
+                              'format.'))
 
     if len(sys.argv) == 1:
         parser.print_help()

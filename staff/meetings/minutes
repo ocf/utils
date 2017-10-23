@@ -14,10 +14,9 @@ import time
 from os.path import join
 from string import Template
 
-from ocflib.misc.shell import get_editor
-
 import bod
 import meetings
+from ocflib.misc.shell import get_editor
 
 
 def minutes_setup(choice, semester, filename):

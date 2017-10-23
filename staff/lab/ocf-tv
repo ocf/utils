@@ -9,6 +9,7 @@ import time
 TV_SINK = 'alsa_output.pci-0000_00_03.0.hdmi-stereo'
 TUNNEL_NAME = 'ocf-tv-remote'
 
+
 def unused_port():
     def used(port):
         s = socket.socket()
@@ -26,6 +27,7 @@ def unused_port():
 
     return port
 
+
 def wait_for_port(host, port, timeout=5, ssh_proc=None):
     spent = 0
     while True:
@@ -41,42 +43,46 @@ def wait_for_port(host, port, timeout=5, ssh_proc=None):
         if spent > timeout:
             raise TimeoutError('Timed out after {} seconds.'.format(timeout))
 
+
 def ssh_to_tv(host_port, remote_port):
     return subprocess.Popen(['ssh', '-N', '-o', 'ExitOnForwardFailure=yes',
                              '-o', 'BatchMode=yes',
                              '-L', '{}:localhost:{}'.format(host_port, remote_port), args.host])
 
+
 def open_vnc(args):
     port = unused_port()
     proc = ssh_to_tv(port, 5900)
-    
+
     try:
         wait_for_port('localhost', port, ssh_proc=proc)
         subprocess.call(['xvncviewer', 'localhost:{}'.format(port)])
     finally:
         proc.terminate()
         proc.wait()
-        
-def tunnel_audio(args = None):
+
+
+def tunnel_audio(args=None):
     port = unused_port()
     proc = ssh_to_tv(port, 4713)
 
     try:
         wait_for_port('localhost', port, ssh_proc=proc)
         create_audio_tunnel(port)
-        input("Press enter to close the tunnel...")
+        input('Press enter to close the tunnel...')
     finally:
         close_audio_tunnel()
         proc.terminate()
         proc.wait()
-        
-def create_audio_tunnel(local_port = 4710):
+
+
+def create_audio_tunnel(local_port=4710):
     """Create an explicit PulseAudio tunnel sink to the TV."""
 
     try:
         # unload preexisting tunnel sinks if they're there because otherwise
         # pulse will just create a new one with the name incremented
-        ret = subprocess.call("pactl list sinks " 
+        ret = subprocess.call('pactl list sinks '
                               "| grep -qE 'Name: {}$'".format(TUNNEL_NAME),
                               shell=True)
         if ret is 0:
@@ -88,23 +94,25 @@ def create_audio_tunnel(local_port = 4710):
         ret = subprocess.check_call(('pactl', 'load-module', 'module-tunnel-sink-new',
                                      'server=tcp:localhost:{}'.format(local_port),
                                      'sink_name=' + TUNNEL_NAME), stdout=subprocess.DEVNULL)
-        
+
         ret = subprocess.check_call(('pactl', 'set-default-sink', TUNNEL_NAME))
 
         # move everything that's currently playing to the new sink
         cmd = "pacmd list-sink-inputs \
               | awk '/index: / { print $2 }' \
               | xargs -I {} pacmd move-sink-input {} " + TUNNEL_NAME
-                              
+
         subprocess.check_call(cmd, shell=True)
-                              
+
     except Exception as e:
         print(e)
         exit(1)
 
+
 def close_audio_tunnel():
     return subprocess.call(('pactl', 'unload-module', 'module-tunnel-sink-new'),
                            stdout=subprocess.DEVNULL)
+
 
 def volume(args):
     # remote pulse explicitly binds to only 127.0.0.1 and using localhost doesn't work anymore
@@ -115,8 +123,9 @@ def volume(args):
 
     # prints the 5th field in the 7th line after match, which has volume info
     cmd += "pactl list sinks | awk '/Name: {}$/ {{ target = NR + 7 }}; NR == target {{ print $5 }}'".format(TV_SINK)
-    
+
     return subprocess.call(('ssh', args.host, cmd))
+
 
 def check_volume(val):
     x = int(val)
@@ -125,10 +134,12 @@ def check_volume(val):
 
     return val
 
+
 def mute(args):
     cmd = 'PULSE_SERVER=127.0.0.1 pactl set-sink-mute {} toggle'.format(TV_SINK)
     return subprocess.call(('ssh', args.host, cmd))
-                              
+
+
 if __name__ == '__main__':
 
     parser = argparse.ArgumentParser(
@@ -167,13 +178,13 @@ if __name__ == '__main__':
              ' +/- a relative value is also allowed.',
     )
     subparser_volume.set_defaults(func=volume)
-    
+
     subparser_mute = command_subparser.add_parser(
         'mute',
-        help="Toggle mute on the TV",
+        help='Toggle mute on the TV',
     )
     subparser_mute.set_defaults(func=volume)
-    
+
     if len(sys.argv) == 1:
         args = parser.parse_args(['connect'])
     else:

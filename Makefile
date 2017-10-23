@@ -7,3 +7,7 @@ venv: Makefile
 	vendor/venv-update \
 		venv= venv -ppython3 \
 		install= -r requirements-dev.txt
+
+.PHONY: clean
+clean:
+	rm -rf venv

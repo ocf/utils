@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 """Add a note about a user to User_Info."""
-
 import argparse
 import collections
 import getpass

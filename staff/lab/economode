@@ -4,12 +4,11 @@ import argparse
 import getpass
 import sys
 
-from ocflib.misc.shell import bold
-from ocflib.misc.shell import green
-from ocflib.misc.shell import red
 import lxml.html
 import requests
 import urllib3
+from ocflib.misc.shell import green
+from ocflib.misc.shell import red
 
 
 PRINTERS = ['papercut', 'pagefault']

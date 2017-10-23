@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
 """Print DNS entries for domains we are configured to host for our users."""
-
 import sys
 
 from dns import resolver
-from ocflib.vhost import web
-from ocflib.vhost import mail
 from ocflib.vhost import application
+from ocflib.vhost import mail
+from ocflib.vhost import web
+
 
 def _query(domain, record):
     return resolver.query(domain, record, raise_on_no_answer=False)
+
 
 def main(username):
 
@@ -32,23 +33,23 @@ def main(username):
     for domain in sorted(domains):
         try:
             for rdata in _query(domain, 'A'):
-                print("{}\tIN\tA\t{}".format(domain, rdata))
+                print('{}\tIN\tA\t{}'.format(domain, rdata))
 
             for rdata in _query(domain, 'AAAA'):
-                print("{}\tIN\tAAAA\t{}".format(domain, rdata))
+                print('{}\tIN\tAAAA\t{}'.format(domain, rdata))
 
             for rdata in _query(domain, 'CNAME'):
-                print("{}\tIN\tCNAME\t{}".format(domain, rdata))
+                print('{}\tIN\tCNAME\t{}'.format(domain, rdata))
 
             for rdata in _query(domain, 'MX'):
-                print("{}\tIN\tMX\t{} {}".format(domain, rdata.preference, rdata.exchange))
+                print('{}\tIN\tMX\t{} {}'.format(domain, rdata.preference, rdata.exchange))
         except resolver.NXDOMAIN as n:
-            print("[{}]: {}".format(domain, n))
-            
+            print('[{}]: {}'.format(domain, n))
+
+
 if __name__ == '__main__':
     if len(sys.argv) != 2:
-        print("Usage: check-dns <username>")
+        print('Usage: check-dns <username>')
         exit(1)
 
     exit(main(sys.argv[1]))
-

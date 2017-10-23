@@ -1,4 +1,5 @@
 #!/bin/sh
+
 # Look up user for relevant account information.
 
 # specify location of User_Info file
@@ -7,6 +8,8 @@ User_Info_file='/home/s/st/staff/User_Info'
 vhost_file='/home/s/st/staff/vhost/vhost.conf'
 # specify location of vhost-app file
 vhost_app_file='/home/s/st/staff/vhost/vhost-app.conf'
+# specify location of vhost-mail file
+vhost_mail_file='/home/s/st/staff/vhost/vhost-mail.conf'
 # specify location of wtmp files
 wtmp_files='/var/log/wtmp /var/log/wtmp.1'
 # default number of logins to display from wtmp files
@@ -132,11 +135,31 @@ if [ -f "$vhost_file" ] && vhost=$(grep -E "^[#[:space:]]*$user[![:space:]]" "$v
 fi
 
 # check apphosting config
-if [ -f "$vhost_app_file" ] && vhost=$(grep -E "^[#[:space:]]*$user[![:space:]]" "$vhost_app_file"); then
+if [ -f "$vhost_app_file" ] && vhost_app=$(grep -E "^[#[:space:]]*$user[![:space:]]" "$vhost_app_file"); then
   echo
   echo "Virtual apphosts:"
   echo "-------------------------------------------------------------------------------"
-  echo "$vhost"
+  echo "$vhost_app"
+  echo "-------------------------------------------------------------------------------"
+fi
+
+# check virtual mail config
+if [ -f "$vhost_mail_file" ] && vhost_mail=$(grep -E "^[#[:space:]]*$user[![:space:]]" "$vhost_mail_file"); then
+  echo
+  echo "Virtual mail:"
+  echo "-------------------------------------------------------------------------------"
+  echo "$vhost_mail"
+  echo "-------------------------------------------------------------------------------"
+fi
+
+# check dns entries
+dns=$("$(dirname "$(readlink -f -- "$0")")"/check-dns "$user")
+
+if [ -n "$dns" ]; then
+  echo
+  echo "DNS records for $user:"
+  echo "-------------------------------------------------------------------------------"
+  echo "$dns"
   echo "-------------------------------------------------------------------------------"
 fi
 
@@ -159,7 +182,6 @@ echo
 echo "Signatories/Signatory for:"
 signat user "$user"
 
-
 # check user crontab, probably requires root privileges
 crontab=$(crontab -lu "$user" 2> /dev/null | sed '/^[ ]*$/d')
 if [ -n "$crontab" ]; then
@@ -169,7 +191,6 @@ if [ -n "$crontab" ]; then
   echo "$crontab"
   echo "-------------------------------------------------------------------------------"
 fi
-
 
 # check currently running processes in tree format
 ps=$(ps Sfw -u "$user" 2> /dev/null | tail -n +2)

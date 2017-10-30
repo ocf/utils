@@ -75,8 +75,8 @@ def main():
     lines.sort()
 
     try:
-        with tempfile.NamedTemporaryFile(prefix='User_Info.bak.{}.'
-                                         .format(getpass.getuser())) as tmpfile:
+        with tempfile.NamedTemporaryFile(prefix='User_Info.bak.{}.'.format(getpass.getuser()),
+                                         delete=False) as tmpfile:
             with open(USER_INFO, 'rb') as fin:
                 tmpfile.write(fin.read())
     except IOError as e:

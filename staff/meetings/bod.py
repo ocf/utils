@@ -1,4 +1,5 @@
 """Module for BoD meeting logic."""
+from datetime import datetime
 from math import ceil
 from os.path import join
 
@@ -16,7 +17,7 @@ def quorum(semester, minutes_filename):
 
     """
     return quorum_next(*meetings.get_prev_meeting('bod', semester,
-                                                  minutes_filename))
+                                                  datetime.strptime(minutes_filename, '%Y-%m-%d').date()))
 
 
 def quorum_next(semester, minutes_filename):
@@ -29,8 +30,8 @@ def quorum_next(semester, minutes_filename):
                           the meeting
 
     """
-    bod = ls(semester, minutes_filename)
-    return int(ceil(2 / 3 * len(bod)))
+    bod_minutes = ls(semester, minutes_filename)
+    return int(ceil(2 / 3 * len(bod_minutes)))
 
 
 def get_bod_minutes_path(semester=meetings.get_semester()):
@@ -117,8 +118,10 @@ def ls(semester, minutes_filename):
         A set of BoD members as specified above
 
     """
-    prev_sem, prev_fname = meetings.get_prev_meeting('bod', semester,
-                                                     minutes_filename)
+    prev_sem, prev_fname = \
+        meetings.get_prev_meeting('bod', semester,
+                                  datetime.strptime(minutes_filename,
+                                                    '%Y-%m-%d').date())
 
     # FIXME: Always include the GM and SM on this list
     # (And the ASUC EVP and CFO if we want to be pedantic)
@@ -161,7 +164,7 @@ def split_attendance(semester, minutes_filename):
 
     replacement_lines.append('Directors in attendance:\n')
     on_bod = set(ls(*meetings.get_prev_meeting('bod', semester,
-                                               minutes_filename)))
+                                               datetime.strptime(minutes_filename, '%Y-%m-%d').date())))
     for director in sorted(attendees & on_bod):
         replacement_lines.append(director + '\n')
     replacement_lines.append('\n')

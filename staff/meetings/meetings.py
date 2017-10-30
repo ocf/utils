@@ -1,3 +1,4 @@
+import bisect
 import os
 import os.path
 import re
@@ -28,15 +29,15 @@ def get_template(choice):
     return join(minutes_folder, 'template')
 
 
-def get_semester():
+def get_semester(date=None):
     """Returns the directory name for the current semester
 
     For example: 2017/Fall
     """
-    now = datetime.now()
-    year = now.year
-    month = now.month
-    day = now.day
+    date = date or datetime.today().date()
+    year = date.year
+    month = date.month
+    day = date.day
 
     AUG = 8
     MAY = 5
@@ -81,7 +82,7 @@ def get_minutes_path(choice, semester=get_semester()):
     return path
 
 
-def get_minutes_file():
+def get_minutes_filename():
     """Gets the filename for the current minutes."""
     return time.strftime('%Y-%m-%d')
 
@@ -90,8 +91,7 @@ def get_minutes(folder):
     """Gets the minutes contained in a folder
 
     Returns the files in a folder that are the format ####-##-## exactly.
-    This is done to excluse extra files that are uploaded like pdfs and
-    membership file
+    This is done to exclude extra files that are uploaded like pdfs.
 
     Args:
         folder (str): The folder the function looks through
@@ -104,38 +104,34 @@ def get_minutes(folder):
     return sorted(i for i in os.listdir(folder) if pattern.match(i))
 
 
-def get_prev_meeting(choice, semester, minutes_filename):
-    """Gets the semester and minutes filename of the previous meeting.
+def get_prev_meeting(choice, semester, date):
+    """Gets the semester and minutes filename of the last meeting of the given
+    type which occurred strictly before the given date.
 
     Args:
         choice: the meeting type
         semester: the directory name (as given by ``meetings.get_semester()``)
                   for the semester in which the meeting took place
-        minutes_filename: the filename of the file containing the minutes for
-                          the meeting
+        date: a datetime.date object
 
     Returns:
         A tuple of (semester of previous meeting, filename of previous meeting
         minutes)
 
     """
-    minutes = get_minutes(get_minutes_path(choice, semester=semester))
-    try:
-        i = minutes.index(minutes_filename)
-    except IndexError:
-        raise ValueError('The minutes file "{}" was not found'
-                         .format(minutes_filename))
-
+    minutes = [datetime.strptime(m, '%Y-%m-%d').date()
+               for m in get_minutes(get_minutes_path(choice, semester=semester))]
+    i = bisect.bisect_left(minutes, date)
     if i > 0:
         semester_prev = semester
-        prev_meeting_file = minutes[i - 1]
+        prev_meeting_filename = minutes[i - 1].strftime('%Y-%m-%d')
     else:
         semester_prev = get_prev_semester(semester=semester)
-        prev_minutes = get_minutes(get_minutes_path(choice,
-                                                    semester=semester_prev))
-        prev_meeting_file = prev_minutes[-1]
+        strarr_prev_minutes = get_minutes(get_minutes_path(choice,
+                                                           semester=semester_prev))
+        prev_meeting_filename = strarr_prev_minutes[-1]
 
-    return (semester_prev, prev_meeting_file)
+    return (semester_prev, prev_meeting_filename)
 
 
 def get_attendance(path):

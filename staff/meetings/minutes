@@ -80,7 +80,7 @@ def main():
             return 1
 
     semester = meetings.get_semester()
-    filename = meetings.get_minutes_file()
+    filename = meetings.get_minutes_filename()
     filepath = join(meetings.get_minutes_path(choice, semester=semester),
                     filename)
     minutes_setup(choice, semester, filename)

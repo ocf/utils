@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 """
 Force the Disable Comments plugin onto an existing Wordpress install.
 
@@ -47,7 +47,7 @@ b:1;s:9:\"permanent\";b:0;s:10:\"db_version\";i:5;}}','yes');""".format(options_
             ],
             stdin=PIPE,
         )
-        p.communicate(input=self.query)
+        p.communicate(input=self.query.encode('ascii'))
 
 
 class Wordpress:
@@ -103,7 +103,7 @@ class Wordpress:
         logger.debug(cmd)
 
         try:
-            return check_output(cmd, shell=True, stderr=STDOUT).strip()
+            return check_output(cmd, shell=True, stderr=STDOUT).decode('ascii').strip()
         except CalledProcessError as ex:
             map(logger.error, ex.output.strip().split('\n'))
             raise Exception('Error raised by WP-CLI')
@@ -123,7 +123,7 @@ def get_mysql_password(path):
         raise Exception("Can't find WordPress installation.")
 
     code = "require('" + config_path + "'); echo DB_PASSWORD;"
-    return check_output(['php', '-r', code])
+    return check_output(['php', '-r', code]).decode('ascii')
 
 
 def main():

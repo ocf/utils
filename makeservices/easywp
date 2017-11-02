@@ -2,23 +2,23 @@
 
 # Creates symlink to user's webroot. If the symlink exists and files
 # are present in webroot, they are backed up in the user's home directory.
-# A user's database is created or, if it already exists, the password 
+# A user's database is created or, if it already exists, the password
 # is reset. WordPress is installed and the wp-config file is filled
-# out with the requisite information. Further configuration can be 
-# done by the user from a browser.  
+# out with the requisite information. Further configuration can be
+# done by the user from a browser.
 #
 
 set -euo pipefail
 shopt -s dotglob
 
-echo -e "\033[31mWARNING: This script should generally be run on a fresh account!\033[00m"
-echo -e "A user with an existing website or database will have their files 
-backed up, but their database password will change and the WordPress 
+echo -e "\033[33mWARNING: This script should generally be run on a fresh account!\033[00m"
+echo -e "A user with an existing website or database will have their files
+backed up, but their database password will change and the WordPress
 install may clutter or try to migrate tables.\n"
 
-read -rp "Are you sure you want to continue? [Y/n] " idunno
+read -rp "Are you sure you want to continue? [y/N] " idunno
 idunno=${idunno,,}
-if ! [[ "$idunno" =~ ^(yes|y|^$) ]]; then
+if ! [[ "$idunno" =~ ^(yes|y) ]]; then
     echo "Ok, bye!"
     exit 0
 fi
@@ -30,22 +30,19 @@ user=$(whoami)
 makehttp
 cd "$webroot"
 
-# Check if user has files and let user decide what they want to do. 
+# Check if user has files and let user decide what they want to do.
 if [[ -n "$(ls -A)" ]]; then
     echo
-    echo -e "There are currently files in webroot!\n"
-    read -rp "Do you want to back these files up? [Y/n/x] " whoknows
+    echo -e "\033[33mThere are currently files in webroot!\033[00m\n"
+    read -rp "Do you want to continue? [y/N] " whoknows
 
     whoknows=${whoknows,,}
-    if [[ "$whoknows" =~ ^(yes|y|^$) ]]; then
+    if [[ "$whoknows" =~ ^(yes|y) ]]; then
         ts=$(date +"%Y-%m-%d_%H:%M:%S")
         backup="$HOME/webroot-$ts"
         mkdir -p "$backup"
-        echo "Moving current files to $backup ..." 
+        echo "Moving current files to $backup ..."
         mv ./* "$backup"
-    elif [[ "$whoknows" =~ ^(no|n) ]]; then
-        echo "Ok, say goodbye to your website."
-        rm -rf ./*
     else
         echo "Ok, bye!"
         exit 0
@@ -63,5 +60,7 @@ echo "SQL set up and the password can be found in wp-config.php ..."
 
 # Install WordPress and create config file
 wp core download
-wp config create --dbname="$user" --dbuser="$user" --dbpass="$sqlpass" --dbhost=mysql --dbcharset=utf8mb4 
+wp config create --dbname="$user" --dbuser="$user" --dbpass="$sqlpass" --dbhost=mysql --dbcharset=utf8mb4
+# Somehow 644 is the default...
+chmod 600 "$webroot/wp-config.php"
 echo "WordPress install successful. Go to https://www.ocf.berkeley.edu/~$user to finish the setup process."

@@ -38,7 +38,7 @@ def confirm_updates():
         packages=num_packages,
         hosts=num_hosts,
     ))
-    input('Press any key to continue...')
+    input('Press enter to continue...')
     print('Emailing root...')
     send_mail(
         MAIL_ROOT,

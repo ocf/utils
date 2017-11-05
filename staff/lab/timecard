@@ -79,7 +79,7 @@ def get_usage_count(*users, start=None, end=None):
 def valid_date(s):
     # https://stackoverflow.com/a/25470943/6587177
     try:
-        return datetime.datetime.strptime(s, '%m/%d/%Y')
+        return datetime.datetime.strptime(s, '%Y-%m-%d')
     except ValueError:
         msg = "Not a valid date: '{0}'.".format(s)
         raise argparse.ArgumentTypeError(msg)

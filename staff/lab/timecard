@@ -8,13 +8,17 @@ from ocflib.lab import stats
 
 
 def generate_image(usage, users, dest, start, end):
-    def h(h):
-        return 12 if h == 0 else (h if h <= 12 else h - 12)
+    def adjusted_hour(hour):
+        """Converts a 0-23 hour format into a 1-12 hour format"""
+        if hour == 0 or hour == 12:
+            return 12
+        else:
+            return hour % 12
 
-    def p(h):
-        return 'am' if h <= 11 else 'pm'
+    def pm_or_am(hour):
+        return 'am' if hour <= 11 else 'pm'
 
-    hours = ['{}{}'.format(h(hour), p(hour)) for hour in range(24)]
+    hours = ['{}{}'.format(adjusted_hour(hour), pm_or_am(hour)) for hour in range(24)]
     sums = [sum(usage[h]) for h in range(24)]
 
     fig = plt.figure()
@@ -29,18 +33,18 @@ def generate_image(usage, users, dest, start, end):
 
     plt.title('OCF Lab Timecard for {} ({}-{})'.format(
         ', '.join(users),
-        start.strftime('%m/%d/%Y'),
-        end.strftime('%m/%d/%Y')
+        start.strftime('%Y-%m-%d'),
+        end.strftime('%Y-%m-%d')
     ))
     plt.savefig(dest, bbox_inches='tight')
 
 
 def get_usage_count(*users, start=None, end=None):
-    dates = stats.semester_dates()
+    sem_start, sem_end = stats.semester_dates()
     if start is None:
-        start = datetime.datetime.combine(dates[0], datetime.time())
+        start = datetime.datetime.combine(sem_start, datetime.time())
     if end is None:
-        end = datetime.datetime.combine(dates[1], datetime.time())
+        end = datetime.datetime.combine(sem_end, datetime.time())
 
     step = datetime.timedelta(minutes=60)
     hours = collections.defaultdict(lambda: [0 for _ in range(7)])
@@ -60,9 +64,9 @@ def get_usage_count(*users, start=None, end=None):
     logins = cursor.fetchall()
 
     was_logged_in = dict()
-    for log in logins:
-        start_time = log['start'].replace(microsecond=0, second=0, minute=0)
-        end_time = log['end']
+    for session in logins:
+        start_time = session['start'].replace(microsecond=0, second=0, minute=0)
+        end_time = session['end']
         while start_time <= end_time:
             was_logged_in[start_time] = True
             start_time += step
@@ -81,7 +85,7 @@ def valid_date(s):
     try:
         return datetime.datetime.strptime(s, '%Y-%m-%d')
     except ValueError:
-        msg = "Not a valid date: '{0}'.".format(s)
+        msg = "Not a valid date: '{0}'. Use an isoformat string (YYYY-mm-dd)".format(s)
         raise argparse.ArgumentTypeError(msg)
 
 
@@ -95,7 +99,7 @@ if __name__ == '__main__':
     parser.add_argument('--end', type=valid_date, default=None,
                         help='Start date for chart (in form mm/dd/yyyy; defaults to semester start')
     args = parser.parse_args()
-    dest = args.dest if args.dest else ', '.join(args.users) + '.png'
+    dest = args.dest if args.dest else '{}.png'.format('_'.join(args.users)[:251])
 
     usage, start, end = get_usage_count(*args.users, start=args.start, end=args.end)
     generate_image(usage, args.users, dest, start, end)

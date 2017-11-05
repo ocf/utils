@@ -14,7 +14,7 @@ shopt -s dotglob
 echo -e "\033[33mWARNING: This script should generally be run on a fresh account!\033[00m"
 echo -e "A user with an existing website or database will have their files
 backed up, but their database password will change and the WordPress
-install may clutter or try to migrate tables.\n"
+install may migrate and reuse existing tables.\n"
 
 read -rp "Are you sure you want to continue? [y/N] " idunno
 idunno=${idunno,,}
@@ -33,15 +33,16 @@ cd "$webroot"
 # Check if user has files and let user decide what they want to do.
 if [[ -n "$(ls -A)" ]]; then
     echo
-    echo -e "\033[33mThere are currently files in webroot!\033[00m\n"
+    echo -e "\033[33mThere are currently files in webroot! These will be backed up.\033[00m\n"
     read -rp "Do you want to continue? [y/N] " whoknows
 
     whoknows=${whoknows,,}
     if [[ "$whoknows" =~ ^(yes|y) ]]; then
         ts=$(date +"%Y-%m-%d_%H:%M:%S")
-        backup="$HOME/webroot-$ts"
+        backup="$HOME/public_html-$ts"
         mkdir -p "$backup"
         echo "Moving current files to $backup ..."
+        # Note that dotglob is set so hidden files are moved too
         mv ./* "$backup"
     else
         echo "Ok, bye!"
@@ -61,6 +62,6 @@ echo "SQL set up and the password can be found in wp-config.php ..."
 # Install WordPress and create config file
 wp core download
 wp config create --dbname="$user" --dbuser="$user" --dbpass="$sqlpass" --dbhost=mysql --dbcharset=utf8mb4
-# Somehow 644 is the default...
+# Somehow 644 is the default... See https://core.trac.wordpress.org/ticket/37264
 chmod 600 "$webroot/wp-config.php"
 echo "WordPress install successful. Go to https://www.ocf.berkeley.edu/~$user to finish the setup process."

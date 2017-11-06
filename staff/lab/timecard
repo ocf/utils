@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from ocflib.lab import stats
 
 
-UNIX_FILENAME_LIMIT = 255
+NAME_MAX = 255
 
 
 def generate_image(usage, users, dest, start, end):
@@ -95,19 +95,20 @@ def valid_date(s):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Generate timecard graphs')
     parser.add_argument('users', type=str, nargs='+', help='User to generate graph for')
-    parser.add_argument('--dest', type=str, nargs='?', default='',
+    parser.add_argument('--dest', type=str, default='',
                         help='File to save graph in')
     parser.add_argument('--start', type=valid_date, default=None,
                         help='Start date for chart (in form YYYY-mm-dd; defaults to semester start')
     parser.add_argument('--end', type=valid_date, default=None,
-                        help='Start date for chart (in form YYYY-mm-dd; defaults to semester start')
+                        help='Start date for chart (in form YYYY-mm-dd; defaults to semester end')
     args = parser.parse_args()
+
     if args.dest:
         dest = args.dest
     else:
         # set name equal to a string of all users separated by underscores.
         # limit the string to be at max UNIX_FILENAME_LIMIT (-4 to account for '.png')
-        dest = '{}.png'.format('_'.join(sorted(args.users))[:UNIX_FILENAME_LIMIT - 4])
+        dest = '{}.png'.format('_'.join(sorted(args.users))[:NAME_MAX - 4])
 
     usage, start, end = get_usage_count(*args.users, start=args.start, end=args.end)
     generate_image(usage, args.users, dest, start, end)

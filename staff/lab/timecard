@@ -24,6 +24,7 @@ def generate_image(usage, users, dest, start, end):
     hours = ['{}{}'.format(adjusted_hour(hour), pm_or_am(hour)) for hour in range(24)]
     sums = [sum(usage[h]) for h in range(24)]
 
+    plt.switch_backend('agg')
     fig = plt.figure()
     fig.set_size_inches(12, 4)
 
@@ -34,7 +35,7 @@ def generate_image(usage, users, dest, start, end):
     plt.ylabel('# Times Present')
     plt.ylim(0, max(sums) * 1.15)
 
-    plt.title('OCF Lab Timecard for {} ({}-{})'.format(
+    plt.title('OCF Lab Timecard for {} ({} to {})'.format(
         ', '.join(users),
         start.strftime('%Y-%m-%d'),
         end.strftime('%Y-%m-%d')

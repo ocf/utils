@@ -107,7 +107,7 @@ if __name__ == '__main__':
         dest = args.dest
     else:
         # set name equal to a string of all users separated by underscores.
-        # limit the string to be at max UNIX_FILENAME_LIMIT (-4 to account for '.png')
+        # limit the string to be at max NAME_MAX (-4 to account for '.png')
         dest = '{}.png'.format('_'.join(sorted(args.users))[:NAME_MAX - 4])
 
     usage, start, end = get_usage_count(*args.users, start=args.start, end=args.end)

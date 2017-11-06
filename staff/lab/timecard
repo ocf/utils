@@ -32,13 +32,12 @@ def generate_image(usage, users, dest, start, end):
     plt.ylabel('# Times Present')
 
     # create a new mapping of user : length 24 array (frequencies for each hour)
-    users_daily_usage = dict()
-    for user, hours in usage.items():
-        users_daily_usage[user] = [sum(hours[h]) for h in range(24)]
+    users_daily_usage = {user: [sum(hours[h]) for h in range(24)]
+                         for user, hours in usage.items()}
     stacked = [sum(x) for x in zip(*users_daily_usage.values())]
     plt.ylim(0, max(stacked) * 1.15)  # set y limit to max cumulative usage
 
-    colors = ['b', 'y', 'g', 'r']
+    colors = ['b', 'y', 'g', 'r', 'c', 'm', 'k']
     col_ind = 0
     baseline = [0] * 24  # an offset on the bottom so stacked charts don't cover each other
     for user in users:

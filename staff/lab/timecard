@@ -100,7 +100,7 @@ if __name__ == '__main__':
     parser.add_argument('--start', type=valid_date, default=None,
                         help='Start date for chart (in form YYYY-mm-dd; defaults to semester start')
     parser.add_argument('--end', type=valid_date, default=None,
-                        help='Start date for chart (in form YYYY-mm-dd; defaults to semester end')
+                        help='End date for chart (in form YYYY-mm-dd; defaults to semester end')
     args = parser.parse_args()
 
     if args.dest:

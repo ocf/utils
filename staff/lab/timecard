@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+import argparse
+import collections
+import datetime
+
+import matplotlib.pyplot as plt
+from ocflib.lab import stats
+
+
+NAME_MAX = 255
+
+
+def generate_image(usage, users, dest, start, end):
+    def adjusted_hour(hour):
+        """Converts a 0-23 hour format into a 1-12 hour format"""
+        if hour == 0 or hour == 12:
+            return 12
+        else:
+            return hour % 12
+
+    def pm_or_am(hour):
+        return 'am' if hour <= 11 else 'pm'
+
+    plt.switch_backend('agg')
+
+    hours = ['{}{}'.format(adjusted_hour(hour), pm_or_am(hour)) for hour in range(24)]
+    fig = plt.figure()
+    fig.set_size_inches(12, 4)
+    plt.xlim(0, 24)
+    plt.xticks(range(24), hours, fontsize=8)
+    plt.xlabel('Hour')
+    plt.ylabel('# Times Present')
+
+    # create a new mapping of user : length 24 array (frequencies for each hour)
+    users_daily_usage = {user: [sum(hours[h]) for h in range(24)]
+                         for user, hours in usage.items()}
+    stacked = [sum(x) for x in zip(*users_daily_usage.values())]
+    plt.ylim(0, max(stacked) * 1.15)  # set y limit to max cumulative usage
+
+    colors = ['b', 'y', 'g', 'r', 'c', 'm', 'k']
+    col_ind = 0
+    baseline = [0] * 24  # an offset on the bottom so stacked charts don't cover each other
+    for user in users:
+        hours = users_daily_usage[user]
+        plt.bar(
+            range(24),
+            hours,
+            align='edge',
+            color=colors[col_ind % len(colors)],
+            bottom=baseline,
+            label=user,
+        )
+        col_ind += 1
+        baseline = [x + y for x, y in zip(baseline, hours)]
+
+    plt.legend(loc='best', bbox_to_anchor=(1.13, 1.0), shadow=True, fancybox=True)
+    plt.title('OCF Lab Timecard for {} ({} to {})'.format(
+        ', '.join(users),
+        start.strftime('%Y-%m-%d'),
+        end.strftime('%Y-%m-%d')
+    ))
+    plt.savefig(dest, bbox_inches='tight')
+
+
+def get_usage_count(users, start=None, end=None):
+    sem_start, sem_end = stats.semester_dates()
+    if start is None:
+        start = datetime.datetime.combine(sem_start, datetime.time())
+    if end is None:
+        end = datetime.datetime.combine(sem_end, datetime.time())
+
+    step = datetime.timedelta(minutes=60)
+    hours = dict()
+
+    cnx = stats.get_connection()
+    cursor = cnx.cursor()
+
+    for user in users:
+        user_hours = collections.defaultdict(lambda: [0] * 7)
+        query = """
+            SELECT `start`, `end`
+            FROM `staff_session_duration_public`
+            WHERE `user` = %s
+                AND `start` >= %s
+                AND `end` <= %s
+                AND `duration` IS NOT NULL
+            ORDER BY start ASC"""
+        cursor.execute(query, (user, start, end))
+        logins = cursor.fetchall()
+
+        was_logged_in = dict()
+        for session in logins:
+            start_time = session['start'].replace(microsecond=0, second=0, minute=0)
+            end_time = session['end']
+            while start_time <= end_time:
+                was_logged_in[start_time] = True
+                start_time += step
+
+        time = start
+        while time <= end:
+            if was_logged_in.get(time):
+                user_hours[time.hour][time.weekday()] += 1
+            time += step
+
+        hours[user] = user_hours
+
+    return hours, start, end
+
+
+def valid_date(s):
+    # https://stackoverflow.com/a/25470943/6587177
+    try:
+        return datetime.datetime.strptime(s, '%Y-%m-%d')
+    except ValueError:
+        msg = "Not a valid date: '{0}'. Use an isoformat string (YYYY-mm-dd)".format(s)
+        raise argparse.ArgumentTypeError(msg)
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='Generate timecard graphs')
+    parser.add_argument('users', type=str, nargs='+', help='User to generate graph for')
+    parser.add_argument('--dest', type=str, default='',
+                        help='File to save graph in')
+    parser.add_argument('--start', type=valid_date, default=None,
+                        help='Start date for chart (in form YYYY-mm-dd; defaults to semester start')
+    parser.add_argument('--end', type=valid_date, default=None,
+                        help='End date for chart (in form YYYY-mm-dd; defaults to semester end')
+    args = parser.parse_args()
+
+    if args.dest:
+        dest = args.dest
+    else:
+        # set name equal to a string of all users separated by underscores.
+        # limit the string to be at max NAME_MAX (-4 to account for '.png')
+        dest = '{}.png'.format('_'.join(args.users)[:NAME_MAX - 4])
+
+    usage, start, end = get_usage_count(args.users, start=args.start, end=args.end)
+    generate_image(usage, args.users, dest, start, end)

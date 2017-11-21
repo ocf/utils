@@ -1,4 +1,5 @@
 #!/bin/sh
+set -u
 
 # Look up user for relevant account information.
 
@@ -34,10 +35,17 @@ elif [ "$1" = '-h' ] || [ "$1" = '--help' ]; then
   usage
   exit
 else
-  user=$(echo "$1" | tr -cd '[:alnum:]')
-  if [ -n "$2" ]; then
-    login_count=$(echo "$2" | tr -cd '[:digit:]')
-    if [ -z "$login_count" ]; then
+  user=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+  if ! (echo "$user" | grep -qE '^[a-z]+$'); then
+    echo 'Error: Invalid user' >&2
+    echo
+    usage
+    exit 1
+  fi
+
+  if [ $# -ge 2 ]; then
+    login_count="$2"
+    if ! (echo "$login_count" | grep -qE '^[0-9]+$'); then
       echo 'Error: Invalid login_count' >&2
       echo
       usage

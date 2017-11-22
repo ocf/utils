@@ -55,6 +55,6 @@ def main(username):
 if __name__ == '__main__':
     if len(sys.argv) != 2:
         print('Usage: check-dns <username>')
-        exit(1)
+        sys.exit(1)
 
-    exit(main(sys.argv[1]))
+    sys.exit(main(sys.argv[1]))

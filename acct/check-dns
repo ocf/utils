@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 """Print DNS entries for domains we are configured to host for our users."""
 import sys
+from collections import namedtuple
 
 from dns import resolver
 from ocflib.vhost import application
 from ocflib.vhost import mail
 from ocflib.vhost import web
+from tabulate import tabulate
+
+
+Record = namedtuple('Record', ('domain', 'type', 'value'))
 
 
 def _query(domain, record):
@@ -13,8 +18,8 @@ def _query(domain, record):
 
 
 def main(username):
-
     domains = set()
+    records = []
 
     for primary_domain, vhost_config in web.get_vhosts().items():
         if vhost_config['username'] == username:
@@ -32,21 +37,19 @@ def main(username):
 
     for domain in sorted(domains):
         try:
-            cname_rdata = _query(domain, 'CNAME')
-            if cname_rdata:
-                print('{}\tIN\tCNAME\t{}'.format(domain, cname_rdata[0]))
+            answer = _query(domain, 'CNAME')
+            if answer:
+                records.append(Record(domain, 'CNAME', str(answer[0])))
                 continue
 
-            for rdata in _query(domain, 'A'):
-                print('{}\tIN\tA\t{}'.format(domain, rdata))
-
-            for rdata in _query(domain, 'AAAA'):
-                print('{}\tIN\tAAAA\t{}'.format(domain, rdata))
-
-            for rdata in _query(domain, 'MX'):
-                print('{}\tIN\tMX\t{} {}'.format(domain, rdata.preference, rdata.exchange))
+            for type in ('A', 'AAAA', 'MX'):
+                for rdata in _query(domain, type):
+                    records.append(Record(domain, type, str(rdata)))
         except resolver.NXDOMAIN as n:
-            print('[{}]: {}'.format(domain, n))
+            records.append(Record(domain, 'NXDOMAIN', str(n)))
+
+    headers = ('Domain', 'Type', 'Value')
+    print(tabulate(records, headers))
 
 
 if __name__ == '__main__':

@@ -32,14 +32,16 @@ def main(username):
 
     for domain in sorted(domains):
         try:
+            cname_rdata = _query(domain, 'CNAME')
+            if cname_rdata:
+                print('{}\tIN\tCNAME\t{}'.format(domain, cname_rdata[0]))
+                continue
+
             for rdata in _query(domain, 'A'):
                 print('{}\tIN\tA\t{}'.format(domain, rdata))
 
             for rdata in _query(domain, 'AAAA'):
                 print('{}\tIN\tAAAA\t{}'.format(domain, rdata))
-
-            for rdata in _query(domain, 'CNAME'):
-                print('{}\tIN\tCNAME\t{}'.format(domain, rdata))
 
             for rdata in _query(domain, 'MX'):
                 print('{}\tIN\tMX\t{} {}'.format(domain, rdata.preference, rdata.exchange))

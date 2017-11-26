@@ -65,23 +65,23 @@ def get_ldap():
     """Returns LDAP connection, or None."""
     try:
         auth = ldap.sasl.gssapi('')
-        l = ldap.initialize(LDAP_SERVER)
-        l.sasl_interactive_bind_s('', auth)
-        return l
+        conn = ldap.initialize(LDAP_SERVER)
+        conn.sasl_interactive_bind_s('', auth)
+        return conn
     except ldap.LOCAL_ERROR:
         return None
 
 
-def get_email(dn):
+def get_email(conn, dn):
     """Returns current email, or None."""
-    results = l.search_s(dn, ldap.SCOPE_SUBTREE, attrlist=[MAIL_ATTR])
+    results = conn.search_s(dn, ldap.SCOPE_SUBTREE, attrlist=[MAIL_ATTR])
 
     if results:
         attrs = results[0][1]
         return attrs.get(MAIL_ATTR, [None])[0]
 
 
-def set_email(l, dn, old_email, new_email):
+def set_email(conn, dn, old_email, new_email):
     """Updates email attribute in LDAP."""
     old = {MAIL_ATTR: '*'}
     new = {MAIL_ATTR: new_email}
@@ -93,7 +93,7 @@ def set_email(l, dn, old_email, new_email):
     # condition), try the other one
     def attempt_modify(modify):
         ldif = ldap.modlist.modifyModlist(old if modify else {}, new)
-        l.modify_s(dn, ldif)
+        conn.modify_s(dn, ldif)
 
     modify = old_email is not None
 
@@ -113,15 +113,15 @@ if __name__ == '__main__':
                         help='only prompt if email is missing, suppress errors')
     args = parser.parse_args()
 
-    l = get_ldap()
+    conn = get_ldap()
 
-    if not l:
+    if not conn:
         if not args.auto:
             print('Unable to load LDAP, try running kinit', file=sys.stderr)
         sys.exit(1)
 
     dn = get_dn()
-    email = get_email(dn)
+    email = get_email(conn, dn)
 
     if args.auto:
         if valid_email(email):
@@ -140,5 +140,5 @@ if __name__ == '__main__':
             print('The email you entered was invalid; please try again.')
         new_email = input(Q_NEW_EMAIL).strip()
 
-    set_email(l, dn, email, new_email)
+    set_email(conn, dn, email, new_email)
     print('Updated email to {}'.format(new_email))

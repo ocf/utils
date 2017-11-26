@@ -89,7 +89,7 @@ def main():
             connection = MySQLdb.connect(host=mysql_host,
                                          user='root',
                                          passwd=mysql_root_pw)
-        except:
+        except MySQLdb.MySQLError:
             print('>>> Error: Failed to connect to MySQL server.')
             raise
 
@@ -113,7 +113,7 @@ def main():
 
                 help@ocf.berkeley.edu
             """).format(username))
-        except:
+        except MySQLdb.OperationalError:
             print('no.')
             db_create = True
 
@@ -127,7 +127,7 @@ def main():
             connection.store_result()
             # Result should be "Query OK, 0 rows affected",
             # but we'll assume no exception means success.
-        except:
+        except MySQLdb.MySQLError:
             print('>>> Error: Failed to grant database privileges.')
             raise
 
@@ -140,7 +140,7 @@ def main():
                 connection.store_result()
                 # Result should be "Query OK, 1 row affected",
                 # but we'll assume no exception means success.
-            except:
+            except MySQLdb.MySQLError:
                 print('>>> Error: Failed to create database.')
                 raise
 

@@ -22,15 +22,15 @@ while line != '':
         print('Changing shell to %s' % (validshell))
         kinit = '/usr/bin/klist -t || /usr/bin/kinit'
         os.system(kinit)
-        l = ldap.initialize('ldaps://ldap.ocf.berkeley.edu:636/')
+        conn = ldap.initialize('ldaps://ldap.ocf.berkeley.edu:636/')
         auth = sasl.gssapi('')
-        l.sasl_interactive_bind_s('', auth)
+        conn.sasl_interactive_bind_s('', auth)
         dn = 'uid=%s,ou=people,dc=ocf,dc=berkeley,dc=edu' % (getpass.getuser())
         old = {'loginShell': '*'}
         new = {'loginShell': '%s' % (validshell)}
         ldif = modlist.modifyModlist(old, new)
-        l.modify_s(dn, ldif)
-        l.unbind_s()
+        conn.modify_s(dn, ldif)
+        conn.unbind_s()
         print('Shell successfully changed, typically it takes a while for the '
               'changes to propagate to all our machines')
         sys.exit()

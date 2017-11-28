@@ -30,8 +30,11 @@ def quorum_next(semester, minutes_filename):
                           the meeting
 
     """
-    bod_minutes = ls(semester, minutes_filename)
-    return int(ceil(2 / 3 * len(bod_minutes)))
+    bod_members = ls(semester, minutes_filename)
+    if minutes_filename < '2017-11-20':
+        return int(ceil(2 / 3 * len(bod_members)))
+    else:
+        return int(ceil(1 / 2 * len(bod_members)))
 
 
 def get_bod_minutes_path(semester=meetings.get_semester()):

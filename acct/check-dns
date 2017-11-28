@@ -49,7 +49,8 @@ def main(username):
             records.append(Record(domain, 'NXDOMAIN', str(n)))
 
     headers = ('Domain', 'Type', 'Value')
-    print(tabulate(records, headers))
+    if records:
+        print(tabulate(records, headers))
 
 
 if __name__ == '__main__':

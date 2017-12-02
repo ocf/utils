@@ -1,0 +1,14 @@
+#!/bin/bash
+set -euo pipefail
+
+echo "The following files were group or world writable:"
+
+# Find files in /home and /services/http which are world-writable or
+# group-writable and owned by group ocf. Remove the group- and world-writable
+# bits on these files.
+# However, don't bother searching in directories that normal users other than
+# the directory's owner cannot access.
+find /home /services/http \
+     -type d \! -perm -go+x -prune \
+     -o \( -perm -o+w -o -group ocf -perm -g+w \) \! -type l \
+        -exec chmod go-w {} + -print

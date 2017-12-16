@@ -169,7 +169,8 @@ def wait_drop_into_shell(ip, user, key_file):
 
     print()
     print('You should now run puppet. You will now be dropped into a shell.')
-    exec_cmd('ssh', '-o', 'UserKnownHostsFile=/dev/null', '-o', 'StrictHostKeyChecking=no',
+    exec_cmd('ssh', '-o', 'UserKnownHostsFile=/dev/null', '-o', 'GlobalKnownHostsFile=/dev/null',
+             '-o', 'StrictHostKeyChecking=no',
              '-i', key_file, '-l', user, ip)
 
 

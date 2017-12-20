@@ -1,0 +1,25 @@
+#!/usr/bin/perl
+use strict;
+use warnings;
+
+my $PREFIX = "https://ocf.io";
+my $SHORTLINK = "https://raw.githubusercontent.com/ocf/puppet/master/modules/ocf_www/manifests/site/shorturl.pp";
+
+if ( @ARGV != 1 ) {
+    print "Usage: $0 https://rt.ocf.berkeley.edu\n";
+    print "Usage: $0 mail\n";
+    exit -1;
+}
+
+my $resp = `curl -sS -H "content-type: text/plain; charset=utf-8" $SHORTLINK`;
+$? == 0 or die "Could not retrieve short urls... Exiting!\n";
+
+foreach my $line ( split(/\n/, $resp) ) {
+    next if $line !~ /\Q$ARGV[0]\E/;
+    if ( $line =~ /'(.*)'/ ) {
+        my @awked = split /\s+/, $1;
+        next if @awked != 3;
+        my $short = substr $awked[0], 1, length($awked[0]) - 2;
+        print $PREFIX . $short . ' => ' . $awked[1] . "\n";
+    }
+}

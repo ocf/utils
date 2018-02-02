@@ -1,0 +1,62 @@
+#!/usr/bin/env python3
+import argparse
+import json
+import sys
+
+import ocflib.lab.stats
+from ocflib.infra.hosts import hostname_from_domain
+from tabulate import tabulate
+
+
+def make_fqdn(s):
+    """Argparse custom type that appends ".ocf.berkeley.edu" to short hostnames."""
+    if '.' not in s:
+        return s + '.ocf.berkeley.edu'
+    else:
+        return s
+
+
+def get_credentials():
+    """Return dictionary of ocfstats-ro creds, if we can read them."""
+    return json.load(open('/etc/ocfstats-ro.json', 'r'))
+
+
+def format_row(r):
+    """Given a row from the `session` table, formats it for printing."""
+    return (r['user'], hostname_from_domain(r['host']), r['start'],
+            'Still logged in' if r['end'] is None else r['end'])
+
+
+def main():
+    parser = argparse.ArgumentParser(description='Print out most recent desktop login records')
+    parser.add_argument('user', nargs='?', type=str,
+                        help='Show login records for the given user')
+    parser.add_argument('-n', '--limit', type=int, default=30,
+                        help='Only show this many entries')
+    parser.add_argument('-d', '--desktop', type=make_fqdn,
+                        help='Only show logins for this desktop')
+    args = parser.parse_args()
+
+    try:
+        creds = get_credentials()
+    except FileNotFoundError:
+        print('Could not find the file for ocfstats credentials.')
+        print('Are you running this on supernova?')
+        return 1
+
+    query = ('SELECT * FROM `session` WHERE '
+             + ' AND '.join((
+                 '`user` = %s' if args.user else '1',
+                 '`host` = %s' if args.desktop else '1',
+             ))
+             + ' ORDER BY `start` DESC LIMIT %s')
+    query_args = (*filter(None, (args.user, args.desktop)), args.limit)
+
+    with ocflib.lab.stats.get_connection(**creds) as c:
+        c.execute(query, query_args)
+        print(tabulate(map(format_row, c),
+                       headers=['User', 'Desktop', 'Start', 'End']))
+
+
+if __name__ == '__main__':
+    sys.exit(main())

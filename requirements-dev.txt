@@ -2,3 +2,4 @@ dnspython
 matplotlib
 ocflib
 pre-commit
+tabulate

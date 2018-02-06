@@ -51,6 +51,10 @@ def main():
     parser = argparse.ArgumentParser(description='Print out most recent desktop login records')
     parser.add_argument('user', nargs='?', type=str,
                         help='Show login records for the given user')
+    parser.add_argument('-d', '--desktop', type=make_fqdn,
+                        help='Only show logins for this desktop')
+    parser.add_argument('-H', '--no-header', action='store_true',
+                        help='Do not print a header')
     parser.add_argument('-n', '--limit', type=int, default=30,
                         help='Only show this many entries. Can also be '
                         'specified as -<LIMIT>.')
@@ -58,8 +62,6 @@ def main():
     for i in range(10):
         parser.add_argument('-{}'.format(i), action='append_const',
                             const=i, dest='digits', help=argparse.SUPPRESS)
-    parser.add_argument('-d', '--desktop', type=make_fqdn,
-                        help='Only show logins for this desktop')
     args = parser.parse_args()
 
     if args.digits:
@@ -77,8 +79,13 @@ def main():
     with ocflib.lab.stats.get_connection(user='ocfstats-ro',
                                          password=password) as c:
         c.execute(*build_query(args))
-        print(tabulate(map(format_row, c),
-                       headers=['User', 'Desktop', 'Start', 'End']))
+        if args.no_header:
+            headers = []
+            tablefmt = 'plain'
+        else:
+            headers = ['User', 'Desktop', 'Start', 'End']
+            tablefmt = 'simple'
+        print(tabulate(map(format_row, c), headers=headers, tablefmt=tablefmt))
 
 
 if __name__ == '__main__':

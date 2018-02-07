@@ -85,7 +85,9 @@ def main():
         else:
             headers = ['User', 'Desktop', 'Start', 'End']
             tablefmt = 'simple'
-        print(tabulate(map(format_row, c), headers=headers, tablefmt=tablefmt))
+        table = tabulate(map(format_row, c), headers=headers, tablefmt=tablefmt)
+        if table:
+            print(table)
 
 
 if __name__ == '__main__':

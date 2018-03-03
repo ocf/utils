@@ -1,4 +1,6 @@
 """Module for BoD meeting logic."""
+import shutil
+import textwrap
 from datetime import datetime
 from math import ceil
 from os.path import join
@@ -175,15 +177,19 @@ def split_attendance(semester, minutes_filename):
     guests = attendees - on_bod
     appointed_guests = []
     visiting_guests = []
-    for guest in sorted(guests):
-        reply = None
-        while reply not in {'y', 'yes', 'n', 'no'}:
-            reply = input(guest + ' is not on BoD. Would they like to join? '
-                          '(y/n) ')
-        if reply == 'y' or reply == 'yes':
-            appointed_guests.append(guest)
-        else:
-            visiting_guests.append(guest)
+    if guests:
+        termwidth = shutil.get_terminal_size().columns
+        print(textwrap.fill('The following guests are not on BoD. Would they '
+                            'like to join, and can they commit to coming '
+                            'regularly?', width=termwidth))
+        for guest in sorted(guests):
+            reply = None
+            while reply not in {'y', 'yes', 'n', 'no'}:
+                reply = input(guest + ': (y/n) ')
+                if reply == 'y' or reply == 'yes':
+                    appointed_guests.append(guest)
+                else:
+                    visiting_guests.append(guest)
 
     if appointed_guests or visiting_guests:
         replacement_lines.append('Guests in attendance:\n')

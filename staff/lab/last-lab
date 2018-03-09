@@ -2,18 +2,49 @@
 import argparse
 import functools
 import sys
+import textwrap
+from datetime import date
+from datetime import datetime
+from datetime import time
 
 import ocflib.lab.stats
 from ocflib.infra.hosts import hostname_from_domain
 from tabulate import tabulate
 
 
-def make_fqdn(s):
+def make_fqdn(hostname):
     """Argparse custom type that appends ".ocf.berkeley.edu" to short hostnames."""
-    if '.' not in s:
-        return s + '.ocf.berkeley.edu'
+    if '.' not in hostname:
+        return hostname + '.ocf.berkeley.edu'
     else:
-        return s
+        return hostname
+
+
+def parse_datetime(dtstr):
+    """Argparse custom type for parsing time expresssions."""
+    FORMATS = ['%Y%m%d%H%M%S', '%Y-%m-%d %H:%M:%S', '%Y-%m-%d %H:%M',
+               '%Y-%m-%d']
+    FORMATS_TIME = ['%H:%M:%S', '%H:%M']
+    WORD_EXPR = {
+        'now': datetime.now(),
+        'today': datetime.combine(date.today(), time()),
+    }
+
+    if dtstr in WORD_EXPR:
+        return WORD_EXPR[dtstr]
+
+    for format in FORMATS:
+        try:
+            return datetime.strptime(dtstr, format)
+        except ValueError:
+            continue
+    for format in FORMATS_TIME:
+        try:
+            return datetime.combine(date.today(),
+                                    datetime.strptime(dtstr, format).time())
+        except ValueError:
+            continue
+    raise argparse.ArgumentTypeError("date '{}' not understood".format(dtstr))
 
 
 def build_query(args):
@@ -29,8 +60,21 @@ def build_query(args):
         query_conditions.append('`host` = %s')
         query_args.append(args.desktop)
 
-    if query_conditions:
-        query += ' WHERE ' + ' AND '.join(query_conditions)
+    # Calculate the time interval satisfying all constraints.
+    # args.since and args.util have default values, so we assume they are
+    # already present.
+    since = max(args.since, args.present) if args.present else args.since
+    until = min(args.until, args.present) if args.present else args.until
+    # Sessions must end after `since` and start before `until` in order to be
+    # counted. (This is different from the observed behavior of `last`.)
+    # Sessions without an end date are treated as if they have ended infinitely
+    # far in the future.
+    query_conditions.append('(`end` IS NULL OR `end` >= %s)')
+    query_args.append(since)
+    query_conditions.append('`start` <= %s')
+    query_args.append(until)
+
+    query += ' WHERE ' + ' AND '.join(query_conditions)
     query += ' ORDER BY `start` DESC LIMIT %s'
     query_args.append(args.limit)
 
@@ -48,7 +92,21 @@ def format_row(r):
 
 
 def main():
-    parser = argparse.ArgumentParser(description='Print out most recent desktop login records')
+    parser = argparse.ArgumentParser(formatter_class=argparse.RawDescriptionHelpFormatter,
+                                     description='Print out most recent desktop login records',
+                                     # I ripped this epilog from util-linux
+                                     epilog=textwrap.dedent("""
+                                     TIME can be given in the following formats:
+
+                                         YYYYMMDDhhmmss
+                                         YYYY-MM-DD hh:mm:ss
+                                         YYYY-MM-DD hh:mm      (seconds will be set to 00)
+                                         YYYY-MM-DD            (time will be set to 00:00:00)
+                                         hh:mm:ss              (date will be set to today)
+                                         hh:mm                 (date will be set to today, seconds to 00)
+                                         now
+                                         today                 (time is set to 00:00:00)
+                                     """))
     parser.add_argument('user', nargs='?', type=str,
                         help='Show login records for the given user')
     parser.add_argument('-d', '--desktop', type=make_fqdn,
@@ -56,12 +114,24 @@ def main():
     parser.add_argument('-H', '--no-header', action='store_true',
                         help='Do not print a header')
     parser.add_argument('-n', '--limit', type=int, default=30,
-                        help='Only show this many entries. Can also be '
-                        'specified as -<LIMIT>.')
+                        help="""Only show this many entries. Can also be
+                        specified as -<LIMIT>.""")
     # Parse limits specified in the form -<LIMIT>
     for i in range(10):
         parser.add_argument('-{}'.format(i), action='append_const',
                             const=i, dest='digits', help=argparse.SUPPRESS)
+    parser.add_argument('-p', '--present', type=parse_datetime, metavar='TIME',
+                        help="""Show the users present at the specified time.
+                        This is equivalent to using --since and --until
+                        together with the same time.""")
+    parser.add_argument('-s', '--since', type=parse_datetime, metavar='TIME',
+                        default=datetime(1000, 1, 1, 0, 0, 0),
+                        help="""Show sessions which existed on or after the
+                        specified time.""")
+    parser.add_argument('-t', '--until', type=parse_datetime, metavar='TIME',
+                        default=datetime(9999, 12, 31, 23, 59, 59),
+                        help="""Show sessions which existed on or before the
+                        specified time.""")
     args = parser.parse_args()
 
     if args.digits:

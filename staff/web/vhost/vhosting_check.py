@@ -42,8 +42,8 @@ banner_hashes = {  # ocfbadge_mini8.png
     # OCF-Flag.png
     'ce48822dd63785f77d5826b6b215b18d',
     # lighter152x41.gif.png
-    'a9bfe3f918552692f5eddbd3c5446367'} | \
-    {
+    'a9bfe3f918552692f5eddbd3c5446367',
+    # Below hashes are calculated as of 2/18/18
     # berknow150x40.png
     '61cb03fc17cf8a0651627ee78c4801a9',
     # binnov-157x46.png
@@ -76,7 +76,7 @@ banner_hashes = {  # ocfbadge_mini8.png
     'fc743ade8109379db4ddb2d4cf2723f3',
     # ocfbadge_silver8.png
     'a69a0929a9621638dd5b94161954fa5a'
-    }
+}
 
 disclaimer_re = 'We\s*are\s*a\s*student\s*group\s*acting\s*independently\s*'\
                 'of\s*the\s*University\s*of\s*California.\s*(<[\s\S]*>)?\s*We\s*take\s*full'\
@@ -84,7 +84,6 @@ disclaimer_re = 'We\s*are\s*a\s*student\s*group\s*acting\s*independently\s*'\
                 '\s*web\s*site.'
 disclaimer_pattern = re.compile(disclaimer_re)
 img_regex = re.compile("=\"?(\S+\.png|\S+\.gif|\S+\.jpg|\S+\.svg)")
-unavailable_site = re.compile("This\s*web\s*site\s*is\s*unavailable")
 special_strings = ['asuc', 'ocf']
 
 
@@ -101,26 +100,26 @@ def check_vhosting():
         for vhost_url in vhosts.keys():
             if any(is_special(url) for url in {vhost_url} | set(vhosts[vhost_url]['aliases'])):
                 continue
-            vhost_urls.append('http://' + vhost_url)
+            vhost_urls.append('https://' + vhost_url)
         # For log niceness
         vhost_urls.sort()
         for site in vhost_urls:
             try:
-                print("Opening", site)
-                site_html = r.get(site, timeout=10).text
-
+                print('Opening', site)
+                siter = r.get(site, timeout=10)
+                if siter.status_code == 503:
+                    raise Exception('503 Exception')
+                site_html = siter.text
                 isMissingDisc = False
-                if unavailable_site.search(site_html):
-                    raise Exception("Hosting down")
                 if not disclaimer_pattern.search(site_html):
                     isMissingDisc = True
-                    m_d.writelines(site + "\n")
-                    print("\tNo disclaimer")
+                    m_d.writelines(site + '\n')
+                    print('\tNo disclaimer')
                 # Check if they have any OCF banner in their images
                 img_urls = {img_url if img_url.startswith('http') else site + '/' + img_url for img_url in
                             img_regex.findall(site_html)}
                 for img_url in img_urls:
-                    #I'm not exactly sure what the deal with \r is but this should work
+                    # I'm not exactly sure what the deal with \r is but this should work
                     idata = r.get(img_url)
                     img_hash_raw = hashlib.md5(idata.content).hexdigest()
                     img_hash_unix = hashlib.md5(idata.content.replace(b'\r\n', b'\n')).hexdigest()
@@ -128,13 +127,13 @@ def check_vhosting():
                     if any([x in banner_hashes for x in [img_hash_raw, img_hash_unix, img_hash_window]]):
                         break
                 else:
-                    m_i.writelines(site + "\n")
-                    print("\tNo banner", img_urls)
+                    m_i.writelines(site + '\n')
+                    print('\tNo banner', img_urls)
                     if isMissingDisc:
-                        m_b.writelines(site + "\n")
+                        m_b.writelines(site + '\n')
             except Exception as e:
-                print("Error:", e)
-                error_file.writelines(site + "\n")
+                print('Error:', e)
+                error_file.writelines(site + '\n')
                 error_file.writelines(str(e) + '\n\n')
 
 

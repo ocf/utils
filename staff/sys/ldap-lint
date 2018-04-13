@@ -35,7 +35,7 @@ RECOGNIZED_TYPES = frozenset({
 })
 
 # inclusive
-STAFFVM_RANGE = (ip_address('169.229.226.200'), ip_address('169.229.226.249'))
+STAFFVM_RANGE = (ip_address('169.229.226.200'), ip_address('169.229.226.252'))
 
 
 def lookup_dns(host, rtype='A'):

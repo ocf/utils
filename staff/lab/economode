@@ -11,7 +11,7 @@ from ocflib.misc.shell import green
 from ocflib.misc.shell import red
 
 
-PRINTERS = ['papercut', 'pagefault']
+PRINTERS = ['papercut', 'pagefault', 'logjam']
 
 
 class Printer:

@@ -1,6 +1,7 @@
 #!/bin/bash
 # Script for sorrying OCF user accounts
 
+REASONPATH=/opt/share/utils/staff/acct/sorry
 LDAPSEARCH=$(which ldapsearch)
 LDAPMODIFY=$(which ldapmodify)
 KINIT=$(which kinit)
@@ -16,6 +17,11 @@ fi
 
 if [ -z "$1" ] || [ -z "$2" ]; then
     echo "Usage: $0 [user to be sorried] [sorry reason file]"
+    echo
+    echo "Standard Sorry Reasons:"
+    find "$REASONPATH" -maxdepth 1 -mindepth 1 -type f -printf "    %f\n"
+    echo
+    echo "For custom sorry reasons you can pass in your own file"
     exit 0
 fi
 
@@ -32,6 +38,15 @@ if [ -z "$(getent passwd "$sorriedUser")" ]; then
 fi
 
 sorryFile=$2
+
+if [ ! -f "$sorryFile" ]; then
+    sorryFile="$REASONPATH/$sorryFile"
+    if [ ! -f "$sorryFile" ]; then
+        echo "Invalid sorry file"
+        exit 3
+    fi
+fi
+
 userdir=$(ldapsearch -x uid="$sorriedUser" | grep homeDirectory | cut -d' ' -f2)
 
 # Rewriting this to use bash variable substitution is annoying and confusing, so

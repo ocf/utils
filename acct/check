@@ -114,8 +114,8 @@ fi
 # check if CalNet UID number exists in LDAP
 calnetuid=$(ldapsearch -x -LLL uid="$user" calnetuid | grep -i ^calnetuid | cut -d' ' -f2)
 if [ -n "$calnetuid" ]; then
-  calnetemail=$(ldapsearch -x -LLL -H ldap://nds.berkeley.edu -b dc=berkeley,dc=edu uid="$calnetuid" mail | grep ^mail | cut -d' ' -f2)
-  calnetaffiliations=$(ldapsearch -x -LLL -H ldap://nds.berkeley.edu -b dc=berkeley,dc=edu uid="$calnetuid" berkeleyEduAffiliations | grep ^berkeleyEduAffiliations | cut -d' ' -f2- | sed -r 's/(^|$)/\"/g' | sort | tr '\n' ' ' | sed 's/ $//g')
+  calnetemail=$(ldapsearch -x -LLL -H ldaps://nds.berkeley.edu -b dc=berkeley,dc=edu uid="$calnetuid" mail | grep ^mail | cut -d' ' -f2)
+  calnetaffiliations=$(ldapsearch -x -LLL -H ldaps://nds.berkeley.edu -b dc=berkeley,dc=edu uid="$calnetuid" berkeleyEduAffiliations | grep ^berkeleyEduAffiliations | cut -d' ' -f2- | sed -r 's/(^|$)/\"/g' | sort | tr '\n' ' ' | sed 's/ $//g')
   echo "CalNet UID number: $calnetuid"
   if [ -n "$calnetemail" ]; then
     echo "CalNet email address: $calnetemail"

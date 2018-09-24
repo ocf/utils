@@ -1,5 +1,5 @@
-setuptools
 dnspython
 matplotlib
 ocflib
+setuptools
 tabulate

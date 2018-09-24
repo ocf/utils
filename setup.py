@@ -23,7 +23,7 @@ shutil.copytree('./bin', bin_dir)
 shutil.copytree('./sbin', sbin_dir)
 
 setup(
-    name='approve',
+    name='ocf-utils',
     version=VERSION,
     url='https://www.ocf.berkeley.edu/',
     author='Open Computing Facility',

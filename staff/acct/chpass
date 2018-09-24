@@ -1,4 +1,4 @@
-#!/opt/venvs/ocf-utils/bin/python3.7
+#!/opt/venvs/ocf-utils/bin/python3
 """chpass allows root staffers to change OCF users' passwords."""
 import getpass
 import os

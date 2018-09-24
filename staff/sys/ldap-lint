@@ -1,4 +1,4 @@
-#!/opt/venvs/ocf-utils/bin/python3.7
+#!/opt/venvs/ocf-utils/bin/python3
 """Check the sanity of our LDAP database.
 
 Currently checks the Hosts OU for:

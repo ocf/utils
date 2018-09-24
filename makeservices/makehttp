@@ -1,4 +1,4 @@
-#!/opt/venvs/ocf-utils/bin/python3.7
+#!/opt/venvs/ocf-utils/bin/python3
 """Creates a symlink to the current user's web directory in their home folder.
 
 The symlink is called "public_html" by default and points to

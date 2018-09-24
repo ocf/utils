@@ -1,4 +1,4 @@
-#!/opt/venvs/ocf-utils/bin/python3.7
+#!/opt/venvs/ocf-utils/bin/python3
 """Add a note about a user to User_Info."""
 import argparse
 import collections

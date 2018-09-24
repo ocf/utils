@@ -1,4 +1,4 @@
-#!/opt/venvs/ocf-utils/bin/python3.7
+#!/opt/venvs/ocf-utils/bin/python3
 # Print messages stored in /var/mail/nomail sent by the given user
 #
 # example usage: extract-messages ckuehl

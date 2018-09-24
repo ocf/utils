@@ -1,4 +1,4 @@
-#!/opt/venvs/ocf-utils/bin/python3.7
+#!/opt/venvs/ocf-utils/bin/python3
 # Small utility to just get the weather from wttr.in, since wego is kind of
 # annoying to set up and install
 import argparse

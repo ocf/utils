@@ -1,4 +1,4 @@
-#!/opt/venvs/ocf-utils/bin/python3.7
+#!/opt/venvs/ocf-utils/bin/python3
 """Wrapper script around parallel-ssh that helps with targeting OCF systems."""
 import argparse
 import sys

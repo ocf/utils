@@ -1,4 +1,4 @@
-#!/opt/venvs/ocf-utils/bin/python3.7
+#!/opt/venvs/ocf-utils/bin/python3
 """Print DNS entries for domains we are configured to host for our users."""
 import sys
 from collections import namedtuple

@@ -1,4 +1,4 @@
-#!/opt/venvs/ocf-utils/bin/python3.7
+#!/opt/venvs/ocf-utils/bin/python3
 """Script for recording meeting minutes.
 
 This script opens up an editor for taking minutes in the appropriate file.

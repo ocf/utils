@@ -1,4 +1,4 @@
-#!/opt/venvs/ocf-utils/bin/python3.7
+#!/opt/venvs/ocf-utils/bin/python3
 # pyrc - Wrapper to make it easier for ocf users to use irc
 # Author: Nader Morshed
 # Version: 0.0.8

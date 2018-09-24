@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/opt/venvs/ocf-utils/bin/python3.7
 """Wake OCF lab machines via wake-on-LAN."""
 import argparse
 import subprocess

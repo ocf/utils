@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/opt/venvs/ocf-utils/bin/python3.7
 """Migrate a VM from one KVM host to another over SSH.
 
 This should be run on the new host, e.g. moving supernova from jaws to the

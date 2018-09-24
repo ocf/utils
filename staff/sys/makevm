@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/opt/venvs/ocf-utils/bin/python3.7
 # Creates and configures a new vm
 #
 # Dependencies (Debian packages):

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/opt/venvs/ocf-utils/bin/python3.7
 """Creates a symlink to the current user's web directory in their home folder.
 
 The symlink is called "public_html" by default and points to

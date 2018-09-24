@@ -1,0 +1,5 @@
+setuptools
+dnspython
+matplotlib
+ocflib
+tabulate

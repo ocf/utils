@@ -44,15 +44,15 @@ def wait_for_port(host, port, timeout=5, ssh_proc=None):
             raise TimeoutError('Timed out after {} seconds.'.format(timeout))
 
 
-def ssh_to_tv(host_port, remote_port):
+def tunnel_to_host(host_port, remote_port, remote_host):
     return subprocess.Popen(['ssh', '-N', '-o', 'ExitOnForwardFailure=yes',
                              '-o', 'BatchMode=yes',
-                             '-L', '{}:localhost:{}'.format(host_port, remote_port), args.host])
+                             '-L', '{}:localhost:{}'.format(host_port, remote_port), remote_host])
 
 
 def open_vnc(args):
     port = unused_port()
-    proc = ssh_to_tv(port, 5900)
+    proc = tunnel_to_host(port, 5900, args.host)
 
     try:
         wait_for_port('localhost', port, ssh_proc=proc)
@@ -62,14 +62,19 @@ def open_vnc(args):
         proc.wait()
 
 
-def tunnel_audio(args=None):
+def tunnel_audio(args):
     port = unused_port()
-    proc = ssh_to_tv(port, 4713)
+    proc = tunnel_to_host(port, 4713, args.host)
 
     try:
         wait_for_port('localhost', port, ssh_proc=proc)
         create_audio_tunnel(port)
-        input('Press enter to close the tunnel...')
+        while True:
+            vol = input('Enter new volume or nothing to close the tunnel: ')
+            if vol:
+                update_volume(check_volume(vol), args.host)
+            else:
+                break
     finally:
         close_audio_tunnel()
         proc.terminate()
@@ -115,16 +120,7 @@ def close_audio_tunnel():
 
 
 def volume(args):
-    # remote pulse explicitly binds to only 127.0.0.1 and using localhost doesn't work anymore
-    cmd = 'export PULSE_SERVER=127.0.0.1; '
-
-    if args.amount is not None:
-        cmd += 'pactl set-sink-volume {} {}%; '.format(TV_SINK, args.amount)
-
-    # prints the 5th field in the 7th line after match, which has volume info
-    cmd += "pactl list sinks | awk '/Name: {}$/ {{ target = NR + 7 }}; NR == target {{ print $5 }}'".format(TV_SINK)
-
-    return subprocess.call(('ssh', args.host, cmd))
+    return update_volume(args.amount, args.host)
 
 
 def check_volume(val):
@@ -133,6 +129,17 @@ def check_volume(val):
         raise argparse.ArgumentTypeError('Volume out of bounds: {} not in [0, 150]'.format(val))
 
     return val
+
+
+def update_volume(amount, host):
+    cmd = ''
+
+    if amount:
+        cmd += 'pactl set-sink-volume {} {}%; '.format(TV_SINK, amount)
+
+    cmd += "pactl list sinks | awk '/Name: {}$/ {{ target = NR + 7 }}; NR == target {{ print $5 }}'".format(TV_SINK)
+
+    return subprocess.call(('ssh', host, cmd))
 
 
 def mute(args):

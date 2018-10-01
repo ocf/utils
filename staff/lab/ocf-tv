@@ -9,6 +9,10 @@ import time
 TV_SINK = 'alsa_output.pci-0000_00_03.0.hdmi-stereo'
 TUNNEL_NAME = 'ocf-tv-remote'
 
+# ===============
+# helpers =======
+# ===============
+
 
 def unused_port():
     def used(port):
@@ -44,15 +48,18 @@ def wait_for_port(host, port, timeout=5, ssh_proc=None):
             raise TimeoutError('Timed out after {} seconds.'.format(timeout))
 
 
-def ssh_to_tv(host_port, remote_port):
+def tunnel_to_host(local_port, remote_port, remote_host):
     return subprocess.Popen(['ssh', '-N', '-o', 'ExitOnForwardFailure=yes',
                              '-o', 'BatchMode=yes',
-                             '-L', '{}:localhost:{}'.format(host_port, remote_port), args.host])
+                             '-L', '{}:localhost:{}'.format(local_port, remote_port), remote_host])
 
 
+# ================
+# VNC ============
+# ================
 def open_vnc(args):
     port = unused_port()
-    proc = ssh_to_tv(port, 5900)
+    proc = tunnel_to_host(port, 5900, args.host)
 
     try:
         wait_for_port('localhost', port, ssh_proc=proc)
@@ -62,20 +69,9 @@ def open_vnc(args):
         proc.wait()
 
 
-def tunnel_audio(args=None):
-    port = unused_port()
-    proc = ssh_to_tv(port, 4713)
-
-    try:
-        wait_for_port('localhost', port, ssh_proc=proc)
-        create_audio_tunnel(port)
-        input('Press enter to close the tunnel...')
-    finally:
-        close_audio_tunnel()
-        proc.terminate()
-        proc.wait()
-
-
+# ======================================
+# PulseAudio tunnel ====================
+# ======================================
 def create_audio_tunnel(local_port=4710):
     """Create an explicit PulseAudio tunnel sink to the TV."""
 
@@ -114,17 +110,35 @@ def close_audio_tunnel():
                            stdout=subprocess.DEVNULL)
 
 
+def tunnel_audio(args):
+    port = unused_port()
+    proc = tunnel_to_host(port, 4713, args.host)
+
+    try:
+        wait_for_port('localhost', port, ssh_proc=proc)
+        create_audio_tunnel(port)
+        while True:
+            try:
+                vol = input('Enter new volume or q to quit: ')
+                if vol in ('q', 'quit'):
+                    break
+                else:
+                    set_volume(check_volume(vol), args.host)
+                    get_volume(args.host)
+            except (argparse.ArgumentTypeError, ValueError) as e:
+                print(e)
+    finally:
+        close_audio_tunnel()
+        proc.terminate()
+        proc.wait()
+
+# ==============
+# Volume =======
+# ==============
+
+
 def volume(args):
-    # remote pulse explicitly binds to only 127.0.0.1 and using localhost doesn't work anymore
-    cmd = 'export PULSE_SERVER=127.0.0.1; '
-
-    if args.amount is not None:
-        cmd += 'pactl set-sink-volume {} {}%; '.format(TV_SINK, args.amount)
-
-    # prints the 5th field in the 7th line after match, which has volume info
-    cmd += "pactl list sinks | awk '/Name: {}$/ {{ target = NR + 7 }}; NR == target {{ print $5 }}'".format(TV_SINK)
-
-    return subprocess.call(('ssh', args.host, cmd))
+    return set_volume(args.amount, args.host) if args.amount is not None else get_volume(args.host)
 
 
 def check_volume(val):
@@ -135,8 +149,20 @@ def check_volume(val):
     return val
 
 
+def get_volume(host):
+    pre = 'pactl list sinks'
+    # print 5th field in 7th line after match, which contains volume info
+    post = "awk '/Name: {}$/ {{ target = NR + 7 }}; NR == target {{ print $5 }}'".format(TV_SINK)
+    return subprocess.call(('ssh', host, '{} | {}'.format(pre, post)))
+
+
+def set_volume(amount, host):
+    cmd = 'pactl set-sink-volume {} {}%; '.format(TV_SINK, amount)
+    return subprocess.call(('ssh', host, cmd))
+
+
 def mute(args):
-    cmd = 'PULSE_SERVER=127.0.0.1 pactl set-sink-mute {} toggle'.format(TV_SINK)
+    cmd = 'pactl set-sink-mute {} toggle'.format(TV_SINK)
     return subprocess.call(('ssh', args.host, cmd))
 
 

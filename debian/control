@@ -7,5 +7,5 @@ Standards-Version: 3.9.6
 
 Package: ocf-utils
 Architecture: any
-Depends: ${python:Depends}, ${misc:Depends}, ${shlibs:Depends}, virtualenv | python-virtualenv
+Depends: ${shlibs:Depends}, virtualenv | python-virtualenv
 Description: User and staff utilities for the Open Computing Facility

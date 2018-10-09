@@ -24,5 +24,3 @@ venv: Makefile
 clean:
 	rm -rf venv
 	rm -rf debian/*.debhelper debian/*.log dist dist_*
-
-

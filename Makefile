@@ -11,7 +11,7 @@ builddeb: autoversion
 autoversion:
 	date +%Y.%m.%d.%H.%M-git`git rev-list -n1 HEAD | cut -b1-8` > .version
 	rm -f debian/changelog
-	DEBFULLNAME="Open Computing Facility" DEBEMAIL="help@ocf.berkeley.edu" VISUAL=true \
+	DEBFULLNAME="Open Computing Facility" DEBEMAIL="sm+packages@ocf.berkeley.edu" VISUAL=true \
 		dch -v `sed s/-/+/g .version` -D stable --no-force-save-on-release \
 		--create --package "ocf-utils" "Package for Debian."
 

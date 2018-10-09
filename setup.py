@@ -1,6 +1,7 @@
-import pathlib
-import shutil
-import sys
+from pathlib import Path
+from shutil import copytree
+from shutil import rmtree
+from sys import prefix
 
 from setuptools import setup
 
@@ -10,22 +11,22 @@ try:
 except IOError:
     VERSION = 'unknown'
 
-scripts_root = pathlib.Path(sys.prefix) / 'utils'
+scripts_root = Path(prefix) / 'utils'
 scripts_root.mkdir(exist_ok=True)
 
 bin_dir = scripts_root / 'bin'
-shutil.rmtree(bin_dir, ignore_errors=True)
+rmtree(bin_dir, ignore_errors=True)
 
 sbin_dir = scripts_root / 'sbin'
-shutil.rmtree(sbin_dir, ignore_errors=True)
+rmtree(sbin_dir, ignore_errors=True)
 
-shutil.copytree('./bin', bin_dir)
-shutil.copytree('./sbin', sbin_dir)
+copytree('./bin', bin_dir)
+copytree('./sbin', sbin_dir)
 
 setup(
     name='ocf-utils',
     version=VERSION,
     url='https://www.ocf.berkeley.edu/',
     author='Open Computing Facility',
-    author_email='help@ocf.berkeley.edu',
+    author_email='sm+packages@ocf.berkeley.edu',
 )

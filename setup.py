@@ -11,17 +11,17 @@ try:
 except IOError:
     VERSION = 'unknown'
 
+scripts_folders = ['acct', 'bin', 'desktop', 'makeservices',
+                   'net', 'printing', 'sbin', 'staff', 'sys']
+
 scripts_root = Path(prefix) / 'utils'
-scripts_root.mkdir(exist_ok=True)
+if scripts_root.exists():
+    rmtree(scripts_root)
+scripts_root.mkdir()
 
-bin_dir = scripts_root / 'bin'
-rmtree(bin_dir, ignore_errors=True)
-
-sbin_dir = scripts_root / 'sbin'
-rmtree(sbin_dir, ignore_errors=True)
-
-copytree('./bin', bin_dir)
-copytree('./sbin', sbin_dir)
+for dir in scripts_folders:
+    bin_dir = scripts_root / dir
+    copytree(Path('.') / dir, bin_dir)
 
 setup(
     name='ocf-utils',

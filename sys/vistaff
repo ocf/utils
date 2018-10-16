@@ -6,13 +6,14 @@ from fcntl import LOCK_NB
 from fcntl import LOCK_UN
 
 import yaml
+from ocflib.lab.staff_hours import get_staff_hours
+from ocflib.lab.staff_hours import STAFF_HOURS_FILE
 from ocflib.misc.shell import edit_file
-from staff_hours import get_staff_hours
 
 
 def main():
     parser = ArgumentParser()
-    parser.add_argument('path')
+    parser.add_argument('--path', '-p', default=STAFF_HOURS_FILE)
     args = parser.parse_args()
 
     content = None
@@ -30,16 +31,16 @@ def main():
             content = edit_file(content)
             try:
                 get_staff_hours(yaml.safe_load(content))
+                # Note: if we get here, the file is valid.
                 target.seek(0)
                 target.write(content)
                 target.truncate()
                 break
             except (yaml.YAMLError, TypeError, KeyError):
-                pass
-            idunno = input('Syntax Error: Try again? [y/n] ')
-            idunno = idunno.strip().lower()
-            if idunno != 'y' and idunno != 'yes':
-                break
+                idunno = input('Syntax Error: Try again? [y/n] ')
+                idunno = idunno.strip().lower()
+                if idunno != 'y' and idunno != 'yes':
+                    break
         flock(target.fileno(), LOCK_UN)
 
 

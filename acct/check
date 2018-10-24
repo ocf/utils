@@ -2,6 +2,8 @@
 
 # Look up user for relevant account information.
 
+# specify location of UCB LDAP password file
+ucb_ldap_passwd_file='/etc/ucbldap.passwd'
 # specify location of User_Info file
 User_Info_file='/home/s/st/staff/User_Info'
 # specify location of vhost file
@@ -115,7 +117,10 @@ fi
 calnetuid=$(ldapsearch -x -LLL uid="$user" calnetuid | grep -i ^calnetuid | cut -d' ' -f2)
 if [ -n "$calnetuid" ]; then
   calnetemail=$(ldapsearch -x -LLL -H ldaps://nds.berkeley.edu -b dc=berkeley,dc=edu uid="$calnetuid" mail | grep ^mail | cut -d' ' -f2)
-  calnetaffiliations=$(ldapsearch -x -LLL -H ldaps://nds.berkeley.edu -b dc=berkeley,dc=edu uid="$calnetuid" berkeleyEduAffiliations | grep ^berkeleyEduAffiliations | cut -d' ' -f2- | sed -r 's/(^|$)/\"/g' | sort | tr '\n' ' ' | sed 's/ $//g')
+  calnetaffiliations=
+  if [ -r "$ucb_ldap_passwd_file" ]; then
+    calnetaffiliations=$(ldapsearch -x -LLL -H ldaps://nds.berkeley.edu -D uid=ocf,ou=applications,dc=berkeley,dc=edu -b dc=berkeley,dc=edu -y "$ucb_ldap_passwd_file" uid="$calnetuid" berkeleyEduAffiliations | grep ^berkeleyEduAffiliations | cut -d' ' -f2- | sed -r 's/(^|$)/\"/g' | sort | tr '\n' ' ' | sed 's/ $//g')
+  fi
   echo "CalNet UID number: $calnetuid"
   if [ -n "$calnetemail" ]; then
     echo "CalNet email address: $calnetemail"

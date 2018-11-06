@@ -1,42 +1,37 @@
-#!/bin/bash
+#!/usr/bin/env python3
+import getpass
+import subprocess
+import sys
 
-if [ "$#" -ne 1 ]; then
-    echo 'Usage: chsh [shell]'
-    exit 1
-fi
+from ocflib.account.manage import modify_ldap_attributes
+from ocflib.misc.validators import VALID_LOGIN_SHELLS
 
-shell_choice=$1
+if len(sys.argv) < 2:
+    print('Usage: chsh [shell]')
+    sys.exit(1)
 
-ldif_template=$(cat <<EOL
-dn: uid=$(whoami),ou=people,dc=ocf,dc=berkeley,dc=edu
-changetype: modify
-replace: loginShell
-loginShell: $shell_choice
-EOL
+new_shell = sys.argv[1]
+
+print('Changing shell to {}...'.format(new_shell))
+
+# Check if the user has a valid kerberos ticket
+has_kerberos = subprocess.run(('/usr/bin/klist', '-t')).returncode
+
+if has_kerberos != 0:
+    # The user doesn't have a valid kerberos ticket already, so obtain a new
+    # ticket (this asks for a password if they don't already have a ticket, and
+    # then uses their password to obtain a new ticket)
+    subprocess.run('/usr/bin/kinit', check=True)
+
+# modify_ldap_attributes already does loginShell validation for us to make sure
+# it's a valid shell, so we don't have to do any extra here
+try:
+    modify_ldap_attributes(getpass.getuser(), {'loginShell': new_shell})
+except ValueError as e:
+    print(e, 'valid shells are: {}'.format(list(VALID_LOGIN_SHELLS)))
+    sys.exit(1)
+
+print(
+    'Shell successfully changed, typically it takes a while for the '
+    'changes to propagate to all our machines'
 )
-
-while read -r shell; do
-    # Strip any whitespace from the shell path
-    shell="${shell## }"
-    shell="${shell%% }"
-
-    # Check that the shell choice isn't commented out and is actually a valid
-    # listed shell
-    if [ "${shell:0:1}" != "#" ] && [ "$shell_choice" = "$shell" ]; then
-        echo "Changing shell to $shell"
-        /usr/bin/klist -t || /usr/bin/kinit
-
-        # Apply the change to LDAP and silence the (rather verbose) output
-        echo "$ldif_template" | ldapmodify -Q > /dev/null
-
-        echo 'Shell successfully changed, typically it takes a while for the' \
-             'changes to propagate to all our machines'
-
-        exit 0
-    fi
-done < /etc/shells
-
-echo "The shell you chose ($shell_choice) is not valid, please chose another"\
-     'shell'
-
-exit 1

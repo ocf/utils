@@ -51,6 +51,9 @@ def valid_non_ocf_email(email):
 def get_email(username):
     """Returns current email, or None."""
 
+    # Since the mail attribute is private, and we can't get the attribute's
+    # value without authenticating, we have to use ldapsearch here instead of
+    # something like ldap3.
     output = subprocess.check_output(
         ('ldapsearch', '-LLL', 'uid={}'.format(username), LDAP_MAIL_ATTR),
         stderr=subprocess.DEVNULL,
@@ -62,6 +65,7 @@ def get_email(username):
     ))
 
     if mail_attr:
+        # Strip the '{LDAP_MAIL_ATTR}: ' from the beginning of the string
         return mail_attr[0][len(LDAP_MAIL_ATTR) + 2:].strip()
 
 

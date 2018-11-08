@@ -116,10 +116,10 @@ fi
 # check if CalNet UID number exists in LDAP
 calnetuid=$(ldapsearch -x -LLL uid="$user" calnetuid | grep -i ^calnetuid | cut -d' ' -f2)
 if [ -n "$calnetuid" ]; then
-  calnetemail=$(ldapsearch -x -LLL -H ldaps://nds.berkeley.edu -b dc=berkeley,dc=edu uid="$calnetuid" mail | grep ^mail | cut -d' ' -f2)
+  calnetemail=$(ldapsearch -x -LLL -H ldaps://ldap.berkeley.edu -b dc=berkeley,dc=edu uid="$calnetuid" mail | grep ^mail | cut -d' ' -f2)
   calnetaffiliations=
   if [ -r "$ucb_ldap_passwd_file" ]; then
-    calnetaffiliations=$(ldapsearch -x -LLL -H ldaps://nds.berkeley.edu -D uid=ocf,ou=applications,dc=berkeley,dc=edu -b dc=berkeley,dc=edu -y "$ucb_ldap_passwd_file" uid="$calnetuid" berkeleyEduAffiliations | grep ^berkeleyEduAffiliations | cut -d' ' -f2- | sed -r 's/(^|$)/\"/g' | sort | tr '\n' ' ' | sed 's/ $//g')
+    calnetaffiliations=$(ldapsearch -x -LLL -H ldaps://ldap.berkeley.edu -D uid=ocf,ou=applications,dc=berkeley,dc=edu -b dc=berkeley,dc=edu -y "$ucb_ldap_passwd_file" uid="$calnetuid" berkeleyEduAffiliations | grep ^berkeleyEduAffiliations | cut -d' ' -f2- | sed -r 's/(^|$)/\"/g' | sort | tr '\n' ' ' | sed 's/ $//g')
   fi
   echo "CalNet UID number: $calnetuid"
   if [ -n "$calnetemail" ]; then

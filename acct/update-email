@@ -17,7 +17,7 @@ LDAP_MAIL_ATTR = 'mail'
 Q_UPDATE_EMAIL = 'Would you like to update your email? [yN] '
 Q_NEW_EMAIL = 'New Email Address: '
 
-AUTO_MESSAGE = '''
+AUTO_MESSAGE = """
 ================================================================================
 The Open Computing Facility requires all members to provide a valid email
 address. OCF volunteers will use this address to contact you in the event that
@@ -27,7 +27,8 @@ Your email address is kept private, and can only be viewed by OCF staff. Please
 enter an email address below that you can be reached at.
 
 For more information, see https://ocf.io/email-update
-================================================================================'''
+================================================================================
+"""
 
 
 def valid_non_ocf_email(email):
@@ -59,10 +60,7 @@ def get_email(username):
         stderr=subprocess.DEVNULL,
     ).decode('utf-8').split('\n')
 
-    mail_attr = list(filter(
-        lambda attr: attr.startswith('{}: '.format(LDAP_MAIL_ATTR)),
-        output
-    ))
+    mail_attr = [attr for attr in output if attr.startswith(LDAP_MAIL_ATTR + ': ')]
 
     if mail_attr:
         # Strip the '{LDAP_MAIL_ATTR}: ' from the beginning of the string
@@ -79,7 +77,7 @@ def set_email(username, new_email):
         sys.exit(1)
 
 
-def main(argv=None):
+def main():
     parser = argparse.ArgumentParser(description='Update OCF email')
     parser.add_argument(
         '--auto',
@@ -95,7 +93,7 @@ def main(argv=None):
     if has_kerberos != 0:
         if args.auto:
             # We can't ask for the user's password in auto mode, so we just exit
-            sys.exit(1)
+            return 1
         else:
             # The user did not already have a valid kerberos ticket, so we need
             # to obtain a new one and ask for their password
@@ -106,14 +104,14 @@ def main(argv=None):
 
     if args.auto:
         if valid_non_ocf_email(email):
-            sys.exit(0)
+            return 0
         else:
             print(AUTO_MESSAGE)
 
     print('Current Email Address: {}'.format(email or '(unset)'))
 
     if valid_non_ocf_email(email) and input(Q_UPDATE_EMAIL) not in ('y', 'yes'):
-        sys.exit(0)
+        return 0
 
     new_email = ''
     while not valid_non_ocf_email(new_email):

@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import argparse
 import getpass
 import subprocess
 import sys
@@ -7,12 +8,28 @@ from ocflib.account.manage import modify_ldap_attributes
 from ocflib.misc.validators import VALID_LOGIN_SHELLS
 
 
-def main(args):
-    if len(args) < 2:
-        print('Usage: chsh shell')
-        return 1
+def main():
+    parser = argparse.ArgumentParser(description='Change OCF login shell')
+    parser.add_argument(
+        '-s', '--shell',
+        help='new login shell for the user account',
+    )
+    args = parser.parse_args()
 
-    new_shell = args[1]
+    username = getpass.getuser()
+    print('Changing the login shell for {}'.format(username))
+
+    # If no shell was provided, enter interactive mode and prompt for a shell
+    if args.shell:
+        new_shell = args.shell
+    else:
+        print('Enter the new value, or press ENTER to keep your current shell')
+        new_shell = input('    Login Shell: ').strip()
+
+        # Exit if no new shell is given, as no update is needed
+        if not new_shell:
+            print('Keeping shell unchanged')
+            return 0
 
     print('Changing shell to {}...'.format(new_shell))
 
@@ -21,14 +38,13 @@ def main(args):
 
     if has_kerberos != 0:
         # The user doesn't have a valid kerberos ticket already, so obtain a new
-        # ticket (this asks for a password if they don't already have a ticket, and
-        # then uses their password to obtain a new ticket)
+        # ticket (this asks for their password)
         subprocess.run('/usr/bin/kinit', check=True)
 
     # modify_ldap_attributes already does loginShell validation for us to make sure
     # it's a valid shell, so we don't have to do any extra here
     try:
-        modify_ldap_attributes(getpass.getuser(), {'loginShell': new_shell})
+        modify_ldap_attributes(username, {'loginShell': new_shell})
     except ValueError as e:
         print(e, 'valid shells are: {}'.format(list(VALID_LOGIN_SHELLS)))
         return 1
@@ -41,4 +57,4 @@ def main(args):
 
 
 if __name__ == '__main__':
-    sys.exit(main(sys.argv))
+    sys.exit(main())

@@ -1,30 +1,22 @@
-#!/usr/bin/env python2
-# Allows OCF users to easily change their email in LDAP
-#
-# Can be used in "auto-mode" to ask users without emails to set an email
-# address, and do nothing if an email is set. Intended to be run on login.
-from __future__ import print_function
+#!/usr/bin/env python3
+"""Allows OCF users to easily change their email in LDAP
 
+Can be used in "auto-mode" to ask users without emails to set an email
+address, and do nothing if an email is set. Intended to be run on login.
+"""
 import argparse
 import getpass
-import re
+import subprocess
 import sys
 
-import ldap
-import ldap.modlist
-import ldap.sasl
-from six.moves import input
+from ocflib.account.manage import modify_ldap_attributes
+from ocflib.misc.validators import valid_email
 
 
-MAIL_ATTR = 'mail'
-LDAP_SERVER = 'ldaps://ldap.ocf.berkeley.edu/'
-LDAP_BASE = 'ou=People,dc=OCF,dc=Berkeley,dc=EDU'
-
-EMAIL_REGEX = re.compile('^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,4}$',
-                         re.IGNORECASE)
-
+LDAP_MAIL_ATTR = 'mail'
 Q_UPDATE_EMAIL = 'Would you like to update your email? [yN] '
 Q_NEW_EMAIL = 'New Email Address: '
+
 AUTO_MESSAGE = """
 ================================================================================
 The Open Computing Facility requires all members to provide a valid email
@@ -34,111 +26,102 @@ there is a problem with your account.
 Your email address is kept private, and can only be viewed by OCF staff. Please
 enter an email address below that you can be reached at.
 
-For more information, see http://ocf.io/email-update
-================================================================================"""
+For more information, see https://ocf.io/email-update
+================================================================================
+"""
 
 
-def email_str(maybe_email):
-    """Returns whether maybe_email could be an email address."""
-    return EMAIL_REGEX.match(maybe_email) is not None
+def valid_non_ocf_email(email):
+    """Returns whether something is a valid email address. It must
+    represent a valid email, and not be an @ocf email address."""
 
-
-def valid_email(maybe_email):
-    """Returns whether maybe_email would be a valid email address. It must
-    represent a possible email, and not be an @ocf email address."""
-
-    if not maybe_email or not email_str(maybe_email):
+    if not email or not valid_email(email):
         return False
 
-    # @ocf emails are no longer supported.
+    # @ocf emails are no longer supported
     #
     # This can be subverted by modifying LDAP directly, but it's a reasonable
     # sanity check.
-    if maybe_email.lower().endswith('@ocf.berkeley.edu'):
+    if email.lower().endswith('@ocf.berkeley.edu'):
         print('You may not use an @ocf.berkeley.edu email address.')
         return False
 
     return True
 
 
-def get_ldap():
-    """Returns LDAP connection, or None."""
-    try:
-        auth = ldap.sasl.gssapi('')
-        conn = ldap.initialize(LDAP_SERVER)
-        conn.sasl_interactive_bind_s('', auth)
-        return conn
-    except ldap.LOCAL_ERROR:
-        return None
-
-
-def get_email(conn, dn):
+def get_email(username):
     """Returns current email, or None."""
-    results = conn.search_s(dn, ldap.SCOPE_SUBTREE, attrlist=[MAIL_ATTR])
 
-    if results:
-        attrs = results[0][1]
-        return attrs.get(MAIL_ATTR, [None])[0]
+    # Since the mail attribute is private, and we can't get the attribute's
+    # value without authenticating, we have to use ldapsearch here instead of
+    # something like ldap3.
+    output = subprocess.check_output(
+        ('ldapsearch', '-LLL', 'uid={}'.format(username), LDAP_MAIL_ATTR),
+        stderr=subprocess.DEVNULL,
+    ).decode('utf-8').split('\n')
+
+    mail_attr = [attr for attr in output if attr.startswith(LDAP_MAIL_ATTR + ': ')]
+
+    if mail_attr:
+        # Strip the '{LDAP_MAIL_ATTR}: ' from the beginning of the string
+        return mail_attr[0][len(LDAP_MAIL_ATTR) + 2:].strip()
 
 
-def set_email(conn, dn, old_email, new_email):
+def set_email(username, new_email):
     """Updates email attribute in LDAP."""
-    old = {MAIL_ATTR: '*'}
-    new = {MAIL_ATTR: new_email}
-
-    # we either need to provide old as {} or {'mail': '*'}; it will do
-    # nothing if we use the wrong one
-    #
-    # we know which one should work, but if it fails (e.g. due to a race
-    # condition), try the other one
-    def attempt_modify(modify):
-        ldif = ldap.modlist.modifyModlist(old if modify else {}, new)
-        conn.modify_s(dn, ldif)
-
-    modify = old_email is not None
 
     try:
-        attempt_modify(modify)
-    except ldap.NO_SUCH_ATTRIBUTE:
-        attempt_modify(not modify)
-
-
-def get_dn():
-    return 'uid={},{}'.format(getpass.getuser(), LDAP_BASE)
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Update OCF email')
-    parser.add_argument('--auto', action='store_true',
-                        help='only prompt if email is missing, suppress errors')
-    args = parser.parse_args()
-
-    conn = get_ldap()
-
-    if not conn:
-        if not args.auto:
-            print('Unable to load LDAP, try running kinit', file=sys.stderr)
+        modify_ldap_attributes(username, {LDAP_MAIL_ATTR: new_email})
+    except ValueError as e:
+        print(e)
         sys.exit(1)
 
-    dn = get_dn()
-    email = get_email(conn, dn)
+
+def main():
+    parser = argparse.ArgumentParser(description='Update OCF email')
+    parser.add_argument(
+        '--auto',
+        action='store_true',
+        help='only prompt if email is missing, suppress errors',
+    )
+    args = parser.parse_args()
+
+    # Check if the user has a valid kerberos ticket. If they don't, then they
+    # will have to enter their password in order to get a new ticket
+    has_kerberos = subprocess.run(('/usr/bin/klist', '-t')).returncode
+
+    if has_kerberos != 0:
+        if args.auto:
+            # We can't ask for the user's password in auto mode, so we just exit
+            return 1
+        else:
+            # The user did not already have a valid kerberos ticket, so we need
+            # to obtain a new one and ask for their password
+            subprocess.run('/usr/bin/kinit', check=True)
+
+    username = getpass.getuser()
+    email = get_email(username)
 
     if args.auto:
-        if valid_email(email):
-            sys.exit(0)
+        if valid_non_ocf_email(email):
+            return 0
         else:
             print(AUTO_MESSAGE)
 
     print('Current Email Address: {}'.format(email or '(unset)'))
 
-    if valid_email(email) and input(Q_UPDATE_EMAIL) not in ('y', 'yes'):
-        sys.exit(0)
+    if valid_non_ocf_email(email) and input(Q_UPDATE_EMAIL) not in ('y', 'yes'):
+        return 0
 
-    new_email = None
-    while not valid_email(new_email):
-        if new_email is not None:
-            print('The email you entered was invalid; please try again.')
+    new_email = ''
+    while not valid_non_ocf_email(new_email):
+        if new_email:
+            print('The email you entered was invalid; please try again.\n')
         new_email = input(Q_NEW_EMAIL).strip()
 
-    set_email(conn, dn, email, new_email)
+    set_email(username, new_email)
     print('Updated email to {}'.format(new_email))
+
+
+if __name__ == '__main__':
+    sys.exit(main())

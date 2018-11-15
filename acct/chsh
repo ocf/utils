@@ -1,60 +1,38 @@
-#!/usr/bin/env python3
-import argparse
+#!/usr/bin/env python
+from __future__ import print_function
+
 import getpass
-import subprocess
+import os
 import sys
 
-from ocflib.account.manage import modify_ldap_attributes
-from ocflib.misc.validators import VALID_LOGIN_SHELLS
+import ldap
+import ldap.modlist as modlist
+import ldap.sasl as sasl
 
+if len(sys.argv) < 2:
+    print('Usage: chsh shell')
+    sys.exit()
 
-def main():
-    parser = argparse.ArgumentParser(description='Change OCF login shell')
-    parser.add_argument(
-        '-s', '--shell',
-        help='new login shell for the user account',
-    )
-    args = parser.parse_args()
-
-    username = getpass.getuser()
-    print('Changing the login shell for {}'.format(username))
-
-    # If no shell was provided, enter interactive mode and prompt for a shell
-    if args.shell:
-        new_shell = args.shell
-    else:
-        print('Enter the new shell, or press ENTER to keep your current shell')
-        new_shell = input('    Login Shell: ').strip()
-
-        # Exit if no new shell is given, as no update is needed
-        if not new_shell:
-            print('Keeping shell unchanged')
-            return 0
-
-    print('Changing shell to {}...'.format(new_shell))
-
-    # Check if the user has a valid kerberos ticket
-    has_kerberos = subprocess.run(('/usr/bin/klist', '-t')).returncode
-
-    if has_kerberos != 0:
-        # The user doesn't have a valid kerberos ticket already, so obtain a new
-        # ticket (this asks for their password)
-        subprocess.run('/usr/bin/kinit', check=True)
-
-    # modify_ldap_attributes already does loginShell validation for us to make sure
-    # it's a valid shell, so we don't have to do any extra here
-    try:
-        modify_ldap_attributes(username, {'loginShell': new_shell})
-    except ValueError as e:
-        print(e, 'valid shells are: {}'.format(list(VALID_LOGIN_SHELLS)))
-        return 1
-
-    print(
-        'Shell successfully changed, typically it takes a while for the '
-        'changes to propagate to all our machines'
-    )
-    return 0
-
-
-if __name__ == '__main__':
-    sys.exit(main())
+shell = sys.argv[1]
+etcshells = open('/etc/shells', 'r')
+line = etcshells.readline()
+while line != '':
+    validshell = line.strip()
+    if shell == validshell:
+        print('Changing shell to %s' % (validshell))
+        kinit = '/usr/bin/klist -t || /usr/bin/kinit'
+        os.system(kinit)
+        conn = ldap.initialize('ldaps://ldap.ocf.berkeley.edu:636/')
+        auth = sasl.gssapi('')
+        conn.sasl_interactive_bind_s('', auth)
+        dn = 'uid=%s,ou=people,dc=ocf,dc=berkeley,dc=edu' % (getpass.getuser())
+        old = {'loginShell': '*'}
+        new = {'loginShell': '%s' % (validshell)}
+        ldif = modlist.modifyModlist(old, new)
+        conn.modify_s(dn, ldif)
+        conn.unbind_s()
+        print('Shell successfully changed, typically it takes a while for the '
+              'changes to propagate to all our machines')
+        sys.exit()
+    line = etcshells.readline()
+print('The shell you chose is not valid, please chose another shell')

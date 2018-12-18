@@ -1,0 +1,8 @@
+#!/bin/bash
+
+docker run \
+    -v "${KUBECONFIG}":/kubeconfig:ro \
+    -v "${PWD}":/input:ro \
+    -t docker.ocf.berkeley.edu/kubernetes-deploy \
+    --revision "$(git rev-parse HEAD)" \
+    "$@"

@@ -1,8 +1,85 @@
-#!/bin/bash
+#!/usr/bin/env python3
+'''
+Deploys Kubernetes templates from the given directory. Creates a namespace
+based on the app name, and runs kubernetes-deploy.
+'''
+import argparse
+import json
+import os
+import subprocess
+import sys
 
-docker run \
-    -v "${KUBECONFIG}":/kubeconfig:ro \
-    -v "${PWD}":/input:ro \
-    -t docker.ocf.berkeley.edu/kubernetes-deploy \
-    --revision "$(git rev-parse HEAD)" \
-    "$@"
+KUBERNETES_DEPLOY_DOCKER = 'docker.ocf.berkeley.edu/kubernetes-deploy:latest'
+
+
+def get_current_context():
+    return subprocess.check_output(
+        ['kubectl', 'config', 'current-context']
+    ).decode().strip()
+
+
+def get_kubeconfig_path():
+    return os.environ.get('KUBECONFIG', os.path.expanduser('~/.kube/config'))
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+
+    parser.add_argument(
+        '--kube-context',
+        default=get_current_context(),
+        help='The Kubernetes context to use. Defaults to the current context.',
+    )
+
+    parser.add_argument(
+        'appname',
+        help='''
+             The name of the app to deploy. The namespace will be called
+             "app-{appname}".
+        ''',
+    )
+    parser.add_argument(
+        'appversion',
+        help='The version of the app, usually the docker tag.',
+    )
+    parser.add_argument(
+        'dir',
+        help='The directory of Kubernetes resource templates.',
+    )
+    args = parser.parse_args()
+
+    namespace_name = 'app-' + args.appname
+
+    # Make the namepace "app-appname"
+    j = {
+        'apiVersion': 'v1',
+        'kind': 'Namespace',
+        'metadata': {'name': namespace_name},
+    }
+    subprocess.run(
+        ['kubectl', 'apply', '-f', '-'],
+        input=json.dumps(j).encode(),
+    ).check_returncode()
+
+    # Bindings passed into the kubernetes-deploy templates
+    bindings = {
+        'version': args.appversion,
+    }
+
+    subprocess.run([
+        'docker', 'run',
+        '-v', '{}:/kubeconfig:ro'.format(get_kubeconfig_path()),
+        # Docker always wants absolute paths
+        '-v', '{}:/input:ro'.format(os.path.abspath(args.dir)),
+        '-t', KUBERNETES_DEPLOY_DOCKER,
+        namespace_name,
+        args.kube_context,
+        '--bindings=' + json.dumps(bindings),
+    ]).check_returncode()
+
+
+if __name__ == '__main__':
+    try:
+        sys.exit(main())
+    except subprocess.CalledProcessError as err:
+        sys.exit(err.returncode)

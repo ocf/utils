@@ -67,6 +67,10 @@ def main():
     }
 
     subprocess.run([
+        'docker', 'pull', KUBERNETES_DEPLOY_DOCKER
+    ]).check_returncode()
+
+    subprocess.run([
         'docker', 'run',
         '-v', '{}:/kubeconfig:ro'.format(get_kubeconfig_path()),
         # Docker always wants absolute paths

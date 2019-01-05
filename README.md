@@ -33,7 +33,7 @@ binary in this repo.
 
 * Use [ocflib][ocflib] functionality when it exists, and put reusable code
   there (and call it from an executable here).
-* When possible, target Python 3.4 and 3.5 (same versions as ocflib)
+* When possible, target Python 3.5 and 3.7 (same versions as ocflib)
 * Generally follow [PEP8][pep8].
 
 ### Shell/Bash

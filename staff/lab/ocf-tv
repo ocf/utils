@@ -9,12 +9,10 @@ import time
 TV_SINK = 'alsa_output.pci-0000_00_03.0.hdmi-stereo'
 TUNNEL_NAME = 'ocf-tv-remote'
 
-# ===============
-# helpers =======
-# ===============
-
 
 def unused_port():
+    """Find an unused port to bind the listener against on our side."""
+
     def used(port):
         s = socket.socket()
         try:
@@ -33,6 +31,8 @@ def unused_port():
 
 
 def wait_for_port(host, port, timeout=5, ssh_proc=None):
+    """Try to acquire a socket on our side againt the specified host/port."""
+
     spent = 0
     while True:
         if ssh_proc and ssh_proc.poll():
@@ -49,15 +49,16 @@ def wait_for_port(host, port, timeout=5, ssh_proc=None):
 
 
 def tunnel_to_host(local_port, remote_port, remote_host):
+    """Open an SSH local port forward tunnel to the remote host."""
+
     return subprocess.Popen(['ssh', '-N', '-o', 'ExitOnForwardFailure=yes',
                              '-o', 'BatchMode=yes',
                              '-L', '{}:localhost:{}'.format(local_port, remote_port), remote_host])
 
 
-# ================
-# VNC ============
-# ================
 def open_vnc(args):
+    """Start xvncviewer against tunneled port 5900 on the remote host."""
+
     port = unused_port()
     proc = tunnel_to_host(port, 5900, args.host)
 
@@ -69,11 +70,8 @@ def open_vnc(args):
         proc.wait()
 
 
-# ======================================
-# PulseAudio tunnel ====================
-# ======================================
 def create_audio_tunnel(local_port=4710):
-    """Create an explicit PulseAudio tunnel sink to the TV."""
+    """Start a PulseAudio network sink, tunneled to the TV."""
 
     try:
         # unload preexisting tunnel sinks if they're there because otherwise
@@ -106,11 +104,15 @@ def create_audio_tunnel(local_port=4710):
 
 
 def close_audio_tunnel():
+    """Unload the PulseAudio network sink on our side."""
+
     return subprocess.call(('pactl', 'unload-module', 'module-tunnel-sink-new'),
                            stdout=subprocess.DEVNULL)
 
 
 def tunnel_audio(args):
+    """Start the audio tunnel session with the ability to change volume on the fly."""
+
     port = unused_port()
     proc = tunnel_to_host(port, 4713, args.host)
 
@@ -132,12 +134,10 @@ def tunnel_audio(args):
         proc.terminate()
         proc.wait()
 
-# ==============
-# Volume =======
-# ==============
-
 
 def volume(args):
+    """Get/set the PulseAudio volume of the TV_SINK on the remote host."""
+
     return set_volume(args.amount, args.host) if args.amount is not None else get_volume(args.host)
 
 

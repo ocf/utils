@@ -1,0 +1,35 @@
+#!/bin/bash
+# shellcheck disable=SC2016
+
+# This script outputs a Kubernetes ExecCredential object with an x509 client
+# cert. It uses a Kerberos ticket to SSH into a Kubernetes master and runs the
+# certsign script.
+# This script will prompt for a Kerberos password if no ticket exists.
+
+# See https://kubernetes.io/docs/reference/access-authn-authz/authentication/#input-and-output-formats
+
+set -euo pipefail
+
+klist -s || kinit
+
+privkey="$(openssl genrsa 2>/dev/null)"
+pubkey="$(openssl rsa -outform PEM -pubout 2>/dev/null <<< "$privkey")"
+cert="$(ssh kubernetes sudo -u kubernetes-ca certsign <<< "$pubkey")"
+
+exec_credential='
+{
+    "apiVersion": "client.authentication.k8s.io/v1beta1",
+    "kind": "ExecCredential",
+    "status": {
+        "clientCertificateData": $cert,
+        "clientKeyData": .
+    }
+}
+'
+
+# Pass privkey in standard input to prevent leakage
+jq --monochrome-output \
+    --slurp --raw-input \
+    --arg cert "$cert" \
+    "$exec_credential" \
+    <<< "$privkey"

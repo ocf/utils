@@ -162,7 +162,7 @@ def main():
     mysql_password = get_mysql_password(args.path)
     logger.info('Read MySQL password from wp-config.php')
 
-    options_table = re.search('\w+options', wp.db.tables()).group(0)
+    options_table = re.search(r'\w+options', wp.db.tables()).group(0)
     logger.info('Options table is {}'.format(options_table))
 
     mysql = MySQL(mysql_user, mysql_password, options_table)

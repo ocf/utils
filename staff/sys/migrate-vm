@@ -110,7 +110,7 @@ def verify_disks(oldpath, newpath):
     print(bold('New SHA1 (on this server): ') + copied)
 
     # Pull out the hash string since file names may not match
-    p = re.compile('^SHA1\([a-z0-9\-/]+\)= ([0-9a-f]+)$')
+    p = re.compile(r'^SHA1([a-z0-9\-/]+)= ([0-9a-f]+)$')
     if p.match(original).group(1) != p.match(copied).group(1):
         print(bold(red('Hashes do not match, something went wrong!')))
         sys.exit(1)
@@ -127,7 +127,7 @@ def shut_down_vm(vm):
         stdout.readline()
         stdout.readline()
 
-        if not any(re.match(r'^\s*[0-9]+\s+' + vm + '\s+.*', line) for line in stdout.readlines()):
+        if not any(re.match(r'^\s*[0-9]+\s+' + vm + r'\s+.*', line) for line in stdout.readlines()):
             break
 
         print('waiting for shutdown...')

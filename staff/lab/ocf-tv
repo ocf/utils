@@ -79,7 +79,7 @@ def create_audio_tunnel(local_port=4710):
         ret = subprocess.call('pactl list sinks '
                               "| grep -qE 'Name: {}$'".format(TUNNEL_NAME),
                               shell=True)
-        if ret is 0:
+        if ret == 0:
             close_audio_tunnel()
 
         # set up an explicit tunnel sink that points to the local end of our SSH tunnel

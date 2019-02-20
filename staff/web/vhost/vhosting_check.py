@@ -45,12 +45,12 @@ banner_hashes = {  # ocfbadge_mini8.png
     # lighter152x41.gif.png
     'a9bfe3f918552692f5eddbd3c5446367'}
 
-disclaimer_re = 'We\s*are\s*a\s*student\s*group\s*acting\s*independently\s*'\
-                'of\s*the\s*University\s*of\s*California.\s*We\s*take\s*full'\
-                '\s*responsibility\s*for\s*our\s*organization\s*and\s*this'\
-                '\s*web\s*site.'
+disclaimer_re = r'We\s*are\s*a\s*student\s*group\s*acting\s*independently\s*'\
+                r'of\s*the\s*University\s*of\s*California.\s*We\s*take\s*full'\
+                r'\s*responsibility\s*for\s*our\s*organization\s*and\s*this'\
+                r'\s*web\s*site.'
 disclaimer_pattern = re.compile(disclaimer_re)
-img_regex = re.compile("=\"?(\S+\.png|\S+\.gif|\S+\.jpg)")
+img_regex = re.compile(r'="?(\S+\.png|\S+\.gif|\S+\.jpg)')
 special_strings = ['asuc', 'ocf']
 
 

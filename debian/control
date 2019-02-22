@@ -2,10 +2,10 @@ Source: ocf-utils
 Section: python
 Priority: extra
 Maintainer: Open Computing Facility <sm+packages@ocf.berkeley.edu>
-Build-Depends: debhelper (>= 9), python3.7, dh-virtualenv (>= 0.8)
+Build-Depends: debhelper (>= 9), python3.7, python3.7-dev, python3.7-venv, dh-virtualenv (>= 0.8), dh-python, dvipng, ghostscript, graphviz, inkscape, ipython, libfreetype6-dev, libgtk2.0-dev, libpng-dev, locales-all, python-all-dbg (>= 2.4.4-6), python-all-dev (>= 2.3.5-7), python3-all-dbg, python3-all-dev, python-cycler (>= 0.10.0), python3-cycler (>= 0.10.0), python-dateutil, python3-dateutil, python-colorspacious, python3-colorspacious, python-cairocffi, python3-cairocffi, python-cxx-dev, python3-cxx-dev, python-functools32, python-gi, python3-gi, python-gtk2-dev, python-mock, python3-mock, python-mpltoolkits.basemap <!stage1>, python3-mpltoolkits.basemap <!stage1>, python-nose, python3-nose, python-numpy, python-numpy-dbg, python-numpydoc, python3-numpy, python3-numpy-dbg, python-pil, python3-pil, python-pkg-resources, python3-pkg-resources, python-pyparsing (>= 1.5.6), python3-pyparsing (>= 1.5.6), python-qt4, python3-pyqt4, python-pyqt5, python3-pyqt5, python-setuptools, python3-setuptools, python-six (>= 1.4), python3-six (>= 1.4), python-sphinx (>= 1.0.7+dfsg), python-subprocess32, python-tk (>= 2.5.2-1.1), python-tk-dbg (>= 2.5.2-1.1), python3-tk, python3-tk-dbg, python-tornado, python3-tornado, python-tz, python3-tz, python-wxgtk3.0, python-xlwt, tcl8.6-dev, texlive-fonts-recommended, texlive-latex-extra, texlive-latex-recommended, tk8.6-dev, xauth, xvfb, zlib1g-dev, libcrack2-dev, pkg-config
 Standards-Version: 3.9.6
 
 Package: ocf-utils
 Architecture: any
-Depends: ${shlibs:Depends}, python, virtualenv | python-virtualenv
+Depends: ${shlibs:Depends}, python3.7
 Description: User and staff utilities for the Open Computing Facility

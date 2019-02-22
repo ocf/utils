@@ -3,7 +3,7 @@
 	dh $@ --with python-virtualenv
 
 override_dh_virtualenv:
-	dh_virtualenv --python=/usr/bin/python3.7 --extra-pip-arg='--no-binary=:all:'
+	dh_virtualenv  --builtin-venv --python=/usr/bin/python3.7 --extra-pip-arg='--no-binary=:all:' --install-suffix utils
 
 override_dh_auto_build:
 	@true

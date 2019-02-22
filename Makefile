@@ -3,8 +3,15 @@ test: venv
 	venv/bin/pre-commit install
 	venv/bin/pre-commit run --all-files
 
+.PHONY: package_%
+package_%: autoversion
+	docker run -e "DIST_UID=$(shell id -u)" -e "DIST_GID=$(shell id -g)" -v $(CURDIR):/mnt:rw "docker.ocf.berkeley.edu/theocf/debian:$*" /mnt/build-in-docker "$*"
+
+dist:
+	mkdir -p "$@"
+
 .PHONY: builddeb
-builddeb: autoversion
+builddeb:
 	dpkg-buildpackage -us -uc
 
 .PHONY: autoversion
@@ -23,4 +30,4 @@ venv: Makefile
 .PHONY: clean
 clean:
 	rm -rf venv
-	rm -rf debian/*.debhelper debian/*.log dist dist_*
+	debian/*.debhelper debian/*.log dist dist_*

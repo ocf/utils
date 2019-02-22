@@ -1,0 +1,16 @@
+#!/bin/bash
+set -euxo pipefail
+
+cp -r /mnt /work
+cd /work
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update
+apt-get -y install --no-install-recommends build-essential devscripts equivs lsb-release
+mk-build-deps -i --tool 'apt-get --no-install-recommends -y'
+
+make builddeb
+
+shopt -s nullglob
+install -o "$DIST_UID" -g "$DIST_GID" -d "/mnt/dist_$1/"
+install -o "$DIST_UID" -g "$DIST_GID" -m 644 ../{*.changes,*.deb,*.dsc,*.tar.*,*.buildinfo} "/mnt/dist_$1/"

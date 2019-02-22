@@ -29,5 +29,4 @@ venv: Makefile
 
 .PHONY: clean
 clean:
-	rm -rf venv
-	debian/*.debhelper debian/*.log dist dist_*
+	rm -rf venv debian/*.debhelper debian/*.log dist dist_*

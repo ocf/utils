@@ -5,7 +5,7 @@ import subprocess
 import sys
 
 from ocflib.infra.hosts import hosts_by_filter
-from ocflib.lab.hours import Day
+from ocflib.lab.hours import read_hours_listing
 
 
 ALL_HOSTS_FILTER = '(type=desktop)'
@@ -34,7 +34,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     force = args.force or args.host
 
-    if force or Day.from_date().is_open():
+    if force or read_hours_listing().is_open():
         wake_hosts(
             build_host_filter(args.host) if args.host else ALL_HOSTS_FILTER,
             args.quiet,

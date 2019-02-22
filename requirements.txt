@@ -1,5 +1,14 @@
 dnspython
+ldap3
+lxml
 matplotlib
+mysqlclient
 ocflib
+paramiko
+pexpect
+progressbar
+requests
 setuptools
+six
 tabulate
+urllib3

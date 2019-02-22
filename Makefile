@@ -4,14 +4,14 @@ test: venv
 	venv/bin/pre-commit run --all-files
 
 .PHONY: package_%
-package_%: autoversion
+package_%:
 	docker run -e "DIST_UID=$(shell id -u)" -e "DIST_GID=$(shell id -g)" -v $(CURDIR):/mnt:rw "docker.ocf.berkeley.edu/theocf/debian:$*" /mnt/build-in-docker "$*"
 
 dist:
 	mkdir -p "$@"
 
 .PHONY: builddeb
-builddeb:
+builddeb: autoversion
 	dpkg-buildpackage -us -uc
 
 .PHONY: autoversion

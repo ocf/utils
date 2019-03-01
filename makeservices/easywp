@@ -11,6 +11,11 @@
 set -euo pipefail
 shopt -s dotglob
 
+if ! [[ "$(hostname)" =~ (dev-)?tsunami ]]; then
+    echo -e '\033[1;31mYou must run this command on tsunami.\033[0m'
+    exit 1
+fi
+
 echo -e "\033[33mWARNING: This script should generally be run on a fresh account!\033[00m"
 echo -e "A user with an existing website or database will have their files
 backed up, but their database password will change and the WordPress

@@ -14,7 +14,8 @@ klist -s || kinit
 
 privkey="$(openssl genrsa 2>/dev/null)"
 pubkey="$(openssl rsa -outform PEM -pubout 2>/dev/null <<< "$privkey")"
-cert="$(ssh kubernetes sudo -u kubernetes-ca certsign <<< "$pubkey")"
+kubehost="$(getent hosts kubernetes | head -1 | cut -d' ' -f1)"
+cert="$(ssh "$kubehost" sudo -u kubernetes-ca certsign <<< "$pubkey")"
 
 exec_credential='
 {

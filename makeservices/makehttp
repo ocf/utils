@@ -8,7 +8,6 @@ takes no action; otherwise, it creates the symlink after removing broken
 symlinks or renaming any file or directory with the same path.
 """
 import datetime
-import os
 import os.path
 from argparse import ArgumentParser
 

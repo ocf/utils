@@ -121,12 +121,12 @@ def tunnel_audio(args):
         create_audio_tunnel(port)
         while True:
             try:
+                get_volume(args.host)
                 vol = input('Enter new volume or q to quit: ')
                 if vol in ('q', 'quit'):
                     break
                 else:
                     set_volume(check_volume(vol), args.host)
-                    get_volume(args.host)
             except (argparse.ArgumentTypeError, ValueError) as e:
                 print(e)
     finally:

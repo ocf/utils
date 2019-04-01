@@ -48,7 +48,8 @@ def main():
     )
     args = parser.parse_args()
 
-    namespace_name = 'app-' + args.appname
+    # Kubernetes namespaces can't have underscores
+    namespace_name = 'app-' + args.appname.replace('_', '-')
 
     # Make the namepace "app-appname"
     j = {

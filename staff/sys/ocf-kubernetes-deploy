@@ -9,8 +9,6 @@ import os
 import subprocess
 import sys
 
-KUBERNETES_DEPLOY_DOCKER = 'docker.ocf.berkeley.edu/kubernetes-deploy:latest'
-
 
 def get_current_context():
     return subprocess.check_output(
@@ -67,20 +65,17 @@ def main():
         'version': args.appversion,
     }
 
-    subprocess.run([
-        'docker', 'pull', KUBERNETES_DEPLOY_DOCKER
-    ]).check_returncode()
+    # kubernetes-deploy requires that this environmental variable be set, and passes
+    # it to templates as the `current_sha` variable. We don't ever use it.
+    os.environ['REVISION'] = 'unused'
 
-    subprocess.run([
-        'docker', 'run',
-        '-v', '{}:/kubeconfig:ro'.format(get_kubeconfig_path()),
-        # Docker always wants absolute paths
-        '-v', '{}:/input:ro'.format(os.path.abspath(args.dir)),
-        '-t', KUBERNETES_DEPLOY_DOCKER,
-        namespace_name,
-        args.kube_context,
-        '--bindings=' + json.dumps(bindings),
-    ]).check_returncode()
+    subprocess.run(
+        ['kubernetes-deploy',
+         namespace_name,
+         args.kube_context,
+         '--bindings=' + json.dumps(bindings),
+         '--template-dir=' + args.dir]
+    ).check_returncode()
 
 
 if __name__ == '__main__':

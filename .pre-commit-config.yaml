@@ -1,6 +1,6 @@
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks.git
-    rev: v2.1.0
+    rev: v2.2.1
     hooks:
     -   id: check-added-large-files
     -   id: check-docstring-first
@@ -20,7 +20,7 @@ repos:
     -   id: sort-simple-yaml
     -   id: trailing-whitespace
 -   repo: https://github.com/pre-commit/mirrors-autopep8
-    rev: v1.4.3
+    rev: v1.4.4
     hooks:
     -   id: autopep8
 -   repo: https://gitlab.com/pycqa/flake8

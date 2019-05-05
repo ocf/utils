@@ -1,0 +1,14 @@
+#!/bin/bash
+set -euo pipefail
+
+NEW_USER="$1"
+LDAP_GROUP="$2"
+
+ldapmodify <<EOF
+dn: cn=$LDAP_GROUP,ou=Group,dc=OCF,dc=Berkeley,dc=EDU
+changetype: modify
+add: memberUid
+memberUid: $NEW_USER
+EOF
+
+echo "$NEW_USER added to $LDAP_GROUP"

@@ -197,7 +197,7 @@ def _main(args):
                         help='amount of memory (in MB)')
     parser.add_argument('-c', '--vcpus', type=int, default=2,
                         help='number of vCPUs')
-    parser.add_argument('-s', '--storage', type=int, default=15,
+    parser.add_argument('-s', '--storage', type=int, default=30,
                         help='amount of disk storage (in GB)')
     parser.add_argument('-V', '--vg', type=str, default='vg',
                         help='LVM volume group to use for storage')

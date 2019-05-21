@@ -182,6 +182,11 @@ if [ -n "$User_Info" ]; then
   echo "-------------------------------------------------------------------------------"
 fi
 
+# show most recent desktop logins
+echo
+echo "Most recent desktop logins:"
+"$(dirname "$(readlink -f -- "$0")")/../sbin/last-lab" -n "$login_count" "$user"
+
 # list signatories for group account
 echo
 echo "Signatories/Signatory for:"

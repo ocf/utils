@@ -92,7 +92,6 @@ def main():
                 bindings_file.write(secrets_file.read().encode())
 
     bindings_file.flush()
-    print(subprocess.run(['cat', bindings_file.name]).check_returncode())
 
     subprocess.run(
         ['kubernetes-deploy',

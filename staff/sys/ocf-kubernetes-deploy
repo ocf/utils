@@ -85,8 +85,11 @@ def main():
     else:
         filename = os.path.join(args.secrets, args.appname + '.yaml')
 
-    with open(filename, 'r') as stream:
-        bindings.update(yaml.safe_load(stream))
+    try:
+        with open(filename, 'r') as stream:
+            bindings.update(yaml.safe_load(stream))
+    except FileNotFoundError:
+        print('Secrets file not found')
 
     # Created with 600 perms
     with tempfile.NamedTemporaryFile(suffix='.json') as bindings_file:

@@ -8,6 +8,9 @@ import json
 import os
 import subprocess
 import sys
+import tempfile
+
+import yaml
 
 
 def get_current_context():
@@ -18,6 +21,13 @@ def get_current_context():
 
 def get_kubeconfig_path():
     return os.environ.get('KUBECONFIG', os.path.expanduser('~/.kube/config'))
+
+
+def get_kubernetes_dir():
+    root_dir = subprocess.check_output(
+        ['git', 'rev-parse', '--show-toplevel']
+    ).decode().strip()
+    return os.path.join(root_dir, 'kubernetes')
 
 
 def main():
@@ -36,13 +46,20 @@ def main():
              "app-{appname}".
         ''',
     )
+
+    # This argument is optional because some Kubernetes services
+    # (sourcegraph) don't need us to build our own Docker images
     parser.add_argument(
         'appversion',
+        nargs='?',
+        default='',
         help='The version of the app, usually the docker tag.',
     )
+
     parser.add_argument(
-        'dir',
-        help='The directory of Kubernetes resource templates.',
+        '--secrets',
+        default='/etc/ocf-kubernetes/secrets/',
+        help='The YAML file or directory of YAML files of Kubernetes secrets.',
     )
     args = parser.parse_args()
 
@@ -61,21 +78,31 @@ def main():
     ).check_returncode()
 
     # Bindings passed into the kubernetes-deploy templates
-    bindings = {
-        'version': args.appversion,
-    }
+    bindings = {'version': args.appversion}
 
-    # kubernetes-deploy requires that this environmental variable be set, and passes
-    # it to templates as the `current_sha` variable. We don't ever use it.
-    os.environ['REVISION'] = 'unused'
+    if os.path.isfile(args.secrets):
+        filename = args.secrets
+    else:
+        filename = os.path.join(args.secrets, args.appname + '.yaml')
 
-    subprocess.run(
-        ['kubernetes-deploy',
-         namespace_name,
-         args.kube_context,
-         '--bindings=' + json.dumps(bindings),
-         '--template-dir=' + args.dir]
-    ).check_returncode()
+    with open(filename, 'r') as stream:
+        bindings.update(yaml.safe_load(stream))
+
+    # Created with 600 perms
+    with tempfile.NamedTemporaryFile(suffix='.json') as bindings_file:
+
+        bindings_file.write(json.dumps(bindings).encode())
+
+        # ensure the file gets written to
+        bindings_file.flush()
+
+        subprocess.run(
+            ['kubernetes-deploy',
+             namespace_name,
+             args.kube_context,
+             '--bindings=@' + bindings_file.name,
+             '--template-dir=' + get_kubernetes_dir()]
+        ).check_returncode()
 
 
 if __name__ == '__main__':

@@ -1,0 +1,68 @@
+#!/bin/bash
+
+# Creates symlink to user's webroot. If the symlink exists and files
+# are present in webroot, they are backed up in the user's home directory.
+# DokuWiki and the upgrade plugin are installed in the chosen directory.
+#
+
+set -euo pipefail
+shopt -s dotglob
+
+if ! [[ "$(hostname)" =~ (dev-)?tsunami ]]; then
+    echo -e '\033[1;31mYou must run this command on tsunami.\033[0m'
+    exit 1
+fi
+
+user=$(whoami)
+
+echo "What subfolder would you like to install DokuWiki in?"
+echo "Example: type nothing for root (https://www.ocf.berkeley.edu/~$(whoami))"
+echo "Example: type \"wiki\" for wiki subfolder (https://www.ocf.berkeley.edu/~$(whoami)/wiki)"
+
+read -r subfolder
+
+read -rp "Are you sure you want to continue? [y/N] " idunno
+idunno=${idunno,,}
+if ! [[ "$idunno" =~ ^(yes|y) ]]; then
+    echo "Ok, bye!"
+    exit 0
+fi
+
+webroot="$HOME/public_html/$subfolder"
+
+# Create symlink to webroot
+makehttp
+
+mkdir -p "$webroot"
+cd "$webroot"
+
+# Check if user has files and let user decide what they want to do.
+if [[ -n "$(ls -A)" ]]; then
+    echo
+    echo -e "\033[33mThere are currently files in webroot! These will be backed up.\033[00m\n"
+    read -rp "Do you want to continue? [y/N] " whoknows
+
+    whoknows=${whoknows,,}
+    if [[ "$whoknows" =~ ^(yes|y) ]]; then
+        ts=$(date +"%Y-%m-%d_%H:%M:%S")
+        backup="$HOME/public_html-doku-$ts"
+        mkdir -p "$backup"
+        echo "Moving current files to $backup ..."
+        # Note that dotglob is set so hidden files are moved too
+        mv ./* "$backup"
+    else
+        echo "Ok, bye!"
+        exit 0
+    fi
+fi
+
+echo "Downloading and installing DokuWiki"
+curl -L "https://download.dokuwiki.org/src/dokuwiki/dokuwiki-stable.tgz" \
+    | tar -xz --strip-components=1
+
+echo "Downloading and installing the Upgrade plugin"
+mkdir lib/plugins/upgrade
+curl -L "https://github.com/splitbrain/dokuwiki-plugin-upgrade/tarball/master" \
+    | tar -xz -C lib/plugins/upgrade --strip-components=1
+
+echo "DokuWiki install successful. Go to https://www.ocf.berkeley.edu/~$user/$subfolder to finish the setup process."

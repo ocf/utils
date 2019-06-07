@@ -1,0 +1,250 @@
+#!/usr/bin/env python3
+"""
+Creates an XMPP account with the same name as the username of the user who
+runs this program.
+
+To prevent the user from taking control of this program and e.g., causing the
+program to dump core and reveal the Prosody admin credentials, this program
+should be run under a separate account from that of the user.
+
+The password set for this new account is randomly generated; it is not
+user-selectable. Ths is to prevent compromised user accounts from also
+compromising the shell account password. Note that the XMPP server should also
+prevent the user from later changing the password.
+
+The admin credentials are read from a config file; the path to it is stored in
+the CONF_FILE global. This file must be readable only by the setuid user! The
+Python configparser module is used to parse the config file, so the format is
+basically the Windows INI format.
+
+Most of the code in this file was adapted from a SleekXMPP example program, see
+https://github.com/fritzy/SleekXMPP/blob/master/examples/admin_commands.py
+"""
+import os
+import random
+import string
+import sys
+from configparser import ConfigParser
+from textwrap import dedent
+
+import sleekxmpp
+from ocflib.misc.mail import send_problem_report
+
+
+CONF_FILE = '/opt/share/makexmpp/makexmpp.conf'
+JID_DOMAIN = 'ocf.berkeley.edu'
+
+PW_LENGTH = 24
+
+
+def read_config():
+    """Fetches the server admin JID and password from the config in
+    '/opt/share/makeservices'."""
+    conf = ConfigParser()
+    conf.read(CONF_FILE)
+    admin_jid = conf.get('makexmpp', 'jid')
+    admin_pw = conf.get('makexmpp', 'passwd')
+    return admin_jid, admin_pw
+
+
+def generate_password(length):
+    r = random.SystemRandom()
+    return ''.join(
+        r.choice(string.ascii_letters + string.digits)
+        for _ in range(length)
+    )
+
+
+def intro_prompt():
+    print(dedent(
+        """
+        This program will create an XMPP account, if one does not already exist.
+        A randomly-generated password will be generated for this account and
+        displayed on-screen. Please make sure you are in an environment where
+        nobody else will see it when it appears.
+
+        You can always re-run this command to reset the password if you lose it.
+
+        If you are ready to continue, type 'yes'.
+        Typing anything other than yes will abort this script.
+        """
+    ))
+    return input('Continue? ') == 'yes'
+
+
+class XMPPUserPasswordClient(sleekxmpp.ClientXMPP):
+    def __init__(self, jid, password, newuser, newpassword):
+        super().__init__(jid, password)
+
+        self._newuser = newuser
+        self._newjid = newuser + '@' + JID_DOMAIN
+        self._newpassword = newpassword
+
+        self.add_event_handler('session_start', self.start)
+
+    def start(self, event):
+        """
+        Process the session_start event. We first try to change the user's
+        password. If the account does not exist, we then create it.
+
+        `event` is an empty dictionary. The session_start event does not
+        provide any additional data.
+        """
+
+        def command_error(iq, session):
+            self['xep_0050'].terminate_command(session)
+            self.disconnect()
+
+            condition = iq['error']['condition']
+            errtext = iq['error']['text']
+            raise Exception('{}: {}'.format(condition, errtext))
+
+        def adduser_coda(iq, session):
+            errors = [
+                note
+                for note in iq['command']['notes']
+                if note[0] != 'info'
+            ]
+            if not errors:
+                # No errors mean the user was created successfully
+                print(dedent("""
+                Your XMPP account has been created.
+
+                For instructions on using your account, please visit
+
+                  https://www.ocf.berkeley.edu/docs/services/xmpp/
+
+                If you run into trouble, contact us at
+
+                    help@ocf.berkeley.edu
+                """))
+
+                self.disconnect()
+            else:
+                self.disconnect()
+                raise Exception(iq['command']['notes'])
+
+        def adduser_form(iq, session):
+            form = iq['command']['form']
+
+            answers = {
+                'FORM_TYPE': form['fields']['FORM_TYPE']['value'],
+                'accountjid': self._newjid,
+                'password': self._newpassword,
+                'password-verify': self._newpassword,
+            }
+
+            form['type'] = 'submit'
+            form['values'] = answers
+
+            session['next'] = adduser_coda
+            session['payload'] = form
+
+            self['xep_0050'].complete_command(session)
+
+        def changepassword_coda(iq, session):
+            errors = [
+                note
+                for note in iq['command']['notes']
+                if note[0] != 'info'
+            ]
+            if not errors:
+                # No errors means the password was changed successfully
+                print(dedent("""
+                Your XMPP account {} already exists. Its password was reset.
+
+                For details on how to connect to XMPP, visit
+
+                  https://www.ocf.berkeley.edu/docs/services/xmpp/
+
+                If you run into trouble using your account, contact us at
+
+                    help@ocf.berkeley.edu
+                """).format(self._newjid))
+
+                self.disconnect()
+            elif errors == [('error', 'User does not exist')]:
+                # Account does not exist, create it
+                self['xep_0133'].add_user(session={
+                    'next': adduser_form,
+                    'error': command_error
+                })
+            else:
+                self.disconnect()
+                raise Exception(iq['command']['notes'])
+
+        def changepassword_form(iq, session):
+            form = iq['command']['form']
+
+            answers = {
+                'FORM_TYPE': form['fields']['FORM_TYPE']['value'],
+                'accountjid': self._newjid,
+                'password': self._newpassword,
+            }
+
+            form['type'] = 'submit'
+            form['values'] = answers
+
+            session['next'] = changepassword_coda
+            session['payload'] = form
+
+            self['xep_0050'].complete_command(session)
+
+        self['xep_0133'].change_user_password(session={
+            'next': changepassword_form,
+            'error': command_error
+        })
+
+
+def main():
+    try:
+        username = os.environ.get('SUDO_USER')
+
+        if not username:
+            raise RuntimeError('Unable to read SUDO_USER.')
+
+        # Read config file.
+        admin_jid, admin_pw = read_config()
+
+        # Check whether the script should proceed.
+        if not intro_prompt():
+            print('>>> Aborted by user request.')
+            return
+
+        newpassword = generate_password(PW_LENGTH)
+
+        # Initialize the XMPP connection and register the service admin plugin.
+        xmpp = XMPPUserPasswordClient(
+            admin_jid,
+            admin_pw,
+            username,
+            newpassword,
+        )
+        xmpp.register_plugin('xep_0133')  # Service Administration
+
+        # Connect to the XMPP server and start processing XMPP stanzas.
+        if xmpp.connect(reattempt=False):
+            xmpp.process(block=True)
+        else:
+            raise Exception('Unable to connect to XMPP server.')
+
+        print('>>> Your XMPP account password is: {}'.format(newpassword))
+    except Exception as ex:
+        send_problem_report(dedent(
+            """\
+            Fatal error for user '{}'
+
+            {}: {}\
+            """
+        ).format(username, ex.__class__.__name__, ex))
+        print(dedent(
+            """
+            A fatal error was encountered during program execution.
+            OCF staff have been notified of the problem.
+            """
+        ))
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()

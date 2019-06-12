@@ -41,7 +41,7 @@ def read_config():
     """Fetches the MySQL hostname and root password from the config in
     '/opt/share/makeservices'."""
     conf = ConfigParser()
-    conf.readfp(open(CONF_FILE))
+    conf.read(CONF_FILE)
     mysql_host = conf.get('makemysql', 'host')
     mysql_root_pw = conf.get('makemysql', 'passwd')
     return mysql_host, mysql_root_pw

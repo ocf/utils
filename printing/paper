@@ -19,7 +19,7 @@ from ocflib.printing.quota import Payload
 
 def staff_creds():
     """Return dictionary of staff creds, if we can read them."""
-    return json.load(open('/etc/ocfprinting-dev.json'))
+    return json.load(open('/etc/ocfprinting.json'))
 
 
 def view(args):

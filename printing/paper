@@ -103,7 +103,7 @@ def main(argv=None):
         return 1
 
     if args.command == 'refund' or args.command == 'forward':
-        return commands[args.command](args,args.command)
+        return commands[args.command](args, args.command)
     else:
         return commands[args.command](args)
 

@@ -31,7 +31,7 @@ def is_atdp_hours(when=None):
     If not provided, when defaults to now.
     """
     days = [0, 2, 4]  # Monday, Wednesday, Friday
-    open_time = time(8, 15)  # 8:15 AM
+    open_time = time(8, 00)  # 8:00 AM
     close_time = time(16, 30)  # 4:30 PM
     if when is None:
         when = datetime.now()

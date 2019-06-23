@@ -84,7 +84,7 @@ def main():
 
             ip = ip_address(attrs['ipHostNumber'][0])
             in_staffvm_range = STAFFVM_RANGE[0] <= ip <= STAFFVM_RANGE[1]
-            if type_ == 'staffvm' and not in_staffvm_range:
+            if type_ == 'staffvm' and not in_staffvm_range and not cn.startswith('hozer-'):
                 complain(cn, 'is a staff VM, but not in staffvm IP range')
             elif type_ != 'staffvm' and in_staffvm_range:
                 complain(cn, 'is in staffvm IP range, but not a staffvm')

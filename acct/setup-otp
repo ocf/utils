@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+if [ "$#" -ne 1 ]; then
+    echo "Usage: setup-otp <username>"
+    exit 1
+fi
+
+username="$1"
+
+# get last ocf-tagged public ID
+IDHex=$(sudo cut -d: -f2- /etc/otp/yubikeys | tr : \\n | grep vvfuckcrv | tr "cbdefghijklnrtuv" "0123456789ABCDEF" | sort | tail -1)
+
+while true; do
+    # increment to get next ID
+    IDHex=$(echo "obase=ibase=16;${IDHex}+1" | bc)
+    ID=$(echo "$IDHex" | tr "0123456789ABCDEF" "cbdefghijklnrtuv")
+    if curl -H "Content-Type: application/json" -d "{\"public_id\":\"$ID\",\"private_id\":\"000000000000\",\"aes_key\":\"00000000000000000000000000000000\",\"serial\":0}" 'https://upload.yubico.com/prepare' 2> /dev/null | grep -v "PUBLIC_ID_OCCUPIED" >/dev/null; then
+        # this public ID is not taken
+        break
+    fi
+done
+
+# yubikey generate script
+echo "Make sure your Yubikey is connected."
+echo "Programming with public ID $ID."
+read -rp "Is this a FRESH Yubikey (OTP slots unconfigured)? [yes/no] " fresh
+ykman config usb -e OTP
+case $fresh in
+yes)
+    echo "[The factory OTP will be left in slot 2.]"
+    ykman otp swap
+    slot=1
+    ;;
+no)
+    read -rp "Which OTP slot should I use? (1/2) " slot
+    ;;
+*)
+    echo "i said 'yes' or 'no', none of this $fresh nonsense smh"
+    exit 1
+    ;;
+esac
+
+case $slot in
+[12])
+    echo "Using slot $slot."
+    ;;
+*)
+    echo "Slot should be 1 or 2."
+    exit 1
+    ;;
+esac
+
+ykman otp yubiotp "$slot" -P "$ID" -gGu
+
+# force a tty for the sudo prompt
+# shellcheck disable=SC2029
+ssh -t puppet sudo /usr/local/bin/write-otp-config "$username" "$ID"

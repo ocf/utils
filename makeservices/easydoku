@@ -65,4 +65,4 @@ mkdir lib/plugins/upgrade
 curl -L "https://github.com/splitbrain/dokuwiki-plugin-upgrade/tarball/master" \
     | tar -xz -C lib/plugins/upgrade --strip-components=1
 
-echo "DokuWiki install successful. Go to https://www.ocf.berkeley.edu/~$user/$subfolder to finish the setup process."
+echo "DokuWiki install successful. Go to https://www.ocf.berkeley.edu/~$user/$subfolder/install.php to finish the setup process."

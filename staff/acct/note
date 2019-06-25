@@ -3,7 +3,6 @@
 import argparse
 import collections
 import getpass
-import os
 import pwd
 import re
 import sys
@@ -35,7 +34,7 @@ def guess_topic(note):
 
 
 def main():
-    if os.geteuid() == 0:
+    if getpass.getuser() == 'root':
         print('Do not run this script as root. Aborting.')
         return 6
 

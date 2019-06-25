@@ -34,6 +34,10 @@ def guess_topic(note):
 
 
 def main():
+    if getpass.getuser() == 'root':
+        print('Do not run this script as root. Aborting.')
+        return 6
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('-u', '--user', required=True, help='The username')
     parser.add_argument('-t', '--topic',

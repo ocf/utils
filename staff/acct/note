@@ -3,6 +3,7 @@
 import argparse
 import collections
 import getpass
+import os
 import pwd
 import re
 import sys
@@ -34,6 +35,10 @@ def guess_topic(note):
 
 
 def main():
+    if os.geteuid() == 0:
+        print('Do not run this script as root. Aborting.')
+        return 6
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('-u', '--user', required=True, help='The username')
     parser.add_argument('-t', '--topic',

@@ -36,14 +36,8 @@ repos:
     rev: v1.1.6
     hooks:
     -   id: remove-tabs
-# TODO: Replace this with the actual repo
-# (https://github.com/detailyang/pre-commit-shell)
-# once it supports types and not just files ending in shell extensions
--   repo: local
+-   repo: https://github.com/detailyang/pre-commit-shell.git
+    rev: v1.0.6
     hooks:
     -   id: shell-lint
-        name: Shell Syntax Check
-        description: Check Shell Syntax on ALL staged files with user friendly messages and colors
-        entry: shell-lint.sh
-        language: script
-        types: [executable, shell]
+        exclude: ^(.deactivate.sh)$

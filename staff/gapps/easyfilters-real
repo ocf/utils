@@ -1,0 +1,172 @@
+#!/usr/bin/env python3
+"""Gets OAuth authorization for an OCF GApps account, and then adds a set of
+sensible filters for starting out.
+"""
+import argparse
+from collections import namedtuple
+
+import yaml
+from requests_oauthlib import OAuth2Session
+
+CONF_FILE = '/opt/share/easyfilters/easyfilters.yaml'
+
+SCOPES = [
+    'https://www.googleapis.com/auth/gmail.labels',
+    'https://www.googleapis.com/auth/gmail.settings.basic',
+]
+
+Filter = namedtuple('Filter', ['label', 'description', 'list'])
+
+FILTERS = [
+    Filter(
+        label='RT',
+        description='Support tickets',
+        list='(<rt.ocf.berkeley.edu>)',
+    ),
+    Filter(
+        label='Officers',
+        description='External correspondence',
+        list='<officers.ocf.berkeley.edu>',
+    ),
+    Filter(
+        label='extcomm',
+        description='External mailing lists which may have important communications',
+        list='(<extcomm.ocf.berkeley.edu>)',
+    ),
+    Filter(
+        label='Puppet',
+        description='Output from all Puppet runs on our infrastructure',
+        list='"puppet@ocf.berkeley.edu"',
+    ),
+    Filter(
+        label='Root',
+        description='Errors and notifications from our infrastructure',
+        list='"root@ocf.berkeley.edu"',
+    ),
+    Filter(
+        label='Monitoring',
+        description='Alerts for when things are broken',
+        list='"mon@ocf.berkeley.edu"',
+    ),
+]
+
+
+def filter_includes(the_filter, s):
+    """Returns true if the_filter uses `s` in its criteria"""
+    s = s.strip('()<>"')
+    query = the_filter['criteria'].get('query')
+    if not query:
+        return False
+    else:
+        return s in query
+
+
+def get_oauth_session():
+    conf = yaml.safe_load(open(CONF_FILE))
+
+    client_id = conf['client_id']
+    client_secret = conf['client_secret']
+
+    redirect_uri = 'urn:ietf:wg:oauth:2.0:oob'
+    authorization_base_url = 'https://accounts.google.com/o/oauth2/auth'
+    token_url = 'https://oauth2.googleapis.com/token'
+
+    session = OAuth2Session(client_id, scope=SCOPES, redirect_uri=redirect_uri)
+
+    authorization_url, state = session.authorization_url(
+        authorization_base_url,
+        access_type='offline',
+    )
+
+    print(authorization_url)
+    redirect_response = input('Go to the above URL and paste the code here: ')
+
+    session.fetch_token(
+        token_url,
+        client_secret=client_secret,
+        code=redirect_response,
+    )
+
+    return session
+
+
+def main():
+    # This script doesn't have arguments, but it's still nice to handle --help
+    parser = argparse.ArgumentParser(
+        description='Add default filters to your OCF Gmail account',
+    )
+    parser.parse_args()
+
+    google = get_oauth_session()
+
+    user_labels = google.get(
+        'https://www.googleapis.com/gmail/v1/users/me/labels'
+    ).json()['labels']
+
+    user_filters = google.get(
+        'https://www.googleapis.com/gmail/v1/users/me/settings/filters'
+    ).json()['filter']
+
+    # Only install filters that the user isn't already using
+    need_filters = []
+    for ocf_filter in FILTERS:
+        if not any(
+            filter_includes(user_filter, ocf_filter.list)
+            for user_filter in user_filters
+        ):
+            need_filters.append(ocf_filter)
+
+    if not need_filters:
+        print('Filters are already installed, nothing to do')
+        return
+
+    print('Installing filters:')
+    print()
+    for f in need_filters:
+        print('{f.label}: {f.description}'.format(f=f))
+    print()
+
+    answer = None
+    while answer != 'yes':
+        answer = input('Type "yes" to continue, or Ctrl+C to abort: ')
+
+    for f in need_filters:
+        try:
+            # See if the user already has this label
+            label_id = next(
+                label['id']
+                for label in user_labels
+                if label['name'] == f.label
+            )
+            print('Label "{}" already exists, adding filter anyways...'.format(
+                f.label,
+            ))
+        except StopIteration:
+            # Otherwise, create the label
+            create_label = google.post(
+                'https://www.googleapis.com/gmail/v1/users/me/labels',
+                json={'name': f.label}
+            )
+
+            assert create_label.ok, create_label.json()
+            print('Successfully created label "{}"'.format(f.label))
+
+            label_id = create_label.json()['id']
+
+        create_filter = google.post(
+            'https://www.googleapis.com/gmail/v1/users/me/settings/filters',
+            json={
+                'criteria': {'query': 'list:{}'.format(f.list)},
+                'action': {
+                    'addLabelIds': [label_id],
+                    'removeLabelIds': ['INBOX'],
+                },
+            },
+        )
+
+        assert create_filter.ok, create_filter.json()
+        print('Successfully created filter {f.list} -> {f.label}'.format(f=f))
+
+
+if __name__ == '__main__':
+    main()

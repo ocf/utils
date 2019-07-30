@@ -3,8 +3,6 @@
 import argparse
 import subprocess
 import sys
-from datetime import datetime
-from datetime import time
 
 from ocflib.infra.hosts import hosts_by_filter
 from ocflib.lab.hours import read_hours_listing
@@ -25,19 +23,6 @@ def wake_hosts(filter, quiet):
     )
 
 
-def is_atdp_hours(when=None):
-    """Return whether the given time is during atdp hours.
-
-    If not provided, when defaults to now.
-    """
-    days = [0, 2, 4]  # Monday, Wednesday, Friday
-    open_time = time(8, 00)  # 8:00 AM
-    close_time = time(16, 30)  # 4:30 PM
-    if when is None:
-        when = datetime.now()
-    return when.weekday() in days and open_time <= when.time() <= close_time
-
-
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('-f', '--force', action='store_true',
@@ -49,7 +34,7 @@ def main(argv=None):
     args = parser.parse_args(argv)
     force = args.force or args.host
 
-    if force or read_hours_listing().is_open() or is_atdp_hours():
+    if force or read_hours_listing().is_open():
         wake_hosts(
             build_host_filter(args.host) if args.host else ALL_HOSTS_FILTER,
             args.quiet,

@@ -64,6 +64,22 @@ if [[ -z "$sqlpass" ]]; then
 fi
 echo "SQL set up and the password can be found in wp-config.php ..."
 
+tables=$(mysql --user="$USER" --password="$sqlpass" --execute="show tables" "$USER" | grep -E "^wp_" || echo "")
+if ! [[ -z "$tables" ]]; then
+    echo
+    echo -e "\033[33mThere appears to be an existing WordPress installation. Would you like to clean the database?\033[00m\n"
+    read -rp "Do you want to continue? [y/N] " wordpresskiller
+    wordpresskiller=${wordpresskiller,,}
+    if ! [[ "$wordpresskiller" =~ ^(yes|y) ]]; then
+        echo "If you want to run this script and keep the tables intact, rename the existing tables from wp_* to something else."
+        exit 0
+    fi
+
+    echo "$tables" | tr ' ' '\n' | while read -r table; do
+        mysql --user="$USER" --password="$sqlpass" --execute="DROP TABLE $table" "$USER"
+    done
+fi
+
 # Install WordPress and create config file
 wp core download
 wp config create --dbname="$user" --dbuser="$user" --dbpass="$sqlpass" --dbhost=mysql --dbcharset=utf8mb4

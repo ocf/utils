@@ -5,6 +5,7 @@ student group.
 import argparse
 import sys
 import textwrap
+import platform
 
 import ocflib.account.search as search
 import ocflib.ucb.directory as directory
@@ -194,6 +195,15 @@ def main():
     if len(sys.argv) == 1:
         parser.print_help()
         sys.exit(2)
+
+    # TODO: use UUID (/etc/machine-id) instead of hostname?
+    WORK_ON_HOSTNAME = ['supernova']
+
+    if not platform.node() in WORK_ON_HOSTNAME:
+        print("Unfortunately, this script does not work on any machine except:")
+        print(', '.join(WORK_ON_HOSTNAME))
+        print("To view the information you are requesting, ssh to any of the hostname above.")
+        sys.exit(3)
 
     args = parser.parse_args()
     if args.idtype == 'uid':

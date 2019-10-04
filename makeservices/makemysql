@@ -3,4 +3,19 @@ if [[ "$(hostname)" != "tsunami" && "$(hostname)" != "dev-tsunami" ]]; then
     echo -e '\033[1;31mYou must run this command on tsunami.\033[0m'
     exit 1
 fi
+
+PASS=$(pwgen -s -N 1 -cn 24)
+
+touch ~/.temp
+
+cat >> ~/.temp << EOF
+$PASS
+EOF
+
+cd ~/
 sudo -u mysql /opt/share/utils/makeservices/makemysql-real
+
+rm ~/.temp
+
+cd ~/public_html/
+wp config set DB_PASSWORD $PASS

@@ -1,156 +1,183 @@
-#!/bin/bash
-# Script for sorrying OCF user accounts
+#!/usr/bin/env python3
+# Script for sorrying OCF user accounts rewritten in python3
+import argparse
+import datetime
+import grp
+import os
+import shutil
+import subprocess
+import sys
 
-REASONPATH=/opt/share/utils/staff/acct/sorry
-LDAPSEARCH=$(which ldapsearch)
-LDAPMODIFY=$(which ldapmodify)
-KINIT=$(which kinit)
-KDESTROY=$(which kdestroy)
-#KRB5CCNAME=/root/krb5cc_sorry
-#export KRB5CCNAME
+import ocflib.account.manage
+import ocflib.account.search
+import ocflib.account.utils
+import ocflib.misc.mail
 
-# check to see if running as root
-if [ "$(/usr/bin/id -u)" != 0 ]; then
-    echo "You must be root to run this."
-    exit 2
-fi
+reason_path = '/opt/share/utils/staff/acct/sorry/'
+sorry_shell = '/opt/share/utils/bin/sorried'
 
-if [ -z "$1" ] || [ -z "$2" ]; then
-    echo "Usage: $0 [user to be sorried] [sorry reason file]"
-    echo
-    echo "Standard Sorry Reasons:"
-    find "$REASONPATH" -maxdepth 1 -mindepth 1 -type f -printf "    %f\n"
-    echo
-    echo "For custom sorry reasons you can pass in your own file"
-    exit 0
-fi
 
-sorriedUser=$1
+def find_sorry_file(file_path):
+    # Own sorry file
+    if (os.path.isfile(file_path)):
+        return file_path
 
-if [[ ! "$sorriedUser" =~ ^[a-z]+ ]]; then
-    echo "$sorriedUser is an invalid username"
-    exit 3
-fi
+    # Default sorry files
+    if (os.path.isfile(reason_path + file_path)):
+        return reason_path + file_path
 
-if [ -z "$(getent passwd "$sorriedUser")" ]; then
-    echo "User $sorriedUser does not exist"
-    exit 3
-fi
+    raise FileNotFoundError("FATAL: Sorry file \"{}\" does not exist. Exiting.".format(file_path))
 
-sorryFile=$2
 
-if [ ! -f "$sorryFile" ]; then
-    sorryFile="$REASONPATH/$sorryFile"
-    if [ ! -f "$sorryFile" ]; then
-        echo "Invalid sorry file"
-        exit 3
-    fi
-fi
+def sorry_user(username, sorry_file):
+    attributes = ocflib.account.search.user_attrs(username)
+    if attributes is None:
+        raise ValueError('User not found.')
 
-userdir=$(ldapsearch -x uid="$sorriedUser" | grep homeDirectory | cut -d' ' -f2)
+    rootstaffer = real_user()
+    kerberos_credentials(rootstaffer)
 
-# Rewriting this to use bash variable substitution is annoying and confusing, so
-# just use sed instead and ignore the shellcheck warning
-# shellcheck disable=SC2001
-httpdir=$(echo "$sorriedUser" | sed -E 's%([a-z])[a-z]*%/services/http/users/\1/\0%')
+    user_dir = attributes['homeDirectory']
 
-rootstaffer="$SUDO_USER"
+    # Workaround for ldap3 1.x.x machines
+    if isinstance(user_dir, list):
+        user_dir = user_dir[0]
 
-if [ "$rootstaffer" = "root" ] || [ -z "$rootstaffer" ]; then
-    echo "The sorry.log is much more useful when it logs who you are"
-    echo "rather than simply 'root'. Please enter your username:"
-    read -r rootstaffer
-fi
+    print('Copying sorry file and making .oldshell file')
 
-if [ -z "$SORRY_KRB5CCNAME" ]; then
-    echo "You are $rootstaffer"
-    $KINIT "${rootstaffer}/admin"
-    if [ $? -ne 0 ]; then
-        echo "kinit failed, bailing out!"
-        exit 1
-    fi
-else
-    echo "SORRY_KRB5CCNAME set in environment."
-    echo "Assuming this file contains current admin credentials."
-    KRB5CCNAME="$SORRY_KRB5CCNAME"
-    export KRB5CCNAME
-fi
+    if not (os.path.isfile(user_dir + '/.oldshell')):
+        oldshell = attributes['loginShell']
+        # Workaround for ldap3 1.x.x machines
+        if isinstance(oldshell, list):
+            oldshell = user_dir[0]
 
-sorryshell=/opt/share/utils/bin/sorried
+        oldshell_file = open(user_dir + '/.oldshell', 'w')
+        oldshell_file.write(oldshell)
+        oldshell_file.close()
 
-echo ""
-echo "Copying sorry file and making .oldshell file"
+    shutil.copy2(sorry_file, user_dir + '/.sorry')
+    os.chmod(user_dir + '/.sorry', 0o400)
+    shutil.chown(user_dir + '/.sorry', user=username, group='ocf')
 
-oldshell=$($LDAPSEARCH -x "(uid=$sorriedUser)" loginShell | grep "^loginShell:" | cut -d" " -f2)
+    print("Changing user's shell to sorry shell")
 
-if [[ ! -f .oldshell ]]; then
-    echo "$oldshell" > "$userdir/.oldshell"
-fi
+    ocflib.infra.ldap.modify_ldap_entry(ocflib.account.utils.dn_for_username(username),
+                                        {'loginShell': sorry_shell, 'gidNumber': grp.getgrnam('sorry').gr_gid})
 
-cp "$sorryFile" "$userdir/.sorry"
-chmod 400 "$userdir/.sorry"
-chown "$sorriedUser:ocf" "$userdir/.sorry"
+    http_dir = '/services/http/users/{0}/{1}'.format(username[0], username)
+    print('Changing permissions on httpdir to 000')
+    if (os.path.isdir(http_dir)):
+        os.chmod(http_dir, 0o000)
 
-echo ""
-echo "Changing user's shell to a sorry shell"
+    print('Changing permissions on home directory to 500')
+    os.chmod(user_dir, 0o500)
 
-sorrygid=$(getent group sorry | cut -d : -f 3)
-$LDAPMODIFY -H ldaps://ldap.ocf.berkeley.edu <<EOF
-dn: uid=$sorriedUser,ou=People,dc=OCF,dc=Berkeley,dc=EDU
-changetype: modify
-replace: loginShell
-loginShell: $sorryshell
--
-replace: gidNumber
-gidNumber: $sorrygid
-EOF
+    # WTF is final system check for?
+    # log(rootstaffer, username)
+    send_log_mail(rootstaffer, username, open(reason_path, 'r').read())
 
-echo "Changing permissions on httpdir to 000"
-if [[ -d "$httpdir" ]]; then
-    chmod 000 "$httpdir"
-fi
+    user_mail = get_user_real_mail(username)
+    if user_mail:
+        send_sorry_mail(user_mail, username, open(reason_path, 'r').read())
+    kerberos_destroy()
 
-echo ""
-echo "Changing permissions on home directory to 500"
-chmod 500 "$userdir"
+# Returns the real user who is running this script
 
-echo ""
-echo ""
-echo ""
-echo "Final system check"
-ldapsearch -x uid="$sorriedUser"
-ldapsearch -x cn=sorry | tail
-finger -m "$sorriedUser"
-ls -la "$userdir"
-ls -ld "$httpdir"
 
-# logging
-echo "$(/bin/date) - $rootstaffer $sorriedUser" >> /opt/acct/sorry.log
+def real_user():
+    if 'SUDO_USER' in os.environ and os.environ['SUDO_USER'] != 'root':
+        return os.environ['SUDO_USER']
+    else:
+        print("The sorry.log is much more useful when it logs who you are rather than simply 'root'.")
+        username = input('Please enter your username: ')
+        return username
 
-# Notify user by email if email address is available.
-email_from='Open Computing Facility <help@ocf.berkeley.edu>'
-email_subject='[OCF] Account disabled'
-email_to="$(ldapsearch "uid=${sorriedUser}" mail | grep ^mail | cut -d' ' -f2)"
-[ -n "$email_to" ] && \
-  mail -a "From: ${email_from}" -s "$email_subject" "$email_to" <<EOF
+
+def kerberos_credentials(staff_name):
+    if ('SORRY_KRB5CCNAME' in os.environ):
+        print('SORRY_KRB5CCNAME set in environment. Assuming this file contains current admin credentials.')
+        os.environ['KRB5CCNAME'] = os.environ['SORRY_KRB5CCNAME']
+    else:
+        print('Your are {0}.'.format(staff_name))
+        if (subprocess.call([shutil.which('kinit'), '{0}/admin'.format(staff_name)]) != 0):
+            raise OSError('Kinit failed, bailing out!')
+        else:
+            print('Kinit complete.')
+
+
+def kerberos_destroy():
+    return subprocess.call(['kdestroy'])
+
+
+def get_user_real_mail(username):
+    email = str(subprocess.run([shutil.which('ldapsearch'),
+                                'uid={0}'.format(username), 'mail'], stdout=subprocess.PIPE).stdout)
+    email = email[email.find('\\nmail') + 8:]
+    email = email[:email.find('\\n\\n')]
+    return email
+
+
+def log(root_staffer, sorried_user):
+    with open('/opt/acct/sorry.log', 'a') as log_file:
+        # Date style matters...?
+        log_file.write('{0} - {1} {2}'.format(str(datetime.datetime.now()), root_staffer, sorried_user))
+
+
+def send_log_mail(root_staffer, sorried_user, reason):
+    email_from = 'Open Computing Facility <sorry_log@ocf.berkeley.edu>'
+    email_subject = '[OCF] Account disabled'
+    email_body = '''
+This is an automated email sent by sorry script. This is the log of a recent sorry operation:
+Account "{0}" has been disabled by "{1}" for reason "{2}" on "{3}".
+'''.format(sorried_user, root_staffer, reason, str(datetime.datetime.now()))
+    ocflib.misc.mail.send_mail('root@ocf.berkeley.edu', email_subject, email_body, cc=None, sender=email_from)
+
+
+def send_sorry_mail(sorried_user_email, username, reason):
+    email_from = 'Open Computing Facility <help@ocf.berkeley.edu>'
+    email_subject = '[OCF] Account disabled'
+    email_body = '''
 Hello,
 
 Your OCF account has been disabled.
 
-Your account name is: ${sorriedUser}
+Your account name is: {0}
 
 The reason your account has been disabled:
-$(cat "$sorryFile")
+{1}
 
 Feel free to reply to this message.
 Please do not share your password with anyone or over email.
 
-$(python3 -c 'import ocflib.misc.mail as mail; print(mail.MAIL_SIGNATURE)')
-EOF
+{2}
+    '''.format(username, reason, ocflib.misc.mail.MAIL_SIGNATURE)
+    ocflib.misc.mail.send_mail(sorried_user_email, email_subject, email_body, cc=None, sender=email_from)
 
-if [ -z "$SORRY_KRB5CCNAME" ]; then
-    $KDESTROY
-fi
 
-# Huge notice
-echo "NOW RUN note -u $sorriedUser reason. NOW"
+def main():
+    sorry_description = 'Sorry a user. \nStandard sorry reasons are: \n' + '\n'.join(
+        [f for f in os.listdir(reason_path) if
+         os.path.isfile(os.path.join(reason_path, f))]) + '\nBut you can also pass in your own file.'
+    parser = argparse.ArgumentParser(usage='%(prog)s sorriedUser sorryReason',
+                                     formatter_class=argparse.RawDescriptionHelpFormatter,
+                                     description=sorry_description)
+    parser.add_argument('sorriedUser', metavar='sorriedUser', help='Username of sorried user')
+    parser.add_argument('sorryReason', metavar='sorriedReason', help='Reason for the user to be sorried')
+
+    if (len(sys.argv) != 3):
+        parser.print_help()
+        return 1
+
+    if os.getuid() != 0:
+        raise PermissionError('You must be root to run this.')
+
+    args = parser.parse_args()
+    file_path = find_sorry_file(args.sorryReason)
+    print('Sorry file {}.'.format(file_path))
+
+    sorry_user(args.sorriedUser, file_path)
+    print('NOW RUN note -u {0} reason. NOW'.format(args.sorriedUser))
+
+
+if __name__ == '__main__':
+    sys.exit(main())

@@ -18,6 +18,8 @@ is used to parse the config file, so the format is basically the Windows
 INI format.
 """
 import os
+import random
+import string
 import sys
 from configparser import ConfigParser
 from textwrap import dedent
@@ -117,9 +119,9 @@ def main():
 
         # Add or update user database privileges.
         try:
-            # Read from ~/.my.cnf
-            with open('.temp', 'r') as f:
-                userpass = f.read()
+            r = random.SystemRandom()
+            userpass = ''.join(r.choice(string.ascii_letters + string.digits)
+                               for _ in range(PW_LENGTH))
             query = GRANT_QUERY.format(username=username, userpass=userpass)
             connection.query(query)
             connection.store_result()

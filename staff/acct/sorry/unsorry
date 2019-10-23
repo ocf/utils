@@ -1,138 +1,163 @@
-#! /bin/bash
+#!/usr/bin/env python3
+# Script for unsorrying OCF user accounts rewritten in python3
 
-#Script for unsorrying OCF user accounts, adapted for ldap/kerberos
-#gfs, 3-24-08
+import argparse
+import os
+import sys
+import shutil
+import grp
+import datetime
+import subprocess
+import pwd
 
-LDAPMODIFY=$(which ldapmodify)
-KINIT=$(which kinit)
-KDESTROY=$(which kdestroy)
+import ocflib.account.manage
+import ocflib.account.search
+import ocflib.misc.mail
+import ocflib.account.utils
+import ocflib.misc.validators
 
-defaultshell=/bin/bash
-
-# test for root
-if [ "$(/usr/bin/id -u)" != 0 ]; then
-    echo "You must be root to run this"
-    exit 2
-fi
+DEFAULT_SHELL = "/bin/bash"
 
 
-# usage block
-if [ -z "$1" ]; then
-    echo "Usage: $0 [user to be unsorried]"
-    exit 0
-fi
+def unsorry_user(username, ignore):
+    try:
+        pwd.getpwnam(username)
+    except KeyError:
+        raise ValueError("User {} does not exist.".format(username))
+    attributes = ocflib.account.search.user_attrs(username)
+    if attributes is None:
+        raise ValueError("User {} does not exist.".format(username))
+    user_dir = attributes['homeDirectory']
+    # Workaround for ldap3 1.x.x machines
+    if isinstance(user_dir, list):
+        if not user_dir:
+            raise ValueError(
+                "User {} does not have a home directory.".format(username))
+        user_dir = user_dir[0]
+    if not user_dir:
+        raise ValueError(
+            "User {} does not have a home directory.".format(username))
 
-sorriedUser=$1
+    if (not os.path.isfile(user_dir + "/.sorry")):
+        if ignore:
+            print(
+                "WARNING: .sorry file does not found under user's home directory. This is ignored, proceeding anyway."
+            )
+        else:
+            raise FileNotFoundError(
+                ".sorry file does not found under user's home directory.")
 
-if [[ ! "$sorriedUser" =~ ^[a-z]+ ]]; then
-    echo "$sorriedUser is an invalid username"
-    exit 3
-fi
+    rootstaffer = real_user()
+    kerberos_credentials(rootstaffer)
 
-if [ -z "$(getent passwd "$sorriedUser")" ]; then
-    echo "User $sorriedUser does not exist"
-    exit 3
-fi
+    input('''Please ensure that following attributes in LDAP are UP-TO-DATE.
+  for individuals   : calnetuid,  mail
+  for student groups: callinkoid, mail
+Press any key to continue, or Ctrl-C to abort
+    ''')
 
-userdir=$(ldapsearch -x uid="$sorriedUser" | grep homeDirectory | cut -d' ' -f2)
+    print("Changing user's shell back to normal")
+    try:
+        usershell = open(user_dir + "/.oldshell", 'r').read()
+    except FileNotFoundError:
+        usershell = DEFAULT_SHELL
+    if (not ocflib.misc.validators.valid_login_shell(usershell)):
+        usershell = DEFAULT_SHELL
 
-# no home directory case
-if [ -z "$userdir" ]; then
-    echo "Could not find the home directory for user $sorriedUser"
-    exit 2
-fi
+    ocflib.account.manage.modify_ldap_attributes(
+        username, {
+            'loginShell': usershell,
+            'gidNumber': grp.getgrnam('ocf').gr_gid
+        })
+    os.chmod(user_dir, 0o755)
 
-if [ ! -e "$userdir/.sorry" ]; then
-    echo "WARNING: User has no .sorry file"
-fi
+    http_dir = "/services/http/users/{0}/{1}".format(username[0], username)
+    print("Restoring services directory permissions:")
+    if (os.path.isdir(http_dir)):
+        os.chmod(http_dir, 0o755)
 
-echo "Please ensure that following attributes in LDAP are UP-TO-DATE."
-echo "  for individuals   : calnetuid,  mail"
-echo "  for student groups: callinkoid, mail"
-echo "Press enter to continue, or Ctrl-C to abort"
-read -r _
+    print("Removing .sorry and .oldshell files")
+    try:
+        os.remove(user_dir + "/.sorry")
+    except FileNotFoundError:
+        print(".sorry file does not exist, no need to remove it.")
+    try:
+        os.remove(user_dir + "/.oldshell")
+    except FileNotFoundError:
+        print(".oldshell file does not exist, no need to remove it.")
+    send_log_mail(rootstaffer, username)
+    kerberos_destroy()
 
-rootstaffer="$SUDO_USER"
 
-if [ "$rootstaffer" = "root" ] || [ -z "$rootstaffer" ]; then
-    echo "The sorry.log is much more useful when it logs who you are"
-    echo "rather than simply 'root'. Please enter your username:"
-    read -r rootstaffer
-fi
+def real_user():
+    if 'SUDO_USER' in os.environ and os.environ['SUDO_USER'] != 'root':
+        return os.environ['SUDO_USER']
+    else:
+        print(
+            "The sorry.log is much more useful when it logs who you are rather than simply 'root'."
+        )
+        username = input("Please enter your username: ")
+        return username
 
-echo "You are $rootstaffer"
 
-$KINIT "${rootstaffer}/admin"
-if [ $? -ne 0 ]; then
-    echo "kinit failed, bailing out!"
-    exit 1
-fi
+def kerberos_credentials(staff_name):
+    if ('SORRY_KRB5CCNAME' in os.environ):
+        print(
+            "SORRY_KRB5CCNAME set in environment. Assuming this file contains current admin credentials."
+        )
+        os.environ['KRB5CCNAME'] = os.environ['SORRY_KRB5CCNAME']
+    else:
+        print("Your are {0}.".format(staff_name))
+        if (subprocess.call(
+            [shutil.which("kinit"), "{0}/admin".format(staff_name)]) != 0):
+            raise OSError("Kinit failed, bailing out!")
+        else:
+            print("Kinit complete.")
 
-# Rewriting this to use bash variable substitution is annoying and confusing, so
-# just use sed instead and ignore the shellcheck warning
-# shellcheck disable=SC2001
-httpdir=$(echo "$sorriedUser" | sed -E 's%([a-z])[a-z]*%/services/http/users/\1/\0%')
 
-echo ""
-echo "Changing user's shell back to normal"
-if [ -e "$userdir/.oldshell" ]; then
-    shell=$(rev "$userdir/.oldshell" | cut -d/ -f1 | rev)
-    if [ "$shell" = "tcsh" ]; then
-        newshell="/bin/tcsh"
-    elif [ "$shell" = "zsh" ]; then
-        newshell="/bin/zsh"
-    elif [ "$shell" = "csh" ]; then
-        newshell="/bin/tcsh"
-    elif [ "$shell" = "ksh" ]; then
-        newshell="/bin/bash"
-    elif [ "$shell" = "bash" ]; then
-        newshell="/bin/bash"
-    else
-        newshell=$defaultshell
-    fi
-else
-    echo ".oldshell file not found, setting shell to $defaultshell"
-    newshell=$defaultshell
-fi
+def kerberos_destroy():
+    return subprocess.call(["kdestroy"])
 
-echo ""
-echo "Restoring ownership of passwd entry"
 
-ocfgid=$(getent group ocf | cut -d : -f 3)
-$LDAPMODIFY -H ldaps://ldap.ocf.berkeley.edu <<EOF
-dn: uid=$sorriedUser,ou=People,dc=OCF,dc=Berkeley,dc=EDU
-changetype: modify
-replace: loginShell
-loginShell: $newshell
--
-replace: gidNumber
-gidNumber: $ocfgid
-EOF
+def send_log_mail(root_staffer, sorried_user):
+    email_from = 'Open Computing Facility <sorry_log@ocf.berkeley.edu>'
+    email_subject = '[OCF] Account disabled'
+    email_body = '''
+This is an automated email sent by unsorry script. This is the log of a recent unsorry operation:
+Account "{0}" has been enabled by "{1}" on "{2}".
+'''.format(sorried_user, root_staffer, str(datetime.datetime.now()))
+    ocflib.misc.mail.send_mail('root@ocf.berkeley.edu',
+                               email_subject,
+                               email_body,
+                               cc=None,
+                               sender=email_from)
 
-# restoring permission to 755
-chmod 755 "$userdir"
 
-echo ""
-echo "Restoring services directory permissions:"
-if [ -d "$httpdir" ]; then
-    chmod 755 "$httpdir"
-fi
+def main():
 
-echo ""
-echo "Removing .sorry and .oldshell files"
+    parser = argparse.ArgumentParser(
+        usage="%(prog)s unsorryUser",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=
+        "Unsorry a user. This script will do nothing if the user is not sorried."
+    )
+    parser.add_argument('unsorryUser',
+                        metavar="unsorryUser",
+                        help="Username of user to be unsorried")
+    parser.add_argument(
+        '--force-ignore-sorry-file',
+        '-f',
+        action="store_true",
+        help=
+        "Unsorry the user even if .sorry file does not exist in their user directory."
+    )
 
-rm "$userdir/.sorry"
-rm "$userdir/.oldshell"
+    args = parser.parse_args()
+    if os.getuid() != 0:
+        raise PermissionError("You must be root to run this.")
 
-echo ""
-echo "Final system check:"
-finger -m "$sorriedUser"
-ldapsearch -x uid="$sorriedUser"
-ls -la "$userdir"
-ls -ld "$httpdir"
+    unsorry_user(args.unsorryUser, args.force_ignore_sorry_file)
 
-echo "$(/bin/date) + $rootstaffer $sorriedUser" >> /opt/acct/sorry.log
 
-$KDESTROY
-
-exit 0
+if __name__ == "__main__":
+    sys.exit(main())

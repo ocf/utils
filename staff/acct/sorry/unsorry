@@ -109,8 +109,8 @@ replace: gidNumber
 gidNumber: $ocfgid
 EOF
 
-# restoring permission to 755
-chmod 755 "$userdir"
+# restoring permission to 700
+chmod 700 "$userdir"
 
 echo ""
 echo "Restoring services directory permissions:"

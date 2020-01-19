@@ -1,11 +1,11 @@
 #!/bin/bash -e
 
 [ "$#" -eq 1 ]  || (echo "usage: $0 [account]" >&2; exit 1)
-[ "$(hostname)" == "supernova" ] || [ "$(hostname)" == "pandemic" ] || \
-    (echo "This isn't supernova or pandemic!" >&2; exit 1)
+[ "$(hostname)" == "supernova" ] || [ "$(hostname)" == "dataloss" ] || \
+    (echo "This isn't supernova or dataloss!" >&2; exit 1)
 [ "$(whoami)" == "root" ]  || (echo "You're not root." >&2; exit 1)
 
-[ "$(hostname)" == "supernova" ] && echo "This would be much faster on pandemic..."
+[ "$(hostname)" == "supernova" ] && echo "This would be much faster on dataloss..."
 
 user="$1"
 passwd=$(getent passwd "$user") || (echo "Can't find that user." >&2; exit 2)

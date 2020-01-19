@@ -19,10 +19,6 @@ def get_current_context():
     ).decode().strip()
 
 
-def get_kubeconfig_path():
-    return os.environ.get('KUBECONFIG', os.path.expanduser('~/.kube/config'))
-
-
 def get_kubernetes_dir():
     root_dir = subprocess.check_output(
         ['git', 'rev-parse', '--show-toplevel']

@@ -7,6 +7,7 @@ import sys
 import lxml.html
 import requests
 import urllib3
+from urllib3.exceptions import TimeoutError
 from ocflib.misc.shell import green
 from ocflib.misc.shell import red
 from ocflib.printing.printers import PRINTERS
@@ -100,14 +101,21 @@ def main():
               end=' ')
         sys.stdout.flush()
         with Printer(printer_name) as printer:
-            if not printer.log_in(password):
-                print(red('Error:'), 'the password is not correct. Try again.')
-                return 1
-            if printer.change_economode(args.setting.title()):
-                print(green('OK'))
-            else:
+            try:
+                printer.log_in(password)
+                if not printer.logged_in: 
+                    print(red('Error:'), 'the password is not correct. Try again.')
+                    return 1
+                if printer.change_economode(args.setting.title()):
+                    print(green('OK'))
+                else:
+                    print(red('Failure'))
+                    return 1
+            except (OSError, TimeoutError) as e:
+                # If no route to host (e.g. out of rotation) or timeout, we still 
+                # want to set economode on other printers
                 print(red('Failure'))
-                return 1
+                print(e)
 
 
 if __name__ == '__main__':

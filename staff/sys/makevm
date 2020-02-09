@@ -10,6 +10,7 @@ import os.path
 import random
 import re
 import shlex
+import shutil
 import socket
 import subprocess
 import sys
@@ -256,15 +257,22 @@ def _main(args):
             print('Cancelled.')
             sys.exit(2)
 
+    if args.ceph and not shutil.which('ceph'):
+        print("Warning: You are trying to use Ceph but I couldn't find the `ceph` executable.")
+
+        if not confirm():
+            print('Cancelled.')
+            sys.exit(2)
+
     if args.ceph and args.vg != 'vg':
-        print("Warning: You have Ceph backing storage, but specified a non-default VG")
+        print('Warning: You have Ceph backing storage, but specified a non-default VG.')
 
         if not confirm():
             print('Cancelled.')
             sys.exit(2)
 
     if not args.ceph and args.ceph_pool != 'vm':
-        print("Warning: You have LVM backing storage, but specified a Ceph pool")
+        print('Warning: You have LVM backing storage, but specified a Ceph pool.')
 
         if not confirm():
             print('Cancelled.')
@@ -307,11 +315,11 @@ def _main(args):
     mac = generate_mac_addr()
 
     disk_param = None
-    if not args.ceph:
+    if args.ceph:
+        disk_param = gen_ceph_disk_param(args.ceph_pool, args.storage)
+    else:
         create_disk(args.vg, args.hostname, args.storage)
         disk_param = gen_lvm_disk_param(args.hostname, args.vg)
-    else:
-        disk_param = gen_ceph_disk_param(args.ceph_pool, args.storage)
 
     create_vm(args.hostname, args.memory, args.vcpus, disk_param, args.os_type,
               args.os_variant, args.network, mac, args.skip_config)

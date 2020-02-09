@@ -217,7 +217,7 @@ def _main(args):
                         help='Ceph Pool to use for storage')
     parser.add_argument('--os-type', type=str, default='linux',
                         help='os type')
-    parser.add_argument('--os-variant', type=str, default='debian9')
+    parser.add_argument('--os-variant', type=str, default='debian10')
     parser.add_argument('--network', type=str, default='bridge=br0',
                         help='network configuration')
     parser.add_argument('--preseed-user', type=str, default='root',

@@ -256,6 +256,20 @@ def _main(args):
             print('Cancelled.')
             sys.exit(2)
 
+    if args.ceph and args.vg != 'vg':
+        print("Warning: You have Ceph backing storage, but specified a non-default VG")
+
+        if not confirm():
+            print('Cancelled.')
+            sys.exit(2)
+
+    if not args.ceph and args.ceph_pool != 'vm':
+        print("Warning: You have LVM backing storage, but specified a Ceph pool")
+
+        if not confirm():
+            print('Cancelled.')
+            sys.exit(2)
+
     # Check to make sure the IP address provided is an OCF IPv4 address
     ip_addr = ip_address(args.ip)
     if not is_ocf_ip(ip_addr) or not isinstance(ip_addr, IPv4Address):

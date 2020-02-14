@@ -1,59 +1,54 @@
 #!/usr/bin/env python3
-# Script for sorrying OCF user accounts rewritten in python3
+# Script for sorrying OCF accounts
 import argparse
 import datetime
 import grp
+import json
 import os
 import shutil
 import subprocess
 import sys
+import textwrap
 
 import ocflib.account.manage
 import ocflib.account.search
 import ocflib.account.utils
 import ocflib.misc.mail
 
-reason_path = '/opt/share/utils/staff/acct/sorry/'
-sorry_shell = '/opt/share/utils/bin/sorried'
+REASON_PATH = '/opt/share/utils/staff/acct/sorry/'
+SORRY_SHELL = '/opt/share/utils/bin/sorried'
+kerberos_new_ticket = True
 
 
 def find_sorry_file(file_path):
     # Own sorry file
-    if (os.path.isfile(file_path)):
+    if os.path.isfile(file_path):
         return file_path
 
     # Default sorry files
-    if (os.path.isfile(reason_path + file_path)):
-        return reason_path + file_path
+    default_sorry_file = os.path.join(REASON_PATH, file_path)
+    if os.path.isfile(default_sorry_file):
+        return default_sorry_file
 
-    raise FileNotFoundError("FATAL: Sorry file \"{}\" does not exist. Exiting.".format(file_path))
+    raise FileNotFoundError('Sorry file "{}" does not exist.'.format(file_path))
 
 
 def sorry_user(username, sorry_file):
     attributes = ocflib.account.search.user_attrs(username)
     if attributes is None:
-        raise ValueError('User not found.')
+        raise ValueError('User {0} not found.'.format(username))
 
     rootstaffer = real_user()
-    kerberos_credentials(rootstaffer)
+    kerberos_new_ticket = kerberos_init(rootstaffer)
 
     user_dir = attributes['homeDirectory']
 
-    # Workaround for ldap3 1.x.x machines
-    if isinstance(user_dir, list):
-        user_dir = user_dir[0]
-
     print('Copying sorry file and making .oldshell file')
 
-    if not (os.path.isfile(user_dir + '/.oldshell')):
-        oldshell = attributes['loginShell']
-        # Workaround for ldap3 1.x.x machines
-        if isinstance(oldshell, list):
-            oldshell = user_dir[0]
-
-        oldshell_file = open(user_dir + '/.oldshell', 'w')
-        oldshell_file.write(oldshell)
-        oldshell_file.close()
+    if not os.path.isfile(user_dir + '/.oldshell'):
+        with open(user_dir + '/.oldshell', 'w') as oldshell_file:
+            oldshell = attributes['loginShell']
+            print(oldshell, file=oldshell_file)
 
     shutil.copy2(sorry_file, user_dir + '/.sorry')
     os.chmod(user_dir + '/.sorry', 0o400)
@@ -62,9 +57,9 @@ def sorry_user(username, sorry_file):
     print("Changing user's shell to sorry shell")
 
     ocflib.infra.ldap.modify_ldap_entry(ocflib.account.utils.dn_for_username(username),
-                                        {'loginShell': sorry_shell, 'gidNumber': grp.getgrnam('sorry').gr_gid})
+                                        {'loginShell': SORRY_SHELL, 'gidNumber': grp.getgrnam('sorry').gr_gid})
 
-    http_dir = '/services/http/users/{0}/{1}'.format(username[0], username)
+    http_dir = ocflib.account.utils.web_dir(username)
     print('Changing permissions on httpdir to 000')
     if (os.path.isdir(http_dir)):
         os.chmod(http_dir, 0o000)
@@ -74,12 +69,15 @@ def sorry_user(username, sorry_file):
 
     # WTF is final system check for?
     # log(rootstaffer, username)
-    send_log_mail(rootstaffer, username, open(reason_path, 'r').read())
+    with open(sorry_file, 'r') as filep:
+        send_log_mail(rootstaffer, username, filep.read())
 
     user_mail = get_user_real_mail(username)
     if user_mail:
-        send_sorry_mail(user_mail, username, open(reason_path, 'r').read())
-    kerberos_destroy()
+        with open(sorry_file, 'r') as filep:
+            send_sorry_mail(user_mail, username, filep.read())
+    if kerberos_new_ticket:
+        kerberos_destroy()
 
 # Returns the real user who is running this script
 
@@ -93,16 +91,26 @@ def real_user():
         return username
 
 
-def kerberos_credentials(staff_name):
+def kerberos_init(staff_name):
     if ('SORRY_KRB5CCNAME' in os.environ):
         print('SORRY_KRB5CCNAME set in environment. Assuming this file contains current admin credentials.')
         os.environ['KRB5CCNAME'] = os.environ['SORRY_KRB5CCNAME']
+        # TODO: What happened?
+        return False
     else:
-        print('Your are {0}.'.format(staff_name))
-        if (subprocess.call([shutil.which('kinit'), '{0}/admin'.format(staff_name)]) != 0):
+        print('You are {0}.'.format(staff_name))
+        klist = subprocess.run(['sudo', '-u', staff_name, 'klist', '--json'], stdout=subprocess.PIPE)
+        if klist.returncode == 0:
+            cache_info = json.loads(klist.stdout.decode())
+            if cache_info.get('principal') == '{0}/admin@OCF.BERKELEY.EDU'.format(staff_name):
+                print('Using your preexisting credentials.')
+                return False
+
+        if (subprocess.call(['kinit', '{0}/admin'.format(staff_name)]) != 0):
             raise OSError('Kinit failed, bailing out!')
         else:
             print('Kinit complete.')
+            return True
 
 
 def kerberos_destroy():
@@ -110,11 +118,12 @@ def kerberos_destroy():
 
 
 def get_user_real_mail(username):
-    email = str(subprocess.run([shutil.which('ldapsearch'),
-                                'uid={0}'.format(username), 'mail'], stdout=subprocess.PIPE).stdout)
+    email = str(subprocess.run(['ldapsearch', 'uid={0}'.format(username), 'mail'], stdout=subprocess.PIPE).stdout)
     email = email[email.find('\\nmail') + 8:]
     email = email[:email.find('\\n\\n')]
     return email
+
+# TODO: Where to log/no log at all?
 
 
 def log(root_staffer, sorried_user):
@@ -122,19 +131,22 @@ def log(root_staffer, sorried_user):
         # Date style matters...?
         log_file.write('{0} - {1} {2}'.format(str(datetime.datetime.now()), root_staffer, sorried_user))
 
+# TODO: Do we want a log file or log email?
+
 
 def send_log_mail(root_staffer, sorried_user, reason):
+    # TODO: What about this email?
     email_from = 'Open Computing Facility <sorry_log@ocf.berkeley.edu>'
     email_subject = '[OCF] Account disabled'
-    email_body = '''
-This is an automated email sent by sorry script. This is the log of a recent sorry operation:
-Account "{0}" has been disabled by "{1}" for reason "{2}" on "{3}".
-'''.format(sorried_user, root_staffer, reason, str(datetime.datetime.now()))
+    email_body = textwrap.dedent('''
+        This is an automated email sent by OCF sorry script. This is the log of a recent sorry operation:
+        On "{3}", account "{0}" has been disabled by "{1}" for reason:
+        "{2}".
+        '''.format(sorried_user, root_staffer, reason, str(datetime.datetime.now())))
     ocflib.misc.mail.send_mail('root@ocf.berkeley.edu', email_subject, email_body, cc=None, sender=email_from)
 
 
 def send_sorry_mail(sorried_user_email, username, reason):
-    email_from = 'Open Computing Facility <help@ocf.berkeley.edu>'
     email_subject = '[OCF] Account disabled'
     email_body = '''
 Hello,
@@ -151,22 +163,21 @@ Please do not share your password with anyone or over email.
 
 {2}
     '''.format(username, reason, ocflib.misc.mail.MAIL_SIGNATURE)
-    ocflib.misc.mail.send_mail(sorried_user_email, email_subject, email_body, cc=None, sender=email_from)
+    ocflib.misc.mail.send_mail(sorried_user_email, email_subject, email_body, cc=None)
 
 
 def main():
-    sorry_description = 'Sorry a user. \nStandard sorry reasons are: \n' + '\n'.join(
-        [f for f in os.listdir(reason_path) if
-         os.path.isfile(os.path.join(reason_path, f))]) + '\nBut you can also pass in your own file.'
-    parser = argparse.ArgumentParser(usage='%(prog)s sorriedUser sorryReason',
+    sorry_description = textwrap.dedent('''
+        Sorry a user.
+        Standard sorry reasons are:
+        {0}
+        Nevertheless, you can also pass in your own file with its file name as argument sorry_reason.
+    '''.format('\n'.join([f for f in os.listdir(REASON_PATH) if os.path.isfile(os.path.join(REASON_PATH, f))])))
+    parser = argparse.ArgumentParser(usage='%(prog)s sorried_user sorry_reason',
                                      formatter_class=argparse.RawDescriptionHelpFormatter,
                                      description=sorry_description)
-    parser.add_argument('sorriedUser', metavar='sorriedUser', help='Username of sorried user')
-    parser.add_argument('sorryReason', metavar='sorriedReason', help='Reason for the user to be sorried')
-
-    if (len(sys.argv) != 3):
-        parser.print_help()
-        return 1
+    parser.add_argument('sorried_user', metavar='sorried_user', help='Username of sorried user')
+    parser.add_argument('sorry_reason', metavar='sorried_reason', help='Reason for the user to be sorried')
 
     if os.getuid() != 0:
         raise PermissionError('You must be root to run this.')
@@ -175,6 +186,7 @@ def main():
     file_path = find_sorry_file(args.sorryReason)
     print('Sorry file {}.'.format(file_path))
 
+    # TODO: Help user to note... by sub-processing note -u user reason, maybe?
     sorry_user(args.sorriedUser, file_path)
     print('NOW RUN note -u {0} reason. NOW'.format(args.sorriedUser))
 

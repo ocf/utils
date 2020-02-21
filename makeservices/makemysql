@@ -8,4 +8,9 @@ PASS=$(sudo -u mysql /opt/share/utils/makeservices/makemysql-real | tee /dev/tty
 
 echo 'Changing WordPress database password'
 cd ~/public_html/
-wp config set DB_PASSWORD "$PASS" > /dev/null
+FILE=wp-includes/version.php
+if [ -f "$FILE" ]; then
+    wp config set DB_PASSWORD "$PASS" > /dev/null
+else
+    echo "WordPress is not installed!"
+fi

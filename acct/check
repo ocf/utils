@@ -109,7 +109,7 @@ callinkOid=$(ldapsearch -x -LLL uid="$user" callinkOid | grep -i ^callinkOid | c
 if [ -n "$callinkOid" ]; then
   echo "CalLink OID number: $callinkOid"
   if [ "$callinkOid" != 0 ]; then
-    echo "https://ocf.io/callinkapi?status=&category=&type=&name=&OrganizationID=$callinkOid"
+    echo "https://ocf.io/callinkapi/CalLinkOrganizations?status=&category=&type=&name=&OrganizationID=$callinkOid"
   fi
 fi
 

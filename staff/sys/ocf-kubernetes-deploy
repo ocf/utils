@@ -9,8 +9,25 @@ import os
 import subprocess
 import sys
 import tempfile
+import textwrap
 
 import yaml
+
+
+SECRET_RESOURCE_TEMPLATE = '''
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {name}
+type: Opaque
+stringData:
+{string_data}
+'''
+
+STRINGDATA_SECRET_TEMPLATE = '''
+{name}: |2
+{value}
+'''
 
 
 def get_current_context():
@@ -28,6 +45,23 @@ def get_kubernetes_dir():
         ['git', 'rev-parse', '--show-toplevel']
     ).decode().strip()
     return os.path.join(root_dir, 'kubernetes')
+
+
+def write_secret_resource(name, secrets):
+    string_data = '\n'.join(
+        STRINGDATA_SECRET_TEMPLATE.format(
+            name=filename,
+            value=textwrap.indent(contents, ' ' * 2),
+        ) for filename, contents in secrets.items()
+    )
+    yaml_contents = SECRET_RESOURCE_TEMPLATE.format(
+        name=name,
+        string_data=textwrap.indent(string_data, ' ' * 2),
+    )
+    open(os.path.join(
+        get_kubernetes_dir(),
+        'ocf-kubernetes-deploy-secret-{}.yaml.erb'.format(name),
+    ), 'w').write(yaml_contents)
 
 
 def main():
@@ -91,6 +125,23 @@ def main():
     except FileNotFoundError:
         print('Secrets file not found')
 
+    secret_template_dir = os.path.join(get_kubernetes_dir(), 'secrets')
+    if os.path.isdir(secret_template_dir):
+        secret_templates = os.listdir(secret_template_dir)
+        # each subdirectory corresponds to one secret resource
+        for secret_name in secret_templates:
+            subdir = os.path.join(secret_template_dir, secret_name)
+            if os.path.isdir(subdir):
+                # each file corresponds to a single kv pair in the
+                # secret resource
+                secrets = {
+                    # strip .erb from name
+                    name[:-4]: open(os.path.join(subdir, name)).read()
+                    for name in os.listdir(subdir)
+                    if name.endswith('.erb')
+                }
+                write_secret_resource(secret_name, secrets)
+
     # Created with 600 perms
     with tempfile.NamedTemporaryFile(suffix='.json') as bindings_file:
 
@@ -99,13 +150,13 @@ def main():
         # ensure the file gets written to
         bindings_file.flush()
 
-        subprocess.run(
-            ['kubernetes-deploy',
-             namespace_name,
-             args.kube_context,
-             '--bindings=@' + bindings_file.name,
-             '--template-dir=' + get_kubernetes_dir()]
-        ).check_returncode()
+        subprocess.run([
+            'kubernetes-deploy',
+            namespace_name,
+            args.kube_context,
+            '--bindings=@' + bindings_file.name,
+            '--template-dir=' + get_kubernetes_dir(),
+        ]).check_returncode()
 
 
 if __name__ == '__main__':

@@ -111,7 +111,7 @@ fi
 
 # check if CalNet UID number exists in LDAP
 calnetuid=$(ldapsearch -x -LLL uid="$user" calnetuid | grep -i ^calnetuid | cut -d' ' -f2)
-if [ -n "$calnetuid" ]; then
+if [ -n "$calnetuid" ] && [ "$calnetuid" != "0" ]; then
   calnetemail=$(ldapsearch -x -LLL -H ldaps://ldap.berkeley.edu -b dc=berkeley,dc=edu uid="$calnetuid" mail | grep ^mail | cut -d' ' -f2)
   calnetaffiliations=
   if [ -r "$ucb_ldap_passwd_file" ]; then

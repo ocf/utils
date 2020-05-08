@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-# Script for sorrying OCF accounts
+# Script for sorrying OCF accounts v2
 import argparse
 import datetime
 import grp
 import json
 import os
+import pathlib
 import shutil
 import subprocess
 import sys
@@ -15,8 +16,10 @@ import ocflib.account.search
 import ocflib.account.utils
 import ocflib.misc.mail
 
-REASON_PATH = '/opt/share/utils/staff/acct/sorry/'
-SORRY_SHELL = '/opt/share/utils/bin/sorried'
+REASON_PATH = pathlib.Path('/opt/share/utils/staff/acct/sorry/')
+SORRY_SHELL = pathlib.Path('/opt/share/utils/bin/sorried')
+# TODO: This sorry log file does not exist anymore, do we still log to file?
+SORRY_LOG = pathlib.Path('/opt/acct/sorry.log')
 kerberos_new_ticket = True
 
 
@@ -67,21 +70,23 @@ def sorry_user(username, sorry_file):
     print('Changing permissions on home directory to 500')
     os.chmod(user_dir, 0o500)
 
-    # WTF is final system check for?
-    # log(rootstaffer, username)
+    # Omitting final system check for now
     with open(sorry_file, 'r') as filep:
-        send_log_mail(rootstaffer, username, filep.read())
-
-    user_mail = get_user_real_mail(username)
-    if user_mail:
-        with open(sorry_file, 'r') as filep:
+        log(rootstaffer, username, filep.read())
+        user_mail = ocflib.account.utils.get_email(username)
+        if user_mail:
             send_sorry_mail(user_mail, username, filep.read())
+        choice = input("Do you want this script to run 'note -u {0} reason' for you? [Y/n]".format(username))
+        if choice not in ['n', 'N']:
+            subprocess.run(['sudo', '-u', rootstaffer, 'note', '-u', format(username), filep.read()])
+        else:
+            print('NOW RUN note -u {0} reason. NOW'.format(username))
+
     if kerberos_new_ticket:
         kerberos_destroy()
 
-# Returns the real user who is running this script
 
-
+# Returns the real user who is running this script, but probably only works on Linux
 def real_user():
     if 'SUDO_USER' in os.environ and os.environ['SUDO_USER'] != 'root':
         return os.environ['SUDO_USER']
@@ -90,12 +95,15 @@ def real_user():
         username = input('Please enter your username: ')
         return username
 
+# Initiates a kerberos ticket for current user
+# Returns True when a new ticket is created via kinit so that we destroy it afterwards
+# Raises OSError is kinit screwed up
+
 
 def kerberos_init(staff_name):
     if ('SORRY_KRB5CCNAME' in os.environ):
         print('SORRY_KRB5CCNAME set in environment. Assuming this file contains current admin credentials.')
         os.environ['KRB5CCNAME'] = os.environ['SORRY_KRB5CCNAME']
-        # TODO: What happened?
         return False
     else:
         print('You are {0}.'.format(staff_name))
@@ -116,27 +124,27 @@ def kerberos_init(staff_name):
 def kerberos_destroy():
     return subprocess.call(['kdestroy'])
 
-
-def get_user_real_mail(username):
-    email = str(subprocess.run(['ldapsearch', 'uid={0}'.format(username), 'mail'], stdout=subprocess.PIPE).stdout)
-    email = email[email.find('\\nmail') + 8:]
-    email = email[:email.find('\\n\\n')]
-    return email
-
-# TODO: Where to log/no log at all?
+# Do all kinds of logging, like sending e-mails or writing to files
+# Change here if more crazy thingy need to be added
 
 
-def log(root_staffer, sorried_user):
-    with open('/opt/acct/sorry.log', 'a') as log_file:
-        # Date style matters...?
-        log_file.write('{0} - {1} {2}'.format(str(datetime.datetime.now()), root_staffer, sorried_user))
+def log(root_staffer, sorried_user, reason):
+    # Send log files only for now
+    send_log_mail(root_staffer, sorried_user, reason)
 
 # TODO: Do we want a log file or log email?
 
 
+def write_log_file(root_staffer, sorried_user):
+    #
+    with open(SORRY_LOG, 'a') as log_file:
+        # Date style matters...?
+        log_file.write('{0} - {1} {2}'.format(str(datetime.datetime.now()), root_staffer, sorried_user))
+
+
 def send_log_mail(root_staffer, sorried_user, reason):
-    # TODO: What about this email?
-    email_from = 'Open Computing Facility <sorry_log@ocf.berkeley.edu>'
+    # Use root@ for now
+    email_from = 'Open Computing Facility <root@ocf.berkeley.edu>'
     email_subject = '[OCF] Account disabled'
     email_body = textwrap.dedent('''
         This is an automated email sent by OCF sorry script. This is the log of a recent sorry operation:
@@ -155,7 +163,7 @@ Your OCF account has been disabled.
 
 Your account name is: {0}
 
-The reason your account has been disabled:
+The reason your account has been disabled is:
 {1}
 
 Feel free to reply to this message.
@@ -188,7 +196,6 @@ def main():
 
     # TODO: Help user to note... by sub-processing note -u user reason, maybe?
     sorry_user(args.sorriedUser, file_path)
-    print('NOW RUN note -u {0} reason. NOW'.format(args.sorriedUser))
 
 
 if __name__ == '__main__':

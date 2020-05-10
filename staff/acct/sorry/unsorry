@@ -9,6 +9,9 @@ import grp
 import datetime
 import subprocess
 import pwd
+import pathlib
+import textwrap
+import json
 
 import ocflib.account.manage
 import ocflib.account.search
@@ -16,50 +19,50 @@ import ocflib.misc.mail
 import ocflib.account.utils
 import ocflib.misc.validators
 
-DEFAULT_SHELL = "/bin/bash"
-
+DEFAULT_SHELL = pathlib.Path("/bin/bash")
+kerberos_new_ticket = True
+# TODO: This sorry log file does not exist anymore, do we still log to file?
+SORRY_LOG = pathlib.Path('/opt/acct/sorry.log')
 
 def unsorry_user(username, ignore):
     try:
         pwd.getpwnam(username)
     except KeyError:
-        raise ValueError("User {} does not exist.".format(username))
+        raise ValueError("UNIX user {} does not exist.".format(username))
     attributes = ocflib.account.search.user_attrs(username)
     if attributes is None:
-        raise ValueError("User {} does not exist.".format(username))
+        raise ValueError("OCF user {} does not exist in LDAP.".format(username))
     user_dir = attributes['homeDirectory']
-    # Workaround for ldap3 1.x.x machines
-    if isinstance(user_dir, list):
-        if not user_dir:
-            raise ValueError(
-                "User {} does not have a home directory.".format(username))
-        user_dir = user_dir[0]
     if not user_dir:
-        raise ValueError(
-            "User {} does not have a home directory.".format(username))
-
-    if (not os.path.isfile(user_dir + "/.sorry")):
+        raise ValueError("User {} does not have a home directory.".format(username))
+    # Check if user has .sorry file
+    if not os.path.isfile(os.path.join(user_dir, ".sorry")):
         if ignore:
-            print(
-                "WARNING: .sorry file does not found under user's home directory. This is ignored, proceeding anyway."
-            )
+            print("WARNING: .sorry file does not found under home directory of user {0}. This is ignored, proceeding anyway.".format(username))
         else:
-            raise FileNotFoundError(
-                ".sorry file does not found under user's home directory.")
-
+            raise FileNotFoundError(".sorry file does not found under home directory of user {0}.".format(username))
+    # Check if user belong to sorry group
+    if not attributes['gidNumber'] == grp.getgrgid('sorry').gr_gid:
+        if ignore:
+            print("WARNING: User {0} does not belong to 'sorry' group. This user has gid {1} but 'sorry' group has gid {2} This is ignored, proceeding anyway.".format(username, attributes['gidNumber'], grp.getgrgid('sorry').gr_gid))
+        else:
+            raise ValueError("User {0} does not belong to 'sorry' group.".format(username))
     rootstaffer = real_user()
-    kerberos_credentials(rootstaffer)
+    kerberos_init(rootstaffer)
 
-    input('''Please ensure that following attributes in LDAP are UP-TO-DATE.
-  for individuals   : calnetuid,  mail
-  for student groups: callinkoid, mail
-Press any key to continue, or Ctrl-C to abort
-    ''')
+    input(textwrap.dedent('''
+        Please ensure that following attributes in LDAP are UP-TO-DATE.
+        for individuals   : calnetuid,  mail
+        for student groups: callinkoid, mail
+        Press any key to continue, or Ctrl-C to abort
+    '''))
 
     print("Changing user's shell back to normal")
     try:
-        usershell = open(user_dir + "/.oldshell", 'r').read()
+        with open(os.path.join(user_dir, ".oldshell"), 'r') as filep:
+            usershell = filep.read()
     except FileNotFoundError:
+        # Use DEFAULT_SHELL if .oldshell does not exist or has been screwed up
         usershell = DEFAULT_SHELL
     if (not ocflib.misc.validators.valid_login_shell(usershell)):
         usershell = DEFAULT_SHELL
@@ -71,70 +74,104 @@ Press any key to continue, or Ctrl-C to abort
         })
     os.chmod(user_dir, 0o755)
 
-    http_dir = "/services/http/users/{0}/{1}".format(username[0], username)
+    http_dir = ocflib.account.utils.web_dir(username)
     print("Restoring services directory permissions:")
     if (os.path.isdir(http_dir)):
         os.chmod(http_dir, 0o755)
 
     print("Removing .sorry and .oldshell files")
     try:
-        os.remove(user_dir + "/.sorry")
+        os.remove(os.path.join(user_dir, ".sorry"))
     except FileNotFoundError:
         print(".sorry file does not exist, no need to remove it.")
     try:
-        os.remove(user_dir + "/.oldshell")
+        os.remove(os.path.join(user_dir + "/.oldshell"))
     except FileNotFoundError:
         print(".oldshell file does not exist, no need to remove it.")
-    send_log_mail(rootstaffer, username)
-    kerberos_destroy()
+    user_mail = ocflib.account.utils.get_email(username)
+    if user_mail:
+        send_unsorry_mail(user_mail, username)
+    log(rootstaffer, username)
+    if kerberos_new_ticket:
+        kerberos_destroy()
 
-
+# These repetitive codes may worth moving to ocflib
+# Returns the real user who is running this script, but probably only works on Linux
 def real_user():
     if 'SUDO_USER' in os.environ and os.environ['SUDO_USER'] != 'root':
         return os.environ['SUDO_USER']
     else:
-        print(
-            "The sorry.log is much more useful when it logs who you are rather than simply 'root'."
-        )
-        username = input("Please enter your username: ")
+        print("The sorry.log is much more useful when it logs who you are rather than simply 'root'.")
+        username = input('Please enter your username: ')
         return username
 
-
-def kerberos_credentials(staff_name):
+# Initiates a kerberos ticket for current user
+# Returns True when a new ticket is created via kinit so that we destroy it afterwards
+# Raises OSError is kinit screwed up
+def kerberos_init(staff_name):
     if ('SORRY_KRB5CCNAME' in os.environ):
-        print(
-            "SORRY_KRB5CCNAME set in environment. Assuming this file contains current admin credentials."
-        )
+        print('SORRY_KRB5CCNAME set in environment. Assuming this file contains current admin credentials.')
         os.environ['KRB5CCNAME'] = os.environ['SORRY_KRB5CCNAME']
+        return False
     else:
-        print("Your are {0}.".format(staff_name))
-        if (subprocess.call(
-            [shutil.which("kinit"), "{0}/admin".format(staff_name)]) != 0):
-            raise OSError("Kinit failed, bailing out!")
+        print('You are {0}.'.format(staff_name))
+        klist = subprocess.run(['sudo', '-u', staff_name, 'klist', '--json'], stdout=subprocess.PIPE)
+        if klist.returncode == 0:
+            cache_info = json.loads(klist.stdout.decode())
+            if cache_info.get('principal') == '{0}/admin@OCF.BERKELEY.EDU'.format(staff_name):
+                print('Using your preexisting credentials.')
+                return False
+
+        if (subprocess.call(['kinit', '{0}/admin'.format(staff_name)]) != 0):
+            raise OSError('Kinit failed, bailing out!')
         else:
-            print("Kinit complete.")
+            print('Kinit complete.')
+            return True
 
 
 def kerberos_destroy():
-    return subprocess.call(["kdestroy"])
+    return subprocess.call(['kdestroy'])
 
+def send_log_mail(root_staffer, username):
+    # Use root@ for now
+    email_from = 'Open Computing Facility <root@ocf.berkeley.edu>'
+    email_subject = '[OCF] Account enabled'
+    email_body = textwrap.dedent('''
+        This is an automated email sent by OCF unsorry script. This is the log of a recent unsorry operation:
+        On "{0}", account "{1}" has been enabled by "{2}".
+        '''.format(str(datetime.datetime.now()), username, root_staffer))
+        
+    ocflib.misc.mail.send_mail('root@ocf.berkeley.edu', email_subject, email_body, cc=None, sender=email_from)
 
-def send_log_mail(root_staffer, sorried_user):
-    email_from = 'Open Computing Facility <sorry_log@ocf.berkeley.edu>'
-    email_subject = '[OCF] Account disabled'
-    email_body = '''
-This is an automated email sent by unsorry script. This is the log of a recent unsorry operation:
-Account "{0}" has been enabled by "{1}" on "{2}".
-'''.format(sorried_user, root_staffer, str(datetime.datetime.now()))
-    ocflib.misc.mail.send_mail('root@ocf.berkeley.edu',
-                               email_subject,
-                               email_body,
-                               cc=None,
-                               sender=email_from)
+def send_unsorry_mail(sorried_user_email, username):
+    email_subject = '[OCF] Account enabled'
+    email_body = textwrap.dedent('''
+        Hello,
+
+        Your OCF account has been re-enabled.
+
+        Your account name is: {0}
+
+        Feel free to reply to this message.
+        
+        {1}
+    ''').format(username, ocflib.misc.mail.MAIL_SIGNATURE)
+    
+    ocflib.misc.mail.send_mail(sorried_user_email, email_subject, email_body, cc=None)
+
+# Do all kinds of logging, like sending e-mails or writing to files
+# Change here if more crazy thingy need to be added
+def log(root_staffer, username):
+    # Send log files only for now
+    send_log_mail(root_staffer, username)
+
+def write_log_file(root_staffer, username):
+    with open(SORRY_LOG, 'a') as log_file:
+        # Date style matters...?
+        log_file.write('U: {0} - {1} {2}'.format(str(datetime.datetime.now()), root_staffer, username))
 
 
 def main():
-
     parser = argparse.ArgumentParser(
         usage="%(prog)s unsorryUser",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -145,11 +182,11 @@ def main():
                         metavar="unsorryUser",
                         help="Username of user to be unsorried")
     parser.add_argument(
-        '--force-ignore-sorry-file',
+        '--force-ignore',
         '-f',
         action="store_true",
         help=
-        "Unsorry the user even if .sorry file does not exist in their user directory."
+        "Unsorry the user even if .sorry file does not exist in their user directory or the user does not belong to 'sorry' group."
     )
 
     args = parser.parse_args()

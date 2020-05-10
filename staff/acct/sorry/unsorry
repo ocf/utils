@@ -140,7 +140,7 @@ def send_log_mail(root_staffer, username):
         This is an automated email sent by OCF unsorry script. This is the log of a recent unsorry operation:
         On "{0}", account "{1}" has been enabled by "{2}".
         '''.format(str(datetime.datetime.now()), username, root_staffer))
-        
+
     ocflib.misc.mail.send_mail('root@ocf.berkeley.edu', email_subject, email_body, cc=None, sender=email_from)
 
 def send_unsorry_mail(sorried_user_email, username):
@@ -153,10 +153,10 @@ def send_unsorry_mail(sorried_user_email, username):
         Your account name is: {0}
 
         Feel free to reply to this message.
-        
+
         {1}
     ''').format(username, ocflib.misc.mail.MAIL_SIGNATURE)
-    
+
     ocflib.misc.mail.send_mail(sorried_user_email, email_subject, email_body, cc=None)
 
 # Do all kinds of logging, like sending e-mails or writing to files

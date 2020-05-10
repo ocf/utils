@@ -3,4 +3,9 @@ if [[ "$(hostname)" != "tsunami" && "$(hostname)" != "dev-tsunami" ]]; then
     echo -e '\033[1;31mYou must run this command on tsunami.\033[0m'
     exit 1
 fi
-sudo -u mysql /opt/share/utils/makeservices/makemysql-real
+
+PASS=$(sudo -u mysql /opt/share/utils/makeservices/makemysql-real | tee /dev/tty | tail -n 1 | grep -Po '(?<=: )([0-9a-zA-Z]){24,}$')
+
+echo 'Changing WordPress database password'
+cd ~/public_html/
+wp config set DB_PASSWORD "$PASS" > /dev/null

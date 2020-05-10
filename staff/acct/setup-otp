@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+if [[ "$(hostname)" != "lightning" && "$(hostname)" != "dev-lightning" ]]; then
+    echo -e '\033[1;31mYou must run this command on lightning\033[0m, because we'
+    echo "need to be able to write to the puppet private share."
+    exit 1
+fi
+
+if [[ "$USER" != "root" ]]; then
+    echo -e "\033[1;31mYou must be root to run this.\033[0m"
+    exit 1
+fi
+
+if [[ "$#" -ne 1 ]]; then
+    echo "Usage: $0 <username>"
+    exit 1
+fi
+
+username="$1"
+
+if [[ -z "$(getent passwd "$username")" ]]; then
+    echo -e "\033[1;31mUser $username does not exist.\033[0m"
+    exit 1
+fi
+
+echo "If you do not have YubiOTP enabled on your Yubikey, exit now and enable it."
+echo "Press the button on the Yubikey you are registering. To skip, just press enter."
+read -r ykOutput
+
+if [[ -z "$ykOutput" ]]; then
+    echo "Skipping Yubikey configuration."
+elif [[ ! "$ykOutput" =~ ^[cbdefghijklnrtuv]{44}$ ]]; then
+    echo -e "\033[1;31mThat doesn't look like a valid YubiOTP output.\033[0m Exiting."
+    exit 1
+else
+    # We submit the OTP (1) to make sure we can validate it succesfully,
+    # and (2) to avoid replay attacks using this OTP.
+    if curl 'https://demo.yubico.com/api/v1/simple/otp/validate' \
+            -H 'Content-Type: application/json' --data '{"key":"'"$ykOutput"'"}' \
+             2>/dev/null | grep -vq '"status":"success"'; then
+        echo -e "\033[1;31mFailed to verify this OTP using https://demo.yubico.com/otp/verify\033[0m"
+        exit 1
+    fi
+
+    # Continue with registration.
+    yubikeyID=${ykOutput:0:12}
+    if grep -q "^$username:" /opt/puppet/shares/private/otp/yubikeys; then
+        echo "$username already registered. Appending new yubikey $yubikeyID."
+        sed -i "/^$username:/ s/$/:$yubikeyID/" /opt/puppet/shares/private/otp/yubikeys
+    else
+        echo "Registering first yubikey $yubikeyID for $username."
+        echo "$username:$yubikeyID" >> /opt/puppet/shares/private/otp/yubikeys
+    fi
+fi
+
+googleAuthFile="/opt/puppetlabs/shares/private/otp/google-authenticator/$username"
+if [[ -f "$googleAuthFile" ]]; then
+    echo "Google Authenticator is already registered, we won't overwrite it."
+    echo "If you want to re-register, delete your current file, which is:"
+    echo "$googleAuthFile"
+    exit
+fi
+google-authenticator -tDufw 1 -l "ocf: $username" -i OCF -s "$googleAuthFile"
+chmod 400 "$googleAuthFile"
+chown puppet:puppet "$googleAuthFile"

@@ -1,19 +1,15 @@
 #!/bin/sh
 
-# Look up user for relevant account information.
+# Look up a user for relevant account information.
 
-# specify location of UCB LDAP password file
+# Locations for files containing user/vhost/login information
 ucb_ldap_passwd_file='/etc/ucbldap.passwd'
-# specify location of User_Info file
 User_Info_file='/home/s/st/staff/User_Info'
-# specify location of vhost file
-vhost_file='/home/s/st/staff/vhost/vhost.conf'
-# specify location of vhost-app file
-vhost_app_file='/home/s/st/staff/vhost/vhost-app.conf'
-# specify location of vhost-mail file
-vhost_mail_file='/home/s/st/staff/vhost/vhost-mail.conf'
-# specify location of wtmp files
+vhost_file='/etc/ocf/vhost.conf'
+vhost_app_file='/etc/ocf/vhost-app.conf'
+vhost_mail_file='/etc/ocf/vhost-mail.conf'
 wtmp_files='/var/log/wtmp /var/log/wtmp.1'
+
 # default number of logins to display from wtmp files
 login_count=5
 
@@ -109,13 +105,13 @@ callinkOid=$(ldapsearch -x -LLL uid="$user" callinkOid | grep -i ^callinkOid | c
 if [ -n "$callinkOid" ]; then
   echo "CalLink OID number: $callinkOid"
   if [ "$callinkOid" != 0 ]; then
-    echo "https://ocf.io/callinkapi?status=&category=&type=&name=&OrganizationID=$callinkOid"
+    echo "https://ocf.io/callinkapi/CalLinkOrganizations?status=&category=&type=&name=&OrganizationID=$callinkOid"
   fi
 fi
 
 # check if CalNet UID number exists in LDAP
 calnetuid=$(ldapsearch -x -LLL uid="$user" calnetuid | grep -i ^calnetuid | cut -d' ' -f2)
-if [ -n "$calnetuid" ]; then
+if [ -n "$calnetuid" ] && [ "$calnetuid" != "0" ]; then
   calnetemail=$(ldapsearch -x -LLL -H ldaps://ldap.berkeley.edu -b dc=berkeley,dc=edu uid="$calnetuid" mail | grep ^mail | cut -d' ' -f2)
   calnetaffiliations=
   if [ -r "$ucb_ldap_passwd_file" ]; then

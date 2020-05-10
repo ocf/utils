@@ -1,23 +1,40 @@
 #!/bin/bash -e
-if [ "$#" -ne 2 ]; then
-    echo "usage: $0 hostname ipv4"
+if [ "$#" -ne 2 ] && [ "$#" -ne 3 ]; then
+    echo "usage: $0 hostname ip-last-octet [type]"
+    echo "default type is \"server\""
     exit 1
 fi
 
 HOST="$1"
 IP="$2"
+TYPE="${3:-server}"
 
 if grep '\.' <<< "$HOST" > /dev/null; then
     echo "hostname should not contain dots"
     exit 1
 fi
 
+if grep '\.' <<< "$IP" > /dev/null; then
+    if ! grep '169\.229\.226\.' <<< "$IP" > /dev/null; then
+        echo "IP number should not contain dots"
+        echo "just use the last bit, like \"42\" for 169.229.226.42"
+        exit 1
+    else
+        # we assume this is an IPv4 address
+        IP="$(sed -e 's/169\.229\.226\.//' <<< "$IP")"
+        echo "we figured out what you meant, but for future reference,"
+        echo "just use the last bit of the IP, like \"42\" for 169.229.226.42"
+        echo
+    fi
+fi
+
 record="dn: cn=$HOST,ou=Hosts,dc=OCF,dc=Berkeley,dc=EDU
 objectClass: device
 objectClass: ocfDevice
 cn: $HOST
-ipHostNumber: $IP
-type: server
+ipHostNumber: 169.229.226.$IP
+ip6HostNumber: 2607:f140:8801::1:$IP
+type: $TYPE
 environment: production"
 
 echo "$record"

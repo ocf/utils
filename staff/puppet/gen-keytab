@@ -3,7 +3,6 @@ set -euo pipefail
 
 [ "$EUID" -eq 0 ] || { echo 'Run me as root!'; exit 1; }
 
-# TODO: Change to new share when on new puppetmaster
 PRIV_SHARE="/opt/puppet/shares/private"
 
 read -rp 'Your username: ' user

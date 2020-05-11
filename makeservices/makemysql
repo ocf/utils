@@ -8,8 +8,8 @@ PASS=$(sudo -u mysql /opt/share/utils/makeservices/makemysql-real | tee /dev/tty
 
 # Check if wp is installed with wp-cli
 # And change password if installed with easywp
-# But change password only if installed with easywp is a wrong statement 
-if $(wp core is-installed --quiet --path=$HOME/public_html > /dev/null 2>&1) &&
+# But change password only if installed with easywp is a wrong statement
+if (wp core is-installed --quiet --path="$HOME/public_html" > /dev/null 2>&1) &&
         ([ $# -ne 1 ] || ( [ $# -eq 1 ] && [ ! "$1" = '--ignore-wp' ])); then
     wp config set DB_PASSWORD "$PASS" > /dev/null 2>&1
 fi
@@ -18,4 +18,4 @@ fi
 # will extract the password after the colon
 # So that it simulate the same behaviour as the original makemysql
 # which output the same thing as in makemysql-real
-echo "Your MySQL database password is: "$PASS
+echo "Your MySQL database password is: $PASS"

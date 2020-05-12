@@ -2,7 +2,7 @@
 
 [ "$#" -eq 1 ]  || (echo "usage: $0 [account]" >&2; exit 1)
 [ "$(whoami)" == "root" ]  || (echo "You're not root." >&2; exit 1)
-[ "$(hostname)" == "supernova" ] && echo "This would be much faster on the NFS host (homes.ocf.berkeley.edu)..."
+[ "$(hostname)" != "dataloss" ] && echo "This would be much faster on the NFS host (dataloss)..."
 
 user="$1"
 passwd=$(getent passwd "$user") || (echo "Can't find that user." >&2; exit 2)

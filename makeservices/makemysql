@@ -20,7 +20,7 @@ while (( "$#" )); do
             shift
             ;;
         -s|--silent)
-            YES="--silent"
+            SILENT="--silent"
             shift
             ;;
         # I've seen -*|--*=), but idk what does the = serve
@@ -39,7 +39,7 @@ PASS=$(sudo -u mysql /opt/share/utils/makeservices/makemysql-real $SILENT | tail
 # But change password only if installed with easywp is a wrong statement
 # Use --ignore-wp flag to skip this process
 if (wp core is-installed --quiet --path="$HOME/public_html" > /dev/null 2>&1) && ! $IGNORE_WP ; then
-    if ! $silent; then
+    if ! $SILENT; then
         echo "WordPress installation detected, changing WordPress mysql password for you."
     fi
     wp config set DB_PASSWORD "$PASS" > /dev/null 2>&1

@@ -80,7 +80,7 @@ def main():
 
         # Check whether the script should proceed.
         if not intro_prompt():
-            print('>>> Aborted by user request.')
+            print('>>> Aborted by user request.', file=sys.stderr)
             return
 
         # Connect to the MySQL server.
@@ -90,8 +90,8 @@ def main():
                                          user='root',
                                          passwd=mysql_root_pw)
         except MySQLdb.MySQLError:
-            print('>>> Error: Failed to connect to MySQL server.')
-            raise
+            raise ConnectionError('>>> Error: Failed to connect to MySQL server.')
+            
 
         # Check if the database already exists.
         try:
@@ -128,8 +128,7 @@ def main():
             # Result should be "Query OK, 0 rows affected",
             # but we'll assume no exception means success.
         except MySQLdb.MySQLError:
-            print('>>> Error: Failed to grant database privileges.')
-            raise
+            raise ConnectionError('>>> Error: Failed to grant database privileges.')
 
         # Create new database, if necessary.
         if db_create:
@@ -141,8 +140,8 @@ def main():
                 # Result should be "Query OK, 1 row affected",
                 # but we'll assume no exception means success.
             except MySQLdb.MySQLError:
-                print('>>> Error: Failed to create database.')
-                raise
+                raise IOError('>>> Error: Failed to create database.')
+                
 
         # Database is ready for use.
         if db_create:
@@ -172,7 +171,7 @@ def main():
             A fatal error was encountered during program execution.
             OCF staff have been notified of the problem.
             """
-        ))
+        ), file=sys.stderr)
         sys.exit(1)
 
 

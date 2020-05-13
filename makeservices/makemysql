@@ -6,6 +6,7 @@ fi
 
 IGNORE_WP=false
 UNREADABLE_OUTPUT=false
+SILENT=""
 
 # Parse arguments down below
 while (( "$#" )); do
@@ -18,6 +19,10 @@ while (( "$#" )); do
             UNREADABLE_OUTPUT=true
             shift
             ;;
+        -s|--silent)
+            YES="--silent"
+            shift
+            ;;
         # I've seen -*|--*=), but idk what does the = serve
         -*|--*)
             # Output to stderr
@@ -27,14 +32,16 @@ while (( "$#" )); do
     esac
 done
 
-PASS=$(sudo -u mysql /opt/share/utils/makeservices/makemysql-real | tee /dev/tty | tail -n 1 | grep -Po '(?<=: )([0-9a-zA-Z]){24,}$')
+PASS=$(sudo -u mysql /opt/share/utils/makeservices/makemysql-real $SILENT | tail -n 1)
 
 # Check if wp is installed with wp-cli
 # And change password if installed with easywp
 # But change password only if installed with easywp is a wrong statement
 # Use --ignore-wp flag to skip this process
 if (wp core is-installed --quiet --path="$HOME/public_html" > /dev/null 2>&1) && ! $IGNORE_WP ; then
-    echo "WordPress installation detected, changing WordPress mysql password for you."
+    if ! $silent; then
+        echo "WordPress installation detected, changing WordPress mysql password for you."
+    fi
     wp config set DB_PASSWORD "$PASS" > /dev/null 2>&1
 fi
 

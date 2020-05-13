@@ -57,7 +57,7 @@ fi
 
 # Get SQL password
 echo "Resetting database password..."
-sqlpass=$(echo "yes" | makemysql | tail -n 1 | grep -Po '(?<=: )([0-9a-zA-Z]){24,}$')
+sqlpass=$(makemysql --unreadable-output --silent)
 if [[ -z "$sqlpass" ]]; then
     echo -e "\\033[31mError:\\033[00m Could not retrieve database password. Run makemysql to see the issue."
     exit 1

@@ -36,6 +36,7 @@ MYSQL_HOST = 'mysql.ocf.berkeley.edu'
 
 PW_LENGTH = 24
 
+silent = False
 
 def read_config():
     """Fetches the MySQL hostname and root password from the config in
@@ -78,14 +79,18 @@ def main():
         # Read config file.
         mysql_host, mysql_root_pw = read_config()
 
+        # Added a simple and stupid argument parsing so that other scripts can use it without tunneling in yes.
+        if len(sys.argv) > 1 and sys.argv[1] in ["-s", "--silent"]:
+            silent = True
         # Check whether the script should proceed.
-        if not intro_prompt():
+        if not silent and not intro_prompt():
             print('>>> Aborted by user request.', file=sys.stderr)
             return
 
         # Connect to the MySQL server.
         try:
-            print('>>> Connecting to MySQL database server...')
+            if not silent:
+                print('>>> Connecting to MySQL database server...')
             connection = MySQLdb.connect(host=mysql_host,
                                          user='root',
                                          passwd=mysql_root_pw)
@@ -95,26 +100,30 @@ def main():
 
         # Check if the database already exists.
         try:
-            print(">>> Checking if database '{}' already exists...".format(username))
+            if not silent:
+                print(">>> Checking if database '{}' already exists...".format(username))
             connection.select_db(username)
 
             # The database already exists, so skip the creation step.
-            print('yes.')
+            if not silent:
+                print('yes.')
             db_create = False
-            print(dedent("""
-            The MySQL database '{}' already exists.
-            The database password will be reset.
+            if not silent:
+                print(dedent("""
+                The MySQL database '{}' already exists.
+                The database password will be reset.
 
-            If you are unsure how to access or use your database, please visit
+                If you are unsure how to access or use your database, please visit
 
-              https://www.ocf.berkeley.edu/docs/services/mysql/
+                https://www.ocf.berkeley.edu/docs/services/mysql/
 
-            If you run into trouble trying to use your database, contact us at
+                If you run into trouble trying to use your database, contact us at
 
-                help@ocf.berkeley.edu
-            """).format(username))
+                    help@ocf.berkeley.edu
+                """).format(username))
         except MySQLdb.OperationalError:
-            print('no.')
+            if not silent:
+                print('no.')
             db_create = True
 
         # Add or update user database privileges.
@@ -133,7 +142,8 @@ def main():
         # Create new database, if necessary.
         if db_create:
             try:
-                print(">>> Creating new database '{}'...".format(username))
+                if not silent:
+                    print(">>> Creating new database '{}'...".format(username))
                 query = CREATE_QUERY.format(username)
                 connection.query(query)
                 connection.store_result()
@@ -145,19 +155,22 @@ def main():
 
         # Database is ready for use.
         if db_create:
-            print(dedent("""
-            Your MySQL database has been created.
+            if not silent:
+                print(dedent("""
+                Your MySQL database has been created.
 
-            For instructions on accessing and using your database, please visit
+                For instructions on accessing and using your database, please visit
 
-              https://www.ocf.berkeley.edu/docs/services/mysql/
+                https://www.ocf.berkeley.edu/docs/services/mysql/
 
-            If you run into trouble trying to use your database, contact us at
+                If you run into trouble trying to use your database, contact us at
 
-                help@ocf.berkeley.edu
-            """))
+                    help@ocf.berkeley.edu
+                """))
 
-        print('>>> Your MySQL database password is: {}'.format(userpass))
+                print('>>> Your MySQL database password is: {}'.format(userpass))
+            else:
+                print(userpass)
     except Exception as ex:
         send_problem_report(dedent(
             """\

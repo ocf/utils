@@ -38,6 +38,7 @@ PW_LENGTH = 24
 
 silent = False
 
+
 def read_config():
     """Fetches the MySQL hostname and root password from the config in
     '/opt/share/makeservices'."""
@@ -80,7 +81,7 @@ def main():
         mysql_host, mysql_root_pw = read_config()
 
         # Added a simple and stupid argument parsing so that other scripts can use it without tunneling in yes.
-        if len(sys.argv) > 1 and sys.argv[1] in ["-s", "--silent"]:
+        if len(sys.argv) > 1 and sys.argv[1] in ['-s', '--silent']:
             silent = True
         # Check whether the script should proceed.
         if not silent and not intro_prompt():
@@ -96,7 +97,6 @@ def main():
                                          passwd=mysql_root_pw)
         except MySQLdb.MySQLError:
             raise ConnectionError('>>> Error: Failed to connect to MySQL server.')
-            
 
         # Check if the database already exists.
         try:
@@ -151,7 +151,6 @@ def main():
                 # but we'll assume no exception means success.
             except MySQLdb.MySQLError:
                 raise IOError('>>> Error: Failed to create database.')
-                
 
         # Database is ready for use.
         if db_create:

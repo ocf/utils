@@ -23,16 +23,16 @@ pipeline {
     }
   }
 
-//  post {
-//    failure {
-//      emailNotification()
-//    }
-//    always {
-//      node(label: 'slave') {
-//        ircNotification()
-//      }
-//    }
-//  }
+  post {
+    failure {
+      emailNotification()
+    }
+    always {
+      node(label: 'slave') {
+        ircNotification()
+      }
+    }
+  }
 }
 
 // vim: ft=groovy

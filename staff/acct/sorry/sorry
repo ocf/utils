@@ -2,10 +2,10 @@
 # Script for sorrying OCF user accounts
 
 REASONPATH=/opt/share/utils/staff/acct/sorry
-LDAPSEARCH=$(which ldapsearch)
-LDAPMODIFY=$(which ldapmodify)
-KINIT=$(which kinit)
-KDESTROY=$(which kdestroy)
+LDAPSEARCH=$(command -v ldapsearch)
+LDAPMODIFY=$(command -v ldapmodify)
+KINIT=$(command -v kinit)
+KDESTROY=$(command -v kdestroy)
 #KRB5CCNAME=/root/krb5cc_sorry
 #export KRB5CCNAME
 
@@ -19,7 +19,7 @@ if [ -z "$1" ] || [ -z "$2" ]; then
     echo "Usage: $0 [user to be sorried] [sorry reason file]"
     echo
     echo "Standard Sorry Reasons:"
-    find "$REASONPATH" -maxdepth 1 -mindepth 1 -type f -printf "    %f\n"
+    find "$REASONPATH" -maxdepth 1 -mindepth 1 -type f -printf "    %f\\n"
     echo
     echo "For custom sorry reasons you can pass in your own file"
     exit 0
@@ -64,8 +64,7 @@ fi
 
 if [ -z "$SORRY_KRB5CCNAME" ]; then
     echo "You are $rootstaffer"
-    $KINIT "${rootstaffer}/admin"
-    if [ $? -ne 0 ]; then
+    if ! $KINIT "${rootstaffer}/admin"; then
         echo "kinit failed, bailing out!"
         exit 1
     fi

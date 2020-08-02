@@ -31,7 +31,7 @@ fi
 COMMAND="$1"
 
 # find file in PATH
-file=$(which "$COMMAND" || true)
+file=$(command -v "$COMMAND" || true)
 
 # if file does not exist/is broken symlink/is not executable, command does not exist
 if [ -z "$file" ]; then
@@ -65,7 +65,7 @@ if ! ( echo "$targettype" | grep -q ^text ); then
 fi
 
 # check if pager exists
-if [ -z "$(which "$PAGER")" ]; then
+if [ -z "$(command -v "$PAGER")" ]; then
   echo "Error: Pager '$PAGER' could not be found (or not executable) in your PATH." 1>&2
   exit 1
 fi

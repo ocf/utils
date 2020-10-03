@@ -110,7 +110,7 @@ def verify_disks(oldpath, newpath):
     print(bold('New SHA1 (on this server): ') + copied)
 
     # Pull out the hash string since file names may not match
-    p = re.compile(r'^SHA1([a-z0-9\-/]+)= ([0-9a-f]+)$')
+    p = re.compile(r'^SHA1\(([a-z0-9\-/]+)\)= ([0-9a-f]+)$')
     if p.match(original).group(1) != p.match(copied).group(1):
         print(bold(red('Hashes do not match, something went wrong!')))
         sys.exit(1)

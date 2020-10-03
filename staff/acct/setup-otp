@@ -9,7 +9,7 @@ if [[ "$(hostname)" != "lightning" && "$(hostname)" != "dev-lightning" ]]; then
 fi
 
 if [[ "$USER" != "root" ]]; then
-    echo -e "\033[1;31mYou must be root to run this.\033[0m"
+    echo -e "\\033[1;31mYou must be root to run this.\\033[0m"
     exit 1
 fi
 
@@ -21,7 +21,7 @@ fi
 username="$1"
 
 if [[ -z "$(getent passwd "$username")" ]]; then
-    echo -e "\033[1;31mUser $username does not exist.\033[0m"
+    echo -e "\\033[1;31mUser $username does not exist.\\033[0m"
     exit 1
 fi
 
@@ -32,7 +32,7 @@ read -r ykOutput
 if [[ -z "$ykOutput" ]]; then
     echo "Skipping Yubikey configuration."
 elif [[ ! "$ykOutput" =~ ^[cbdefghijklnrtuv]{44}$ ]]; then
-    echo -e "\033[1;31mThat doesn't look like a valid YubiOTP output.\033[0m Exiting."
+    echo -e "\\033[1;31mThat doesn't look like a valid YubiOTP output.\\033[0m Exiting."
     exit 1
 else
     # We submit the OTP (1) to make sure we can validate it succesfully,
@@ -40,7 +40,7 @@ else
     if curl 'https://demo.yubico.com/api/v1/simple/otp/validate' \
             -H 'Content-Type: application/json' --data '{"key":"'"$ykOutput"'"}' \
              2>/dev/null | grep -vq '"status":"success"'; then
-        echo -e "\033[1;31mFailed to verify this OTP using https://demo.yubico.com/otp/verify\033[0m"
+        echo -e "\\033[1;31mFailed to verify this OTP using https://demo.yubico.com/otp/verify\\033[0m"
         exit 1
     fi
 

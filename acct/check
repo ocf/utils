@@ -127,7 +127,7 @@ if [ -n "$calnetuid" ] && [ "$calnetuid" != "0" ]; then
 fi
 
 # check virtual hosting config
-if [ -f "$vhost_file" ] && vhost=$(grep -E "^[#[:space:]]*$user[![:space:]]" "$vhost_file"); then
+if [ -f "$vhost_file" ] && vhost=$(grep -E "^[#[:space:]]*${user}[![:space:]]" "$vhost_file"); then
   echo
   echo "Virtual hosts:"
   echo "-------------------------------------------------------------------------------"
@@ -136,7 +136,7 @@ if [ -f "$vhost_file" ] && vhost=$(grep -E "^[#[:space:]]*$user[![:space:]]" "$v
 fi
 
 # check apphosting config
-if [ -f "$vhost_app_file" ] && vhost_app=$(grep -E "^[#[:space:]]*$user[![:space:]]" "$vhost_app_file"); then
+if [ -f "$vhost_app_file" ] && vhost_app=$(grep -E "^[#[:space:]]*${user}[![:space:]]" "$vhost_app_file"); then
   echo
   echo "Virtual apphosts:"
   echo "-------------------------------------------------------------------------------"
@@ -145,7 +145,7 @@ if [ -f "$vhost_app_file" ] && vhost_app=$(grep -E "^[#[:space:]]*$user[![:space
 fi
 
 # check virtual mail config
-if [ -f "$vhost_mail_file" ] && vhost_mail=$(grep -E "^[#[:space:]]*$user[![:space:]]" "$vhost_mail_file"); then
+if [ -f "$vhost_mail_file" ] && vhost_mail=$(grep -E "^[#[:space:]]*${user}[![:space:]]" "$vhost_mail_file"); then
   echo
   echo "Virtual mail:"
   echo "-------------------------------------------------------------------------------"
@@ -210,7 +210,7 @@ if [ -n "$fingerl" ] || [ -n "$ps" ]; then
 fi
 
 # check most recent login history
-last=$( (for wtmp_file in $wtmp_files; do last -a "$user" -f "$wtmp_file"; done) | egrep -v ' begins|^$' | head -n "$login_count" | awk '{$1=""; print $0}' | sed 's/^[ ]*//g')
+last=$( (for wtmp_file in $wtmp_files; do last -a "$user" -f "$wtmp_file"; done) | grep -Ev ' begins|^$' | head -n "$login_count" | awk '{$1=""; print $0}' | sed 's/^[ ]*//g')
 if [ -n "$last" ]; then
   echo
   echo "Recent login history on local machine:"

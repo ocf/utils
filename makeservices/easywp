@@ -12,14 +12,14 @@ set -euo pipefail
 shopt -s dotglob
 
 if ! [[ "$(hostname)" =~ (dev-)?tsunami ]]; then
-    echo -e '\033[1;31mYou must run this command on tsunami.\033[0m'
+    echo -e '\\033[1;31mYou must run this command on tsunami.\\033[0m'
     exit 1
 fi
 
-echo -e "\033[33mWARNING: This script should generally be run on a fresh account!\033[00m"
+echo -e "\\033[33mWARNING: This script should generally be run on a fresh account!\\033[00m"
 echo -e "A user with an existing website or database will have their files
 backed up, but their database password will change and the WordPress
-install may migrate and reuse existing tables.\n"
+install may migrate and reuse existing tables.\\n"
 
 read -rp "Are you sure you want to continue? [y/N] " idunno
 idunno=${idunno,,}
@@ -38,7 +38,7 @@ cd "$webroot"
 # Check if user has files and let user decide what they want to do.
 if [[ -n "$(ls -A)" ]]; then
     echo
-    echo -e "\033[33mThere are currently files in webroot! These will be backed up.\033[00m\n"
+    echo -e "\\033[33mThere are currently files in webroot! These will be backed up.\\033[00m\\n"
     read -rp "Do you want to continue? [y/N] " whoknows
 
     whoknows=${whoknows,,}
@@ -59,7 +59,7 @@ fi
 echo "Resetting database password..."
 sqlpass=$(echo "yes" | makemysql | tail -n 1 | grep -Po '(?<=: )([0-9a-zA-Z]){24,}$')
 if [[ -z "$sqlpass" ]]; then
-    echo -e "\033[31mError:\033[00m Could not retrieve database password. Run makemysql to see the issue."
+    echo -e "\\033[31mError:\\033[00m Could not retrieve database password. Run makemysql to see the issue."
     exit 1
 fi
 echo "SQL set up and the password can be found in wp-config.php ..."

@@ -3,9 +3,9 @@
 #Script for unsorrying OCF user accounts, adapted for ldap/kerberos
 #gfs, 3-24-08
 
-LDAPMODIFY=$(which ldapmodify)
-KINIT=$(which kinit)
-KDESTROY=$(which kdestroy)
+LDAPMODIFY=$(command -v ldapmodify)
+KINIT=$(command -v kinit)
+KDESTROY=$(command -v kdestroy)
 
 defaultshell=/bin/bash
 
@@ -62,8 +62,7 @@ fi
 
 echo "You are $rootstaffer"
 
-$KINIT "${rootstaffer}/admin"
-if [ $? -ne 0 ]; then
+if ! $KINIT "${rootstaffer}/admin"; then
     echo "kinit failed, bailing out!"
     exit 1
 fi

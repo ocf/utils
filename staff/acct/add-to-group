@@ -24,9 +24,7 @@ if [ "$choice" != "y" ] && [ "$choice" != "yes" ]; then
     exit 0
 fi
 
-ldapadd <<< "$record"
-
-if [ "$?" -eq 0 ]; then
+if ldapadd <<< "$record"; then
     echo "$NEW_USER added to $LDAP_GROUP"
 else
     echo "An error occurred."

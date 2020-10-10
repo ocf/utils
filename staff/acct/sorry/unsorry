@@ -24,7 +24,7 @@ fi
 
 sorriedUser=$1
 
-if [[ ! "$sorriedUser" =~ ^[a-z]+ ]]; then
+if [[ ! "$sorriedUser" =~ ^[a-z0-9]+ ]]; then
     echo "$sorriedUser is an invalid username"
     exit 3
 fi

@@ -5,14 +5,35 @@
 # 2011-04-01: rewritten, daradib@OCF
 # 2011-08-21: revised output, daradib@OCF
 # 2012-02-01: revised formatting, daradib@OCF
+# 2020-08-01: add -e for editing, mcint@OCF
 
 set -e
 
 usage(){
-  echo "Usage: '$(basename "$0") COMMAND'"
+  echo "Usage: '$(basename "$0") [-e|--edit|-h|--help] COMMAND'"
   echo
   echo "Displays the source code of the script run when COMMAND is executed."
 }
+
+if [ -z "$PAGER" ]; then
+  PAGER=less
+fi
+
+HOW_PAGER="$PAGER"
+case $1 in
+    -e|--edit)
+        if [ -z "$EDITOR" ]; then
+            HOW_PAGER="$EDITOR"
+        else
+            HOW_PAGER="$(command -v nvim vim vi nano | head -1)";
+        fi
+        shift;
+        ;;
+    -h|--help)
+        usage
+        exit 1
+        ;;
+esac
 
 # process arguments and respond if needed
 if [ $# -ne 1 ]; then
@@ -20,14 +41,8 @@ if [ $# -ne 1 ]; then
   echo
   usage
   exit 1
-elif [ "$1" = '-h' ] || [ "$1" = '--help' ]; then
-  usage
-  exit
 fi
 
-if [ -z "$PAGER" ]; then
-  PAGER=less
-fi
 COMMAND="$1"
 
 # find file in PATH
@@ -44,14 +59,15 @@ echo "Program found: $file"
 
 # follow any symlinks
 if [ -L "$file" ]; then
-  target=$(readlink -en "$file")
+  cmd_readlink=$(command -v greadlink readlink | head -1) # macos/brew compatibility, bsd vs gnu readline default
+  target=$($cmd_readlink -en "$file")
   echo "Final target@: $target"
 else
   target="$file"
 fi
 
 # find filetype of file
-targettype=$(file -i "$target" | awk '{print $2}' | cut -f 1 -d ';')
+targettype=$(file --mime "$target" | awk '{print $2}' | cut -f 1 -d ';')
 
 # report filetype
 echo "MIME filetype: $targettype"
@@ -71,4 +87,4 @@ if [ -z "$(command -v "$PAGER")" ]; then
 fi
 
 # view or edit the target script
-eval "$PAGER" "$target"
+eval "$HOW_PAGER" "$target"

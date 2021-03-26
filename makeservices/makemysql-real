@@ -48,6 +48,9 @@ def read_config():
     mysql_root_pw = conf.get('makemysql', 'passwd')
     return mysql_host, mysql_root_pw
 
+def print_if_not_silent(*args, **kwargs):
+    if not silent:
+        print(*args, **kwargs)
 
 def intro_prompt():
     print(dedent(
@@ -84,14 +87,13 @@ def main():
         if len(sys.argv) > 1 and sys.argv[1] in ['-s', '--silent']:
             silent = True
         # Check whether the script should proceed.
-        if not silent and not intro_prompt():
-            print('>>> Aborted by user request.', file=sys.stderr)
+        if not intro_prompt():
+            print_if_not_silent('>>> Aborted by user request.', file=sys.stderr)
             return
 
         # Connect to the MySQL server.
         try:
-            if not silent:
-                print('>>> Connecting to MySQL database server...')
+            print_if_not_silent('>>> Connecting to MySQL database server...')
             connection = MySQLdb.connect(host=mysql_host,
                                          user='root',
                                          passwd=mysql_root_pw)
@@ -100,16 +102,13 @@ def main():
 
         # Check if the database already exists.
         try:
-            if not silent:
-                print(">>> Checking if database '{}' already exists...".format(username))
+            print_if_not_silent(">>> Checking if database '{}' already exists...".format(username))
             connection.select_db(username)
 
             # The database already exists, so skip the creation step.
-            if not silent:
-                print('yes.')
+            print_if_not_silent('yes.')
             db_create = False
-            if not silent:
-                print(dedent("""
+            print_if_not_silent(dedent("""
                 The MySQL database '{}' already exists.
                 The database password will be reset.
 
@@ -122,8 +121,7 @@ def main():
                     help@ocf.berkeley.edu
                 """).format(username))
         except MySQLdb.OperationalError:
-            if not silent:
-                print('no.')
+            print_if_not_silent('no.')
             db_create = True
 
         # Add or update user database privileges.
@@ -142,8 +140,7 @@ def main():
         # Create new database, if necessary.
         if db_create:
             try:
-                if not silent:
-                    print(">>> Creating new database '{}'...".format(username))
+                print_if_not_silent(">>> Creating new database '{}'...".format(username))
                 query = CREATE_QUERY.format(username)
                 connection.query(query)
                 connection.store_result()

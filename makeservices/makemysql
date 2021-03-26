@@ -5,8 +5,7 @@ if [[ "$(hostname)" != "tsunami" && "$(hostname)" != "dev-tsunami" ]]; then
 fi
 
 IGNORE_WP=false
-UNREADABLE_OUTPUT=false
-SILENT=""
+SILENT=false
 
 # Parse arguments down below
 while (( "$#" )); do
@@ -15,15 +14,10 @@ while (( "$#" )); do
             IGNORE_WP=true
             shift
             ;;
-        -u|--unreadable-output)
-            UNREADABLE_OUTPUT=true
-            shift
-            ;;
         -s|--silent)
-            SILENT="--silent"
+            SILENT=true
             shift
             ;;
-        # I've seen -*|--*=), but idk what does the = serve
         -*|--*)
             # Output to stderr
             echo "Error: Unsupported flag $1" >&2
@@ -32,20 +26,28 @@ while (( "$#" )); do
     esac
 done
 
-PASS=$(sudo -u mysql /opt/share/utils/makeservices/makemysql-real $SILENT | tail -n 1)
+# The correctness of this line relies on the fact that
+# makemysql-real will output the new password ONLY on the 
+# last line. The --silent will also make sure it only output the password...
+PASS=$(sudo -u mysql /opt/share/utils/makeservices/makemysql-real --silent | tail -n 1)
+
+if [ $? -ne 0 ]; then
+    echo 'makemysql did not exit properly. This script will stop.'
+    exit 1
+fi
 
 # Check if wp is installed with wp-cli
 # And change password if installed with easywp
 # But change password only if installed with easywp is a wrong statement
 # Use --ignore-wp flag to skip this process
-if (wp core is-installed --quiet --path="$HOME/public_html" > /dev/null 2>&1) && ! $IGNORE_WP ; then
+if $IGNORE_WP && ! wp core is-installed --quiet --path="$HOME/public_html" > /dev/null 2>&1 ; then
     if ! $SILENT; then
         echo "WordPress installation detected, changing WordPress mysql password for you."
     fi
     wp config set DB_PASSWORD "$PASS" > /dev/null 2>&1
 fi
 
-if $UNREADABLE_OUTPUT; then
+if $SILENT; then
     echo "$PASS"
 else
     # Added for backward compatibility - the last line will be

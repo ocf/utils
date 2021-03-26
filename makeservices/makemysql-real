@@ -151,8 +151,7 @@ def main():
 
         # Database is ready for use.
         if db_create:
-            if not silent:
-                print(dedent("""
+            print_if_not_silent(dedent("""
                 Your MySQL database has been created.
 
                 For instructions on accessing and using your database, please visit
@@ -164,9 +163,11 @@ def main():
                     help@ocf.berkeley.edu
                 """))
 
-                print('>>> Your MySQL database password is: {}'.format(userpass))
-            else:
-                print(userpass)
+            print_if_not_silent('>>> Your MySQL database password is: ')
+
+            # This line to be printed, no matter silent or not.
+            # The userpass will always be on the last line.
+            print(userpass)
     except Exception as ex:
         send_problem_report(dedent(
             """\

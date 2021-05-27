@@ -74,11 +74,11 @@ chmod 600 "$webroot/wp-config.php"
 echo "WordPress configuration creation successful. Setting it up..."
 
 read -rp 'Enter your desired site title. (Default: newsite)' sitetitle
-if [ -z "$sitetitle"]; then
+if [ -z "$sitetitle" ]; then
     sitetitle="newsite"
 fi
 read -rp 'Enter your desired admin username. (Default: admin)' adminname
-if [ -z "$adminname"]; then
+if [ -z "$adminname" ]; then
     adminname="admin"
 fi
 

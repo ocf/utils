@@ -36,7 +36,7 @@ MYSQL_HOST = 'mysql.ocf.berkeley.edu'
 
 PW_LENGTH = 24
 
-silent = False
+quiet = False
 
 
 def read_config():
@@ -48,8 +48,8 @@ def read_config():
     mysql_root_pw = conf.get('makemysql', 'passwd')
     return mysql_host, mysql_root_pw
 
-def print_if_not_silent(*args, **kwargs):
-    if not silent:
+def print_if_not_quiet(*args, **kwargs):
+    if not quiet:
         print(*args, **kwargs)
 
 def intro_prompt():
@@ -84,16 +84,16 @@ def main():
         mysql_host, mysql_root_pw = read_config()
 
         # Added a simple and stupid argument parsing so that other scripts can use it without tunneling in yes.
-        if len(sys.argv) > 1 and sys.argv[1] in ['-s', '--silent']:
-            silent = True
+        if len(sys.argv) > 1 and sys.argv[1] in ['-q', '--quiet']:
+            quiet = True
         # Check whether the script should proceed.
         if not intro_prompt():
-            print_if_not_silent('>>> Aborted by user request.', file=sys.stderr)
+            print_if_not_quiet('>>> Aborted by user request.', file=sys.stderr)
             return
 
         # Connect to the MySQL server.
         try:
-            print_if_not_silent('>>> Connecting to MySQL database server...')
+            print_if_not_quiet('>>> Connecting to MySQL database server...')
             connection = MySQLdb.connect(host=mysql_host,
                                          user='root',
                                          passwd=mysql_root_pw)
@@ -102,13 +102,13 @@ def main():
 
         # Check if the database already exists.
         try:
-            print_if_not_silent(">>> Checking if database '{}' already exists...".format(username))
+            print_if_not_quiet(">>> Checking if database '{}' already exists...".format(username))
             connection.select_db(username)
 
             # The database already exists, so skip the creation step.
-            print_if_not_silent('yes.')
+            print_if_not_quiet('yes.')
             db_create = False
-            print_if_not_silent(dedent("""
+            print_if_not_quiet(dedent("""
                 The MySQL database '{}' already exists.
                 The database password will be reset.
 
@@ -121,7 +121,7 @@ def main():
                     help@ocf.berkeley.edu
                 """).format(username))
         except MySQLdb.OperationalError:
-            print_if_not_silent('no.')
+            print_if_not_quiet('no.')
             db_create = True
 
         # Add or update user database privileges.
@@ -140,7 +140,7 @@ def main():
         # Create new database, if necessary.
         if db_create:
             try:
-                print_if_not_silent(">>> Creating new database '{}'...".format(username))
+                print_if_not_quiet(">>> Creating new database '{}'...".format(username))
                 query = CREATE_QUERY.format(username)
                 connection.query(query)
                 connection.store_result()
@@ -151,7 +151,7 @@ def main():
 
         # Database is ready for use.
         if db_create:
-            print_if_not_silent(dedent("""
+            print_if_not_quiet(dedent("""
                 Your MySQL database has been created.
 
                 For instructions on accessing and using your database, please visit
@@ -163,9 +163,9 @@ def main():
                     help@ocf.berkeley.edu
                 """))
 
-            print_if_not_silent('>>> Your MySQL database password is: ')
+            print_if_not_quiet('>>> Your MySQL database password is: ')
 
-            # This line to be printed, no matter silent or not.
+            # This line to be printed, no matter quiet or not.
             # The userpass will always be on the last line.
             print(userpass)
     except Exception as ex:

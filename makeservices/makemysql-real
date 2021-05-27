@@ -87,9 +87,10 @@ def main():
         if len(sys.argv) > 1 and sys.argv[1] in ['-q', '--quiet']:
             quiet = True
         # Check whether the script should proceed.
-        if not intro_prompt():
-            print_if_not_quiet('>>> Aborted by user request.', file=sys.stderr)
-            return
+        if not quiet:
+            if not intro_prompt():
+                print_if_not_quiet('>>> Aborted by user request.', file=sys.stderr)
+                return
 
         # Connect to the MySQL server.
         try:

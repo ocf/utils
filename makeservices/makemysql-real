@@ -48,9 +48,11 @@ def read_config():
     mysql_root_pw = conf.get('makemysql', 'passwd')
     return mysql_host, mysql_root_pw
 
+
 def print_if_not_quiet(*args, **kwargs):
     if not quiet:
         print(*args, **kwargs)
+
 
 def intro_prompt():
     print(dedent(
@@ -167,8 +169,8 @@ def main():
 
         print_if_not_quiet('>>> Your MySQL database password is: ')
 
-            # This line to be printed, no matter quiet or not.
-            # The userpass will always be on the last line.
+        # This line to be printed, no matter quiet or not.
+        # The userpass will always be on the last line.
         print(userpass)
     except Exception as ex:
         send_problem_report(dedent(

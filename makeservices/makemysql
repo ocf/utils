@@ -38,9 +38,8 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# Check if wp is installed with wp-cli
+# Check if wp is installed, wp-cli cannot be used as it verifies DB password as well
 # And change password if installed with easywp
-# But change password only if installed with easywp is a wrong statement
 # Use --ignore-wp flag to skip this process
 if ! $IGNORE_WP && [ -f "$HOME/public_html/wp-config.php" ] ; then
     if ! $QUIET; then

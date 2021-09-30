@@ -164,11 +164,11 @@ def main():
                     help@ocf.berkeley.edu
                 """))
 
-            print_if_not_quiet('>>> Your MySQL database password is: ')
+        print_if_not_quiet('>>> Your MySQL database password is: ')
 
             # This line to be printed, no matter quiet or not.
             # The userpass will always be on the last line.
-            print(userpass)
+        print(userpass)
     except Exception as ex:
         send_problem_report(dedent(
             """\
@@ -181,7 +181,8 @@ def main():
             """
             A fatal error was encountered during program execution.
             OCF staff have been notified of the problem.
-            """
+            Error for staff: {}: {}.
+            """.format(ex.__class__.__name__, ex)
         ), file=sys.stderr)
         sys.exit(1)
 

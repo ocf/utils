@@ -74,6 +74,8 @@ def intro_prompt():
 
 
 def main():
+    # Without this quiet below will be local variable
+    global quiet
     try:
         username = os.environ.get('SUDO_USER')
 
@@ -91,7 +93,6 @@ def main():
             if not intro_prompt():
                 print_if_not_quiet('>>> Aborted by user request.', file=sys.stderr)
                 return
-
         # Connect to the MySQL server.
         try:
             print_if_not_quiet('>>> Connecting to MySQL database server...')

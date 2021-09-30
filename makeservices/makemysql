@@ -42,11 +42,11 @@ fi
 # And change password if installed with easywp
 # But change password only if installed with easywp is a wrong statement
 # Use --ignore-wp flag to skip this process
-if ! $IGNORE_WP && wp core is-installed --quiet --path="$HOME/public_html" > /dev/null 2>&1 ; then
+if ! $IGNORE_WP && [ -f "$HOME/public_html/wp-config.php" ] ; then
     if ! $QUIET; then
         echo "WordPress installation detected, changing WordPress mysql password for you."
     fi
-    wp config set DB_PASSWORD "$PASS" > /dev/null 2>&1
+    wp config set DB_PASSWORD "$PASS" --path="$HOME/public_html" > /dev/null 2>&1
 fi
 
 if $QUIET; then

@@ -6,7 +6,7 @@ import subprocess
 import sys
 import time
 
-TV_SINK = 'alsa_output.pci-0000_00_03.0.hdmi-stereo'
+TV_SINK = '0'  # card #0
 TUNNEL_NAME = 'ocf-tv-remote'
 
 

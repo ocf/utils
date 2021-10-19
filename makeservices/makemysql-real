@@ -36,6 +36,8 @@ MYSQL_HOST = 'mysql.ocf.berkeley.edu'
 
 PW_LENGTH = 24
 
+quiet = False
+
 
 def read_config():
     """Fetches the MySQL hostname and root password from the config in
@@ -45,6 +47,11 @@ def read_config():
     mysql_host = conf.get('makemysql', 'host')
     mysql_root_pw = conf.get('makemysql', 'passwd')
     return mysql_host, mysql_root_pw
+
+
+def print_if_not_quiet(*args, **kwargs):
+    if not quiet:
+        print(*args, **kwargs)
 
 
 def intro_prompt():
@@ -69,6 +76,8 @@ def intro_prompt():
 
 
 def main():
+    # Without this quiet below will be local variable
+    global quiet
     try:
         username = os.environ.get('SUDO_USER')
 
@@ -78,43 +87,45 @@ def main():
         # Read config file.
         mysql_host, mysql_root_pw = read_config()
 
+        # Added a simple and stupid argument parsing so that other scripts can use it without tunneling in yes.
+        if len(sys.argv) > 1 and sys.argv[1] in ['-q', '--quiet']:
+            quiet = True
         # Check whether the script should proceed.
-        if not intro_prompt():
-            print('>>> Aborted by user request.')
-            return
-
+        if not quiet:
+            if not intro_prompt():
+                print_if_not_quiet('>>> Aborted by user request.', file=sys.stderr)
+                return
         # Connect to the MySQL server.
         try:
-            print('>>> Connecting to MySQL database server...')
+            print_if_not_quiet('>>> Connecting to MySQL database server...')
             connection = MySQLdb.connect(host=mysql_host,
                                          user='root',
                                          passwd=mysql_root_pw)
         except MySQLdb.MySQLError:
-            print('>>> Error: Failed to connect to MySQL server.')
-            raise
+            raise ConnectionError('>>> Error: Failed to connect to MySQL server.')
 
         # Check if the database already exists.
         try:
-            print(">>> Checking if database '{}' already exists...".format(username))
+            print_if_not_quiet(">>> Checking if database '{}' already exists...".format(username))
             connection.select_db(username)
 
             # The database already exists, so skip the creation step.
-            print('yes.')
+            print_if_not_quiet('yes.')
             db_create = False
-            print(dedent("""
-            The MySQL database '{}' already exists.
-            The database password will be reset.
+            print_if_not_quiet(dedent("""
+                The MySQL database '{}' already exists.
+                The database password will be reset.
 
-            If you are unsure how to access or use your database, please visit
+                If you are unsure how to access or use your database, please visit
 
-              https://www.ocf.berkeley.edu/docs/services/mysql/
+                https://www.ocf.berkeley.edu/docs/services/mysql/
 
-            If you run into trouble trying to use your database, contact us at
+                If you run into trouble trying to use your database, contact us at
 
-                help@ocf.berkeley.edu
-            """).format(username))
+                    help@ocf.berkeley.edu
+                """).format(username))
         except MySQLdb.OperationalError:
-            print('no.')
+            print_if_not_quiet('no.')
             db_create = True
 
         # Add or update user database privileges.
@@ -128,37 +139,39 @@ def main():
             # Result should be "Query OK, 0 rows affected",
             # but we'll assume no exception means success.
         except MySQLdb.MySQLError:
-            print('>>> Error: Failed to grant database privileges.')
-            raise
+            raise ConnectionError('>>> Error: Failed to grant database privileges.')
 
         # Create new database, if necessary.
         if db_create:
             try:
-                print(">>> Creating new database '{}'...".format(username))
+                print_if_not_quiet(">>> Creating new database '{}'...".format(username))
                 query = CREATE_QUERY.format(username)
                 connection.query(query)
                 connection.store_result()
                 # Result should be "Query OK, 1 row affected",
                 # but we'll assume no exception means success.
             except MySQLdb.MySQLError:
-                print('>>> Error: Failed to create database.')
-                raise
+                raise IOError('>>> Error: Failed to create database.')
 
         # Database is ready for use.
         if db_create:
-            print(dedent("""
-            Your MySQL database has been created.
+            print_if_not_quiet(dedent("""
+                Your MySQL database has been created.
 
-            For instructions on accessing and using your database, please visit
+                For instructions on accessing and using your database, please visit
 
-              https://www.ocf.berkeley.edu/docs/services/mysql/
+                https://www.ocf.berkeley.edu/docs/services/mysql/
 
-            If you run into trouble trying to use your database, contact us at
+                If you run into trouble trying to use your database, contact us at
 
-                help@ocf.berkeley.edu
-            """))
+                    help@ocf.berkeley.edu
+                """))
 
-        print('>>> Your MySQL database password is: {}'.format(userpass))
+        print_if_not_quiet('>>> Your MySQL database password is: ')
+
+        # This line to be printed, no matter quiet or not.
+        # The userpass will always be on the last line.
+        print(userpass)
     except Exception as ex:
         send_problem_report(dedent(
             """\
@@ -171,8 +184,9 @@ def main():
             """
             A fatal error was encountered during program execution.
             OCF staff have been notified of the problem.
-            """
-        ))
+            Error for staff: {}: {}.
+            """.format(ex.__class__.__name__, ex)
+        ), file=sys.stderr)
         sys.exit(1)
 
 

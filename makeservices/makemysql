@@ -4,8 +4,52 @@ if [[ "$(hostname)" != "tsunami" && "$(hostname)" != "dev-tsunami" ]]; then
     exit 1
 fi
 
-PASS=$(sudo -u mysql /opt/share/utils/makeservices/makemysql-real | tee /dev/tty | tail -n 1 | grep -Po '(?<=: )([0-9a-zA-Z]){24,}$')
+IGNORE_WP=false
+QUIET=false
 
-echo 'Changing WordPress database password'
-cd ~/public_html/
-wp config set DB_PASSWORD "$PASS" > /dev/null
+# Parse arguments down below
+while (( "$#" )); do
+    case "$1" in
+        -i|--ignore-wp)
+            IGNORE_WP=true
+            shift
+            ;;
+        -q|--quiet)
+            QUIET=true
+            shift
+            ;;
+        -*)
+            # Output to stderr
+            echo "Error: Unsupported flag $1" >&2
+            exit 1
+            ;;
+    esac
+done
+
+# The correctness of this line relies on the fact that
+# makemysql-real will output the new password ONLY on the
+# last line. The --quiet will also make sure it only output the password...
+PASS=$(sudo -u mysql /opt/share/utils/makeservices/makemysql-real --quiet)
+
+if [ $? ] ; then
+    echo 'makemysql-real did not exit properly.'
+    echo 'Run "sudo -u mysql /opt/share/utils/makeservices/makemysql-real" for a more verbose output.'
+    echo 'Additionally, you may contact staff members for help. This script will stop.'
+    exit 1
+fi
+
+# Check if wp is installed, wp-cli cannot be used as it verifies DB password as well
+# And change password if installed with easywp
+# Use --ignore-wp flag to skip this process
+if ! $IGNORE_WP && [ -f "$HOME/public_html/wp-config.php" ] ; then
+    if ! $QUIET; then
+        echo "WordPress installation detected, changing WordPress mysql password for you."
+    fi
+    wp config set DB_PASSWORD "$PASS" --path="$HOME/public_html" > /dev/null 2>&1
+fi
+
+if $QUIET; then
+    echo "$PASS"
+else
+    echo "Your MySQL database password is: $PASS"
+fi

@@ -57,11 +57,18 @@ fi
 
 # Get SQL password
 echo "Resetting database password..."
-sqlpass=$(echo "yes" | makemysql | tail -n 1 | grep -Po '(?<=: )([0-9a-zA-Z]){24,}$')
-if [[ -z "$sqlpass" ]]; then
+# Do not exit immediately if makemysql fails, as we need to display some error message...
+set +e
+sqlpass=$(makemysql --quiet)
+# I don't know if this will work... Just make sure no abnormal exit code first!
+if [ $? ] || [[ -z "$sqlpass" ]]; then
     echo -e "\\033[31mError:\\033[00m Could not retrieve database password. Run makemysql to see the issue."
     exit 1
 fi
+# Only have the aforementioned behaviour when running makemysql
+# Note also technically if should be below this set statement
+# but set messes up with $? as well...
+set -e
 echo "SQL set up and the password can be found in wp-config.php ..."
 
 # Install WordPress and create config file

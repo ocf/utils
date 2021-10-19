@@ -69,4 +69,26 @@ wp core download
 wp config create --dbname="$user" --dbuser="$user" --dbpass="$sqlpass" --dbhost=mysql --dbcharset=utf8mb4
 # Somehow 644 is the default... See https://core.trac.wordpress.org/ticket/37264
 chmod 600 "$webroot/wp-config.php"
-echo "WordPress install successful. Go to https://www.ocf.berkeley.edu/~$user to finish the setup process."
+
+# This is the real install
+echo "WordPress configuration creation successful. Setting it up..."
+
+read -rp 'Enter your desired site title. (Default: newsite)' sitetitle
+if [ -z "$sitetitle" ]; then
+    sitetitle="newsite"
+fi
+read -rp 'Enter your desired admin username. (Default: admin)' adminname
+if [ -z "$adminname" ]; then
+    adminname="admin"
+fi
+
+echo "You admin e-mail will be '$(whoami)@ocf.berkeley.edu', the confirmation e-mail will not be sent to you."
+echo "WP-CLI will install wordpress for you. If you wish, enter your desired admin password and press enter; if you want one to be randomly generated for you, press enter."
+# Use --prompt so that password is not left in ~/.bash_history
+wp core install --admin_user="$adminname" --admin_email="$(whoami)@ocf.berkeley.edu" --skip-email --title=$sitetitle --url="https://www.ocf.berkeley.edu/~$user/" --prompt=admin_password
+# As we had `set -e`, installation must be complete as otherwise the script will end. If it is incomplete, people will still know as this step is verbose.
+
+echo "Campus web security regulations require us to disable unauthenticated REST API. We will install a WordPress plug-in to do that.
+      You may use other plug-ins that achieve the same thing, you may also disable or remove it afterwards, but it is your responsibility
+      to ensure your site complies with regulations. Failure to do so may result in your account being suspended."
+wp plugin install disable-json-api --activate

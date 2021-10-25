@@ -61,7 +61,7 @@ echo "Resetting database password..."
 set +e
 sqlpass=$(makemysql --quiet)
 # I don't know if this will work... Just make sure no abnormal exit code first!
-if [ $? ] || [[ -z "$sqlpass" ]]; then
+if [[ $? -ne 0 ]] || [[ -z "$sqlpass" ]]; then
     echo -e "\\033[31mError:\\033[00m Could not retrieve database password. Run makemysql to see the issue."
     exit 1
 fi

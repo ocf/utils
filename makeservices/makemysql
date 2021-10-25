@@ -31,7 +31,7 @@ done
 # last line. The --quiet will also make sure it only output the password...
 PASS=$(sudo -u mysql /opt/share/utils/makeservices/makemysql-real --quiet)
 
-if [ $? ] ; then
+if [[ $? -ne 0 ]] ; then
     echo 'makemysql-real did not exit properly.'
     echo 'Run "sudo -u mysql /opt/share/utils/makeservices/makemysql-real" for a more verbose output.'
     echo 'Additionally, you may contact staff members for help. This script will stop.'

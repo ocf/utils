@@ -1,0 +1,34 @@
+#!/usr/bin/env python3
+"""Remove or add printers to/from CUPS classes."""
+import argparse
+import subprocess
+import sys
+
+def main(args):
+    # Determine which CUPS classes are available
+    cups_classes = subprocess.check_output(["/usr/bin/lpstat", "-p"]).split("\n")
+    for i in range(len(cups_classes)):
+        clazz = cups_classes[i]
+        # Output is of the form: printer <printername> is idle. <etc>
+        clazz = clazz[len("printer "):]
+        clazz = clazz[:clazz.index(" is ")]
+        cups_classes[i] = clazz
+    
+    for clazz in cups_classes:
+        subprocess.check_output(["/usr/sbin/lpadmin", "-p", args.printer, "-r", clazz])
+
+def parse_args():
+    args = argparse.ArgumentParser(description=__doc__)
+    args.add_argument("action",
+        choices=["add", "remove"], 
+        help="Action to perform"
+    )
+    args.add_argument("printer",
+        help="Name of printer to modify"
+    )
+    
+    return args.parse_args()
+
+if __name__ == "__main__":
+    args = parse_args()
+    sys.exit(main(args))

@@ -4,7 +4,9 @@ import argparse
 import subprocess
 import sys
 
-def main(args):
+
+def modify_printer(args):
+    """Perform internal call to CUPS CLI to modify class(es)."""
     # Determine which CUPS classes are available
     cups_classes = subprocess.check_output(["/usr/bin/lpstat", "-p"]).split("\n")
     for i in range(len(cups_classes)):
@@ -13,22 +15,47 @@ def main(args):
         clazz = clazz[len("printer "):]
         clazz = clazz[:clazz.index(" is ")]
         cups_classes[i] = clazz
-    
-    for clazz in cups_classes:
-        subprocess.check_output(["/usr/sbin/lpadmin", "-p", args.printer, "-r", clazz])
 
-def parse_args():
+    if args.verbose:
+        print("Found CUPS classes:", cups_classes)
+    
+    args_clazz = getattr(args, "class")
+    if args_clazz and args_clazz in cups_classes:
+        cups_classes = [args_clazz]
+        if args.verbose:
+            print("Overriding CUPS classes with parameter:", args_clazz)
+    
+    # Call lpadmin command to perform addition/removal
+    printer = args.printer.lower()
+    if args.verbose:
+        print("Printer to perform action on:", printer)
+    action_flag = "-r" if args.action == "remove" else "-c"
+    if args.verbose:
+        print("Action to be performed (and flag):", args.action, "(" + action_flag + ")")
+    for clazz in cups_classes:
+        action_retval = subprocess.check_output(["/usr/sbin/lpadmin", "-p", printer + "-" + clazz, action_flag, clazz])
+        if action_retval:
+            print("ERROR: lpadmin returned a non-zero value", action_retval)
+            return 1
+    print("Printer", printer, "was successfully", args.action + "(ed)", "from the CUPS class(es)", cups_classes)
+
+def main():
     args = argparse.ArgumentParser(description=__doc__)
     args.add_argument("action",
         choices=["add", "remove"], 
         help="Action to perform"
     )
-    args.add_argument("printer",
-        help="Name of printer to modify"
+    args.add_argument("printer", help="Name of printer to modify")
+    
+    args.add_argument("-c", "--class", help="Remove from only a specific class")
+    args.add_argument("-v", "--verbose", "--debug", 
+        action="store_true",
+        help="Output more verbose logging to stdout"
     )
     
-    return args.parse_args()
+    args = args.parse_args()
+    return modify_printer(args)
+    
 
 if __name__ == "__main__":
-    args = parse_args()
-    sys.exit(main(args))
+    sys.exit(main())

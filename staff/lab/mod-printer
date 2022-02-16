@@ -8,7 +8,9 @@ import sys
 def modify_printer(args):
     """Perform internal call to CUPS CLI to modify class(es)."""
     # Determine which CUPS classes are available
-    cups_classes = subprocess.check_output(["/usr/bin/lpstat", "-p"]).split("\n")
+    cups_classes = subprocess.check_output(["lpstat", "-p"]).decode("utf-8").split("\n")
+    # Remove empty trailing newline
+    cups_classes.remove("")
     for i in range(len(cups_classes)):
         clazz = cups_classes[i]
         # Output is of the form: printer <printername> is idle. <etc>
@@ -17,27 +19,33 @@ def modify_printer(args):
         cups_classes[i] = clazz
 
     if args.verbose:
-        print("Found CUPS classes:", cups_classes)
+        print("Found CUPS classes: " + str(cups_classes))
     
     args_clazz = getattr(args, "class")
     if args_clazz and args_clazz in cups_classes:
         cups_classes = [args_clazz]
         if args.verbose:
-            print("Overriding CUPS classes with parameter:", args_clazz)
+            print("Overriding CUPS classes with parameter: " + str(args_clazz))
     
-    # Call lpadmin command to perform addition/removal
+    # Perform pre-call logging and input processing
     printer = args.printer.lower()
     if args.verbose:
-        print("Printer to perform action on:", printer)
+        print("Printer to perform action on: " + printer)
     action_flag = "-r" if args.action == "remove" else "-c"
     if args.verbose:
-        print("Action to be performed (and flag):", args.action, "(" + action_flag + ")")
+        print("Action to be performed (and flag): " + args.action, "(" + action_flag + ")")
+        
+    # Call lpadmin command to perform addition/removal
     for clazz in cups_classes:
-        action_retval = subprocess.check_output(["/usr/sbin/lpadmin", "-p", printer + "-" + clazz, action_flag, clazz])
-        if action_retval:
-            print("ERROR: lpadmin returned a non-zero value", action_retval)
+        action_cmd = subprocess.Popen(["lpadmin", "-p", printer + "-" + clazz, action_flag, clazz])
+        out, err = action_cmd.communicate()
+        if action_cmd.returncode:
+            print("ERROR: lpadmin returned a non-zero value " + str(action_cmd.returncode))
             return 1
-    print("Printer", printer, "was successfully", args.action + "(ed)", "from the CUPS class(es)", cups_classes)
+        if err:
+            print("ERROR: an error occurred while running lpadmin - " + str(err))
+            return 1
+    print("Printer " + printer + " was successfully " + args.action + "(ed) to/from the CUPS class(es): " + str(cups_classes))
 
 def main():
     args = argparse.ArgumentParser(description=__doc__)

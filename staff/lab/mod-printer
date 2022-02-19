@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Remove or add printers to/from CUPS classes."""
 import argparse
+import re
 import subprocess
 import sys
 
@@ -8,44 +9,50 @@ import sys
 def modify_printer(args):
     """Perform internal call to CUPS CLI to modify class(es)."""
     # Determine which CUPS classes are available
-    cups_classes = subprocess.check_output(["lpstat", "-p"]).decode("utf-8").split("\n")
-    # Remove empty trailing newline
-    cups_classes.remove("")
-    for i in range(len(cups_classes)):
-        clazz = cups_classes[i]
-        # Output is of the form: printer <printername> is idle. <etc>
-        clazz = clazz[len("printer "):]
-        clazz = clazz[:clazz.index(" is ")]
-        cups_classes[i] = clazz
+    try:
+        lpstat_out = subprocess.run(["lpstat", "-p"], check=True, \
+            stdout=subprocess.PIPE, stdin=subprocess.PIPE).strip().split("\n")
+    except subprocess.CalledProcessError as e:
+        print("ERROR: lpstat process exited with exit code %i" % e.returncode)
+        return e.returncode
+    
+    # Parse lpstat output for printer class names
+    # Output is of the form: printer <printername> is idle. <etc>
+    cups_classes = [re.search(r"printer (\S*) is", classname).group(1) for classname in lpstat_out]
 
     if args.verbose:
-        print("Found CUPS classes: " + str(cups_classes))
+        print("Found CUPS classes: %s" % cups_classes)
     
-    args_clazz = getattr(args, "class")
-    if args_clazz and args_clazz in cups_classes:
-        cups_classes = [args_clazz]
-        if args.verbose:
-            print("Overriding CUPS classes with parameter: " + str(args_clazz))
+    # Override with specified classname if provided and valid
+    if args.classname:
+        if args.classname in cups_classes:
+            cups_classes = [args.classname]
+            if args.verbose:
+                print("Overriding CUPS classes with parameter: %s" % args.classname)
+        else:
+            print("ERROR: Specified class %s could not be found in available classes %s" % (args.classname, cups_classes))
+            return 1
     
     # Perform pre-call logging and input processing
     printer = args.printer.lower()
     if args.verbose:
-        print("Printer to perform action on: " + printer)
+        print("Printer to perform action on: %s" % printer)
     action_flag = "-r" if args.action == "remove" else "-c"
     if args.verbose:
-        print("Action to be performed (and flag): " + args.action, "(" + action_flag + ")")
+        print("Action to be performed (and flag): %s (%s)" % (args.action, action_flag))
         
     # Call lpadmin command to perform addition/removal
-    for clazz in cups_classes:
-        action_cmd = subprocess.Popen(["lpadmin", "-p", printer + "-" + clazz, action_flag, clazz])
-        out, err = action_cmd.communicate()
-        if action_cmd.returncode:
-            print("ERROR: lpadmin returned a non-zero value " + str(action_cmd.returncode))
-            return 1
-        if err:
-            print("ERROR: an error occurred while running lpadmin - " + str(err))
-            return 1
-    print("Printer " + printer + " was successfully " + args.action + "(ed) to/from the CUPS class(es): " + str(cups_classes))
+    for classname in cups_classes:
+        action_cmd = ["lpadmin", "-p", printer + "-" + classname, action_flag, classname]
+        try:
+            subprocess.run(action_cmd, check=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
+        except subprocess.CalledProcessError as e:
+            print("ERROR: lpstat process exited with exit code %i" % e.returncode)
+            return e.returncode
+        else:
+            action_out = "added to" if args.action == "add" else "removed from"
+            print("Printer %s was successfully %s %s" % (printer, action_out, classname))
+            
 
 def main():
     args = argparse.ArgumentParser(description=__doc__)
@@ -55,7 +62,7 @@ def main():
     )
     args.add_argument("printer", help="Name of printer to modify")
     
-    args.add_argument("-c", "--class", help="Remove from only a specific class")
+    args.add_argument("-c", "--classname", help="Modify only a specific class")
     args.add_argument("-v", "--verbose", "--debug", 
         action="store_true",
         help="Output more verbose logging to stdout"

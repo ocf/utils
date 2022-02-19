@@ -54,22 +54,39 @@ def modify_printer(args):
             print("Printer %s was successfully %s %s" % (printer, action_out, classname))
             
 
+def list_printers(args):
+    #TODO figure out what CUPS CLI calls this will use and parse data
+    pass
+
+
 def main():
-    args = argparse.ArgumentParser(description=__doc__)
-    args.add_argument("action",
-        choices=["add", "remove"], 
-        help="Action to perform"
-    )
-    args.add_argument("printer", help="Name of printer to modify")
-    
-    args.add_argument("-c", "--classname", help="Modify only a specific class")
-    args.add_argument("-v", "--verbose", "--debug", 
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("-v", "--verbose", "--debug", 
         action="store_true",
-        help="Output more verbose logging to stdout"
+        help="output more verbose logging to stdout"
     )
+    parser.add_argument("-c", "--classname", help="modify/list only a specific class")
     
-    args = args.parse_args()
-    return modify_printer(args)
+    subparsers = parser.add_subparsers(dest="action", help="action to perform", required=True)
+
+    add_parser = subparsers.add_parser("add", help="add a printer")
+    add_parser.add_argument("printer", help="name of printer to add")
+
+    remove_parser = subparsers.add_parser("remove", help="remove a printer")
+    remove_parser.add_argument("printer", help="name of printer to remove")
+
+    list_parser = subparsers.add_parser("list", help="list printer statuses")
+    list_parser.add_argument("-p", "--printer", help="list only this named printer")
+    list_parser.add_argument("-j", "--jobs", help="include print jobs")
+    
+    args = parser.parse_args()
+    if args.action == "add" or args.action == "remove":
+        return modify_printer(args)
+    elif args.action == "list":
+        return list_printers(args)
+    else:
+        print("ERROR: Invalid action passed %s" % args.action)
+        return 1
     
 
 if __name__ == "__main__":

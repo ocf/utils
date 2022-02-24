@@ -55,8 +55,35 @@ def modify_printer(args):
             
 
 def list_printers(args):
-    #TODO figure out what CUPS CLI calls this will use and parse data
-    pass
+    """Perform internal call to CUPS CLI to list printer status(es) (and potentially jobs)."""
+    # Initialize base lpstat command
+    lpstat_cmd = ["lpstat", "-c"]
+
+    # Add on to lpstat command with arguments
+    if args.classname:
+        if args.verbose:
+            print("Limiting results to only class %s" % args.classname)
+        lpstat_cmd.append(args.classname)
+    if args.jobs:
+        if args.verbose:
+            print("Including jobs in stdout")
+        lpstat_cmd.append("-o")
+
+    if args.verbose:
+        print("Calling %s to list printer status" % lpstat_cmd)
+
+    try:
+        # Call lpstat and send output directly to stdout
+        # Command already prints members of the class and can 
+        # be configured to include jobs as well. No way to 
+        # check for printers not in classes.
+        lpstat_out = subprocess.run(lpstat_cmd, check=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
+    except subprocess.CalledProcessError as e:
+        print("ERROR: lpstat process exited with exit code %i" % e.returncode)
+        return e.returncode
+
+    #TODO more advanced processing on output
+    #TODO include printer option in ^^^
 
 
 def main():
@@ -77,7 +104,8 @@ def main():
 
     list_parser = subparsers.add_parser("list", help="list printer statuses")
     list_parser.add_argument("-p", "--printer", help="list only this named printer")
-    list_parser.add_argument("-j", "--jobs", help="include print jobs")
+    list_parser.add_argument("-j", "--jobs", 
+        action="store_true", help="include print jobs")
     
     args = parser.parse_args()
     if args.action == "add" or args.action == "remove":

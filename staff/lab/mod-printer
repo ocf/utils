@@ -73,7 +73,7 @@ def list_printers(args):
         print("Calling %s to list printer status" % lpstat_cmd)
 
     try:
-        # Call lpstat -prints members of the class and can 
+        # Call lpstat - prints members of the class and can 
         # be configured to include jobs as well. No way to 
         # check for printers not in classes.
         lpstat_out = subprocess.run(lpstat_cmd, check=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
@@ -81,7 +81,7 @@ def list_printers(args):
         print("ERROR: lpstat process exited with exit code %i" % e.returncode)
         return e.returncode
 
-    # Parse output to fit args
+    # Parse output to fit printer arg, or send directly to stdout
     status_msgs = lpstat_out.stdout.decode("utf-8")
     if args.printer:
         status_lines = status_msgs.split("\n")

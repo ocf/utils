@@ -84,7 +84,8 @@ def main():
                         )
     parser.add_argument('-c', '--classname', help='modify/list only a specific class')
 
-    subparsers = parser.add_subparsers(dest='action', help='action to perform', required=True)
+    subparsers = parser.add_subparsers(dest='action', help='action to perform')
+    subparsers.required = True
 
     add_parser = subparsers.add_parser('add', help='add a printer')
     add_parser.add_argument('printer', help='name of printer to add')

@@ -74,7 +74,7 @@ def list_printers(args):
 
     # Find differences between all printers and assigned printers
     assigned_printers = []
-    matches_args = lambda name: (not args.printer or args.printer in name) \
+    def matches_args(name): return (not args.printer or args.printer in name) \
         and (not args.classname or args.classname in name)
     for class_name, class_members in cups_classes.items():
         class_members = [name for name in class_members if matches_args(name)]
@@ -147,7 +147,7 @@ def parse_cups_classes(lpstat_raw, args):
                 print('Overriding CUPS classes with parameter: %s' % args.classname)
         else:
             raise CUPSException('ERROR: Specified class %s could not be found in available classes %s'
-                  % (args.classname, cups_classes))
+                                % (args.classname, cups_classes))
     return cups_classes
 
 

@@ -6,30 +6,15 @@ import subprocess
 import sys
 
 
+class CUPSException(Exception):
+    pass
+
+
 def modify_printer(args):
     """Perform internal call to CUPS CLI to modify class(es)."""
-    # Determine which CUPS classes are available
-    lpstat_proc = subprocess.run(['lpstat', '-p'], check=True,
-                                 stdout=subprocess.PIPE, stdin=subprocess.PIPE)
-    lpstat_out = lpstat_proc.stdout.decode('utf-8').strip().split('\n')
-
-    # Parse lpstat output for printer class names
-    # Output is of the form: printer <printername> is idle. <etc>
-    cups_classes = [re.search(r'printer (\S*) is', classname).group(1) for classname in lpstat_out]
-
-    if args.verbose:
-        print('Found CUPS classes: %s' % cups_classes)
-
-    # Override with specified classname if provided and valid
-    if args.classname:
-        if args.classname in cups_classes:
-            cups_classes = [args.classname]
-            if args.verbose:
-                print('Overriding CUPS classes with parameter: %s' % args.classname)
-        else:
-            print('ERROR: Specified class %s could not be found in available classes %s'
-                  % (args.classname, cups_classes))
-            return 1
+    # Get available CUPS classes
+    lpstat_out = do_internal_call(['lpstat', '-c'])
+    cups_classes = parse_cups_classes(lpstat_out, args)
 
     # Perform pre-call logging and input processing
     printer = args.printer.lower()
@@ -40,40 +25,130 @@ def modify_printer(args):
         print('Action to be performed (and flag): %s (%s)' % (args.action, action_flag))
 
     # Call lpadmin command to perform addition/removal
-    for classname in cups_classes:
-        action_cmd = ['lpadmin', '-p', printer + '-' + classname, action_flag, classname]
+    for class_name, class_members in cups_classes.items():
+        printer_name = printer + '-' + class_name
+        if args.action == 'remove' and printer_name not in class_members:
+            # Allow the user to continue - supports removal if only one class was modified
+            print('ERROR: Printer %s is not a member of class %s' % (printer_name, class_name))
+            continue
+        action_cmd = ['lpadmin', '-p', printer_name, action_flag, class_name]
         subprocess.run(action_cmd, check=True)
         action_out = 'added to' if args.action == 'add' else 'removed from'
-        print('Printer %s was successfully %s %s' % (printer, action_out, classname))
+        print('Printer %s was successfully %s %s' % (printer, action_out, class_name))
 
 
 def list_printers(args):
     """Perform internal call to CUPS CLI to list printer status(es) (and potentially jobs)."""
-    # Initialize base lpstat command
-    lpstat_cmd = ['lpstat', '-c']
+    # Get available CUPS classes
+    lpstat_out = do_internal_call(['lpstat', '-c'])
+    cups_classes = parse_cups_classes(lpstat_out, args)
 
-    # Add on to lpstat command with arguments
-    if args.classname:
-        lpstat_cmd.append(args.classname)
-    if args.jobs:
-        lpstat_cmd.append('-o')
+    # Get all CUPS printers
+    lpstat_proc = subprocess.run(['lpstat', '-p'], check=True,
+                                 stdout=subprocess.PIPE, stdin=subprocess.PIPE)
+    lpstat_out = lpstat_proc.stdout.decode('utf-8').strip().split('\n')
+
+    printer_arg = args.printer and args.printer.lower()
+
+    # Parse lpstat output to find all available printers
+    # This includes classes and printers (i.e. shared and non-shared printers)
+    all_printers = []
+    for printer_line in lpstat_out:
+        printer_name_match = re.search(r'printer (\S*)', printer_line)
+        if not printer_name_match:
+            continue
+        printer_name = printer_name_match.group(1)
+
+        if printer_arg and printer_arg not in printer_name:
+            continue
+
+        if args.classname and args.classname not in printer_name:
+            continue
+
+        if printer_name not in cups_classes:
+            all_printers.append(printer_name)
 
     if args.verbose:
-        print('Calling %s to list printer status' % lpstat_cmd)
+        print('All printers found: %s' % all_printers)
+        print('CUPS class-printer mapping found: %s' % cups_classes)
 
-    # Call lpstat - prints members of the class and can
-    # be configured to include jobs as well. No way to
-    # check for printers not in classes.
-    lpstat_proc = subprocess.run(lpstat_cmd, check=True, stdout=subprocess.PIPE, stdin=subprocess.PIPE)
+    # Find differences between all printers and assigned printers
+    assigned_printers = []
+    def matches_args(name): return (not args.printer or args.printer in name) \
+        and (not args.classname or args.classname in name)
+    for class_name, class_members in cups_classes.items():
+        class_members = [name for name in class_members if matches_args(name)]
+        assigned_printers.extend(class_members)
 
-    # Parse output to fit printer arg, or send directly to stdout
-    status_msgs = lpstat_proc.stdout.decode('utf-8')
-    if args.printer:
-        for line in status_msgs.split('\n'):
-            if args.printer in line or 'members of class' in line:
-                print(line)
+        # Print out all printers belonging to class
+        if len(class_members):
+            print('Class %s contains printers: %s' % (class_name, ', '.join(class_members)))
+        else:
+            print('Class %s contains no printers' % class_name)
+    diff_printers = set(all_printers) - set(assigned_printers)
+
+    # Print out all printers not assigned to a class (i.e. out of service)
+    if len(diff_printers):
+        print('No classes contain: %s' % ', '.join(diff_printers))
     else:
-        print(status_msgs, end='')
+        print('All printers are in service')
+
+    # Print out jobs currently queued for specified printers (default: all)
+    if args.jobs:
+        jobs_cmd = ['lpstat', '-o']
+        # Specify targets to lpstat command based on classname and printer args
+        jobs_cmd.extend(cups_classes.keys())
+        jobs_cmd.extend([printer for printer in all_printers if matches_args(printer)])
+        if args.verbose:
+            print('Printing jobs with command %s' % jobs_cmd)
+
+        # Perform internal jobs call and print result
+        jobs_out = do_internal_call(jobs_cmd)
+        # Remove blank lines/extraneous whitespace
+        jobs_out = [job for job in jobs_out if job]
+        if len(jobs_out):
+            print('\nCurrent print jobs:')
+            print('\n'.join(jobs_out))
+        else:
+            print('\nNo current jobs queued')
+
+
+def do_internal_call(cmd):
+    """Perform a call to the system to retrieve data."""
+    # Perform internal call to get raw data
+    proc = subprocess.run(cmd, check=True,
+                          stdout=subprocess.PIPE, stdin=subprocess.PIPE)
+    # Split data by newline, no trailing or leading whitespace
+    return proc.stdout.decode('utf-8').strip().split('\n')
+
+
+def parse_cups_classes(lpstat_raw, args):
+    """Parse raw CUPS class data into class names and members."""
+    # Data output in dict with class names as keys and class
+    # members as values (each stored in an array)
+    cups_classes = {}
+    curr_classname = None
+    for line in lpstat_raw:
+        match = re.search(r'members of class (\S*):', line)
+        if match:
+            curr_classname = match.group(1)
+            cups_classes[curr_classname] = []
+        else:
+            cups_classes[curr_classname].append(line.strip())
+
+    if args.verbose:
+        print('Found CUPS classes: %s' % cups_classes)
+
+    # Override with specified classname if provided and valid
+    if args.classname:
+        if args.classname in cups_classes:
+            cups_classes = {args.classname: cups_classes[args.classname]}
+            if args.verbose:
+                print('Overriding CUPS classes with parameter: %s' % args.classname)
+        else:
+            raise CUPSException('ERROR: Specified class %s could not be found in available classes %s'
+                                % (args.classname, cups_classes))
+    return cups_classes
 
 
 def main():
@@ -104,8 +179,7 @@ def main():
     elif args.action == 'list':
         return list_printers(args)
     else:
-        print('ERROR: Invalid action passed %s' % args.action)
-        return 1
+        raise CUPSException('ERROR: Invalid action passed %s' % args.action)
 
 
 if __name__ == '__main__':

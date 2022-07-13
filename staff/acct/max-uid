@@ -2,24 +2,34 @@
 """Find the highest non-excluded OCF UID."""
 import sys
 
+from ocflib.account.creation import IGNORED_UID_RANGES
+from ocflib.account.creation import RESERVED_UID_RANGES
 from ocflib.infra.ldap import ldap_ocf
 from ocflib.infra.ldap import OCF_LDAP_PEOPLE
-from ocflib.account.creation import RESERVED_UID_RANGES
-from ocflib.account.creation import IGNORED_UID_RANGES
+
+
+INVALID_UID_RANGES = sorted(RESERVED_UID_RANGES + IGNORED_UID_RANGES)
+
+
+def is_valid_uid(uid):
+    for start, end in IGNORED_UID_RANGES:
+        if start <= uid <= end:
+            return False
+    return True
 
 
 def main():
+    print('Searching for maximum currently used OCF UID')
     with ldap_ocf() as c:
         c.search(
-            OCF_LDAP_PEOPLE, 
-            '(uid=*)', 
+            OCF_LDAP_PEOPLE,
+            '(uid=*)',
             attributes=['uidNumber']
         )
-    uids = [int(entry['attributes']['uidNumber']) for entry in c.response]
-    remove_ranges = RESERVED_UID_RANGES + IGNORED_UID_RANGES
-    uids = filter(lambda v: v not in remove_ranges, uids)
-    print(f"Max currently used UID is: {max(uids)}")
-    
+        uids = [int(entry['attributes']['uidNumber']) for entry in c.response]
+    uids = filter(is_valid_uid, uids)
+    print('Max currently used OCF UID is: %s' % max(uids))
 
-if __name__ == "__main__":
+
+if __name__ == '__main__':
     sys.exit(main())

@@ -43,18 +43,18 @@ def view(args):
         print(bold(red("Group accounts can't print. Sorry!")))
 
 
-def adjust(args, type):
+def adjust(args):
     payload = Payload(
         user=args.user,
         time=datetime.now(),
         pages=args.pages,
-        action=type,
+        action=args.command,
         staffer=current_user(),
         reason=args.reason,
     )
 
-    stringtype = 'Refund' if type == 'refund' else 'Forward'
-    prompt = bold(stringtype + ' {} pages to {}? [yN] '.format(payload.pages, payload.user))
+    stringtype = 'Refund' if payload.action == 'refund' else 'Forward'
+    prompt = bold('{} +  {} pages to {}? [yN] '.format(stringtype, payload.pages, payload.user))
     if input(prompt) not in {'y', 'yes'}:
         print('Cancelled.')
         return
@@ -102,10 +102,7 @@ def main(argv=None):
         print(bold(red("The user {} doesn't exist.".format(args.user))))
         return 1
 
-    if args.command == 'refund' or args.command == 'forward':
-        return commands[args.command](args, args.command)
-    else:
-        return commands[args.command](args)
+    return commands[args.command](args)
 
 
 if __name__ == '__main__':

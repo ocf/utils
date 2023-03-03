@@ -44,7 +44,9 @@ if ! $IGNORE_WP && [ -f "$HOME/public_html/wp-config.php" ] ; then
     if ! $QUIET; then
         echo "WordPress installation detected, changing WordPress mysql password for you."
     fi
+    chmod 600 $HOME/public_html/wp-config.php
     wp config set DB_PASSWORD "$PASS" --path="$HOME/public_html" > /dev/null 2>&1
+    chmod 400 $HOME/public_html/wp-config.php
 fi
 
 if $QUIET; then

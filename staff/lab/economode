@@ -36,7 +36,7 @@ class Printer:
         resp = self.session.get('https://' + self.server +
                                 '/hp/device/SignIn/Index')
         tree = lxml.html.fromstring(resp.content)
-        token = tree.get_element_by_id('CSRFToken')
+        token = tree.get_element_by_id('CSRFToken').value
         resp = self.session.post('https://' + self.server +
                                  '/hp/device/SignIn/Index',
                                  data={'CSRFToken': token,

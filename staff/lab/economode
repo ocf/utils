@@ -35,9 +35,9 @@ class Printer:
     def log_in(self, password):
         """Logs in to the printer and returns whether that succeeded."""
         resp = self.session.get('https://' + self.server +
-                                 '/hp/device/SignIn/Index')
+                                '/hp/device/SignIn/Index')
         tree = lxml.html.fromstring(resp.content)
-        token = tree.get_element_by_id("CSRFToken")
+        token = tree.get_element_by_id('CSRFToken')
         resp = self.session.post('https://' + self.server +
                                  '/hp/device/SignIn/Index',
                                  data={'CSRFToken': token,
@@ -72,10 +72,10 @@ class Printer:
     def get_csrf_token(self):
         """Gets the CSRF token."""
 
-        resp = self.session.get("https://" + self.server +
-                                "/hp/device/PrintQuality/Index")
+        resp = self.session.get('https://' + self.server +
+                                '/hp/device/PrintQuality/Index')
         tree = lxml.html.fromstring(resp.content)
-        value = tree.get_element_by_id("CSRFToken")
+        value = tree.get_element_by_id('CSRFToken')
         return value
 
     def change_economode(self, setting):
@@ -98,8 +98,8 @@ class Printer:
         opts['PrintQualityMode'] = 'Economode' if setting == 'On' else 'Normal'
         opts['FormButtonSubmit'] = 'Apply'
         resp = self.session.post('https://' + self.server +
-                                '/hp/device/DefaultPrintOptions/Save',
-                                data=opts)
+                                 '/hp/device/DefaultPrintOptions/Save',
+                                 data=opts)
         return '<h2>The operation was completed successfully.</h2>' in resp.text
 
 

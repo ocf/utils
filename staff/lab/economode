@@ -21,7 +21,6 @@ class Printer:
         self.session.verify = False
         self.server = server
         self.logged_in = False
-        self.version = 4
 
     def __enter__(self):
         self.session.__enter__()

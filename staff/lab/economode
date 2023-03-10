@@ -72,7 +72,7 @@ class Printer:
         """Gets the CSRF token."""
 
         resp = self.session.get('https://' + self.server +
-                                '/hp/device/PrintQuality/Index')
+                                '/hp/device/DefaultPrintOptions/Index')
         tree = lxml.html.fromstring(resp.content)
         value = tree.get_element_by_id('CSRFToken')
         return value

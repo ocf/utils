@@ -33,12 +33,17 @@ class Printer:
 
     def log_in(self, password):
         """Logs in to the printer and returns whether that succeeded."""
+        resp = self.session.get('https://' + self.server +
+                                '/hp/device/SignIn/Index')
+        tree = lxml.html.fromstring(resp.content)
+        token = tree.get_element_by_id('CSRFToken').value
         resp = self.session.post('https://' + self.server +
                                  '/hp/device/SignIn/Index',
-                                 data={'agentIdSelect': 'hp_EmbeddedPin_v1',
+                                 data={'CSRFToken': token,
+                                       'agentIdSelect': 'hp_EmbeddedPin_v1',
                                        'PinDropDown': 'AdminItem',
                                        'PasswordTextBox': password})
-        if '<h2>Sign In failed</h2>' in resp.text:
+        if '<h2>Sign-In failed</h2>' in resp.text:
             return False
         else:
             self.logged_in = True
@@ -55,7 +60,7 @@ class Printer:
         form option name -> form option value."""
 
         resp = self.session.get('https://' + self.server +
-                                '/hp/device/MenuTree/IndexForm?id=PrintQuality')
+                                '/hp/device/DefaultPrintOptions/Index')
         tree = lxml.html.fromstring(resp.content)
         opts = {}
         for select_elem in tree.xpath('//form//select'):
@@ -63,9 +68,18 @@ class Printer:
             opts[select_elem.name] = val
         return opts
 
+    def get_csrf_token(self):
+        """Gets the CSRF token."""
+
+        resp = self.session.get('https://' + self.server +
+                                '/hp/device/DefaultPrintOptions/Index')
+        tree = lxml.html.fromstring(resp.content)
+        value = tree.get_element_by_id('CSRFToken')
+        return value
+
     def change_economode(self, setting):
         """Changes the economode setting on the printer and returns whether
-        that succeeded.
+        that succeeded. For both versions of the HP firmware.
 
         'setting' must be "On" or "Off"."""
 
@@ -73,17 +87,19 @@ class Printer:
             raise ValueError('You must log in first')
         if setting not in ('On', 'Off'):
             raise ValueError('setting must be "On" or "Off"')
-
-        # We must fetch the current option values and re-submit them, or else
-        # the printer will set the options other than economode to the wrong
-        # values
+        token = self.get_csrf_token().value
         opts = self.get_print_quality_opts()
-        opts['Economode__mEconomodeListBox'] = setting
-        opts['FormButtonSubmit'] = 'OK'
+        opts['CSRFToken'] = token
+        opts['NumberOfCopies'] = '1'
+        opts['XDimension'] = '12.28'
+        opts['YDimension'] = '18.5'
+        opts['UseInches'] = 'on'
+        opts['PrintQualityMode'] = 'Economode' if setting == 'On' else 'Normal'
+        opts['FormButtonSubmit'] = 'Apply'
         resp = self.session.post('https://' + self.server +
-                                 '/hp/device/MenuTree/IndexForm?id=PrintQuality',
+                                 '/hp/device/DefaultPrintOptions/Save',
                                  data=opts)
-        return '<h2>The operation was executed successfully.</h2>' in resp.text
+        return '<h2>The operation was completed successfully.</h2>' in resp.text
 
 
 def main():

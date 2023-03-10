@@ -21,7 +21,7 @@ class Printer:
         self.session.verify = False
         self.server = server
         self.logged_in = False
-        self.version = 3
+        self.version = 4
 
     def __enter__(self):
         self.session.__enter__()
@@ -34,19 +34,19 @@ class Printer:
 
     def log_in(self, password):
         """Logs in to the printer and returns whether that succeeded."""
-
+        resp = self.session.get('https://' + self.server +
+                                 '/hp/device/SignIn/Index')
+        tree = lxml.html.fromstring(resp.content)
+        token = tree.get_element_by_id("CSRFToken")
         resp = self.session.post('https://' + self.server +
                                  '/hp/device/SignIn/Index',
-                                 data={'agentIdSelect': 'hp_EmbeddedPin_v1',
+                                 data={'CSRFToken': token,
+                                       'agentIdSelect': 'hp_EmbeddedPin_v1',
                                        'PinDropDown': 'AdminItem',
                                        'PasswordTextBox': password})
-        if '<h2>Sign In failed</h2>' in resp.text or '<h2>Sign-In failed</h2>' in resp.text:
+        if '<h2>Sign-In failed</h2>' in resp.text:
             return False
         else:
-            if 'HP Development Company, L.P.' in resp.text:
-                self.version = 4
-            else:
-                self.version = 3
             self.logged_in = True
             return True
 
@@ -61,7 +61,7 @@ class Printer:
         form option name -> form option value."""
 
         resp = self.session.get('https://' + self.server +
-                                '/hp/device/MenuTree/IndexForm?id=PrintQuality')
+                                '/hp/device/DefaultPrintOptions/Index')
         tree = lxml.html.fromstring(resp.content)
         opts = {}
         for select_elem in tree.xpath('//form//select'):
@@ -88,27 +88,19 @@ class Printer:
             raise ValueError('You must log in first')
         if setting not in ('On', 'Off'):
             raise ValueError('setting must be "On" or "Off"')
-        if self.version == 3:
-            opts = self.get_print_quality_opts()
-            opts['Economode__mEconomodeListBox'] = setting
-            opts['FormButtonSubmit'] = 'OK'
-            resp = self.session.post('https://' + self.server +
-                                     '/hp/device/MenuTree/IndexForm?id=PrintQuality',
-                                     data=opts)
-            return '<h2>The operation was executed successfully.</h2>' in resp.text
-        elif self.version == 4:
-            token = self.get_csrf_token().value
-            density = 2 if setting == 'On' else 3
-            opts = {}
-            opts['CSRFToken'] = token
-            opts['TonerDensityBlack'] = density
-            opts['ResolutionEnhancementTechnology'] = "on"
-            opts['FormButtonSubmit'] = 'Apply'
-            print(opts)
-            resp = self.session.post('https://' + self.server +
-                                    '/hp/device/PrintQuality/Save',
-                                    data=opts)
-            return '<h2>The operation was completed successfully.</h2>' in resp.text
+        token = self.get_csrf_token().value
+        opts = self.get_print_quality_opts()
+        opts['CSRFToken'] = token
+        opts['NumberOfCopies'] = '1'
+        opts['XDimension'] = '12.28'
+        opts['YDimension'] = '18.5'
+        opts['UseInches'] = 'on'
+        opts['PrintQualityMode'] = 'Economode' if setting == 'On' else 'Normal'
+        opts['FormButtonSubmit'] = 'Apply'
+        resp = self.session.post('https://' + self.server +
+                                '/hp/device/DefaultPrintOptions/Save',
+                                data=opts)
+        return '<h2>The operation was completed successfully.</h2>' in resp.text
 
 
 def main():

@@ -21,6 +21,7 @@ class Printer:
         self.session.verify = False
         self.server = server
         self.logged_in = False
+        self.version = 3
 
     def __enter__(self):
         self.session.__enter__()
@@ -33,14 +34,19 @@ class Printer:
 
     def log_in(self, password):
         """Logs in to the printer and returns whether that succeeded."""
+
         resp = self.session.post('https://' + self.server +
                                  '/hp/device/SignIn/Index',
                                  data={'agentIdSelect': 'hp_EmbeddedPin_v1',
                                        'PinDropDown': 'AdminItem',
                                        'PasswordTextBox': password})
-        if '<h2>Sign In failed</h2>' in resp.text:
+        if '<h2>Sign In failed</h2>' in resp.text or '<h2>Sign-In failed</h2>' in resp.text:
             return False
         else:
+            if 'HP Development Company, L.P.' in resp.text:
+                self.version = 4
+            else:
+                self.version = 3
             self.logged_in = True
             return True
 
@@ -63,9 +69,18 @@ class Printer:
             opts[select_elem.name] = val
         return opts
 
+    def get_csrf_token(self):
+        """Gets the CSRF token."""
+
+        resp = self.session.get("https://" + self.server +
+                                "/hp/device/PrintQuality/Index")
+        tree = lxml.html.fromstring(resp.content)
+        value = tree.get_element_by_id("CSRFToken")
+        return value
+
     def change_economode(self, setting):
         """Changes the economode setting on the printer and returns whether
-        that succeeded.
+        that succeeded. For both versions of the HP firmware.
 
         'setting' must be "On" or "Off"."""
 
@@ -73,17 +88,27 @@ class Printer:
             raise ValueError('You must log in first')
         if setting not in ('On', 'Off'):
             raise ValueError('setting must be "On" or "Off"')
-
-        # We must fetch the current option values and re-submit them, or else
-        # the printer will set the options other than economode to the wrong
-        # values
-        opts = self.get_print_quality_opts()
-        opts['Economode__mEconomodeListBox'] = setting
-        opts['FormButtonSubmit'] = 'OK'
-        resp = self.session.post('https://' + self.server +
-                                 '/hp/device/MenuTree/IndexForm?id=PrintQuality',
-                                 data=opts)
-        return '<h2>The operation was executed successfully.</h2>' in resp.text
+        if self.version == 3:
+            opts = self.get_print_quality_opts()
+            opts['Economode__mEconomodeListBox'] = setting
+            opts['FormButtonSubmit'] = 'OK'
+            resp = self.session.post('https://' + self.server +
+                                     '/hp/device/MenuTree/IndexForm?id=PrintQuality',
+                                     data=opts)
+            return '<h2>The operation was executed successfully.</h2>' in resp.text
+        elif self.version == 4:
+            token = self.get_csrf_token().value
+            density = 2 if setting == 'On' else 3
+            opts = {}
+            opts['CSRFToken'] = token
+            opts['TonerDensityBlack'] = density
+            opts['ResolutionEnhancementTechnology'] = "on"
+            opts['FormButtonSubmit'] = 'Apply'
+            print(opts)
+            resp = self.session.post('https://' + self.server +
+                                    '/hp/device/PrintQuality/Save',
+                                    data=opts)
+            return '<h2>The operation was completed successfully.</h2>' in resp.text
 
 
 def main():

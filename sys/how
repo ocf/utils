@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
 # how: view or edit source of a command that calls a script in $PATH
 # 2011-11-17: crudely assembled, daradib@OCF

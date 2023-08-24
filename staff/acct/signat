@@ -8,6 +8,7 @@ import textwrap
 
 import ocflib.account.search as search
 import ocflib.ucb.directory as directory
+from ocflib.misc.shell import green
 from ocflib.misc.shell import red
 from ocflib.misc.shell import yellow
 from ocflib.ucb.groups import group_by_oid
@@ -67,7 +68,8 @@ def show_signatories_for_group(oid):
 
     if group:
         accounts = ' '.join(group['accounts']) if group['accounts'] else 'n/a'
-        subtitle = 'Group accounts: {}'.format(accounts)
+        subtitle = '{} - Group accounts: {}'.format(
+            red('Inactive Group') if group['inactive'] else green('Active Group'), accounts)
         title = '{} (OID: {} - Email: {})'.format(group['name'], oid, group['email'])
     else:
         subtitle = None

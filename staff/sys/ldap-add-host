@@ -21,6 +21,7 @@ if grep '\.' <<< "$IP" > /dev/null; then
         exit 1
     else
         # we assume this is an IPv4 address
+        # shellcheck disable=SC2001
         IP="$(sed -e 's/169\.229\.226\.//' <<< "$IP")"
         echo "we figured out what you meant, but for future reference,"
         echo "just use the last bit of the IP, like \"42\" for 169.229.226.42"

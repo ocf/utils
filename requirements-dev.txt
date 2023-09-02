@@ -1,5 +1,5 @@
 dnspython
-matplotlib
+matplotlib<3.6.0
 ocflib
 pre-commit
 tabulate

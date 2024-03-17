@@ -14,10 +14,15 @@
         overlays = [ ocflib.overlays.default ];
       };
       package = pkgs.callPackage ./default.nix { };
+      overlay = self: super: {
+        ocf-utils = package;
+      };
     in
     {
       packages.default = package;
       packages.ocf-utils = package;
+      overlays.default = overlay;
+      overlays.ocf-utils = overlay;
     }
   );
 }

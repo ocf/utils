@@ -8,7 +8,11 @@ python3Packages.buildPythonApplication {
   src = ./.;
 
   dontBuild = true;
-  installPhase = "cp -r . $out";
+  installPhase = ''
+    mkdir -p $out/bin $out/sbin
+    cp bin/* $out/bin
+    cp sbin/* $out/sbin
+  '';
   doCheck = false;
 
   buildInputs = [ bash ];

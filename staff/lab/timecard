@@ -72,37 +72,35 @@ def get_usage_count(users, start=None, end=None):
     step = datetime.timedelta(minutes=60)
     hours = dict()
 
-    cnx = stats.get_connection()
-    cursor = cnx.cursor()
+    with stats.get_connection() as cursor:
+        for user in users:
+            user_hours = collections.defaultdict(lambda: [0] * 7)
+            query = """
+                SELECT `start`, `end`
+                FROM `staff_session_duration_public`
+                WHERE `user` = %s
+                    AND `start` >= %s
+                    AND `end` <= %s
+                    AND `duration` IS NOT NULL
+                ORDER BY start ASC"""
+            cursor.execute(query, (user, start, end))
+            logins = cursor.fetchall()
 
-    for user in users:
-        user_hours = collections.defaultdict(lambda: [0] * 7)
-        query = """
-            SELECT `start`, `end`
-            FROM `staff_session_duration_public`
-            WHERE `user` = %s
-                AND `start` >= %s
-                AND `end` <= %s
-                AND `duration` IS NOT NULL
-            ORDER BY start ASC"""
-        cursor.execute(query, (user, start, end))
-        logins = cursor.fetchall()
+            was_logged_in = dict()
+            for session in logins:
+                start_time = session['start'].replace(microsecond=0, second=0, minute=0)
+                end_time = session['end']
+                while start_time <= end_time:
+                    was_logged_in[start_time] = True
+                    start_time += step
 
-        was_logged_in = dict()
-        for session in logins:
-            start_time = session['start'].replace(microsecond=0, second=0, minute=0)
-            end_time = session['end']
-            while start_time <= end_time:
-                was_logged_in[start_time] = True
-                start_time += step
+            time = start
+            while time <= end:
+                if was_logged_in.get(time):
+                    user_hours[time.hour][time.weekday()] += 1
+                time += step
 
-        time = start
-        while time <= end:
-            if was_logged_in.get(time):
-                user_hours[time.hour][time.weekday()] += 1
-            time += step
-
-        hours[user] = user_hours
+            hours[user] = user_hours
 
     return hours, start, end
 

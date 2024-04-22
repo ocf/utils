@@ -2,7 +2,7 @@
 
 python3Packages.buildPythonApplication {
   pname = "ocf-utils";
-  version = "2024-03-17";
+  version = "2024-04-22";
   format = "other";
 
   src = ./.;

@@ -1,0 +1,350 @@
+#!/usr/bin/env python3
+# This script generates TLS certificates for use by Kubernetes masters.
+# It should be run on the puppet master when new Kubernetes masters are added.
+#
+#
+# Kubernetes SSL is a huge pain
+# We have 3 CAs (two for Kubernetes (main/proxy), and one for etcd)
+#
+# The main Kubernetes CA is used authenticating the following:
+# 1. kubelet on each node -> kube-apiserver
+# 2. kube-controller-manager -> kube-apiserver
+# 3. kube-scheduler -> kube-apiserver
+# 4. admin -> kube-apiserver
+# 5. kube-apiserver -> kubelet on each node
+#
+# The etcd CA is required because etcd relies on certificates for
+# authorization, but we only want the kubernetes masters to be able
+# authorized to read/write etcd. Any worker node should not have a
+# certificate signed by the etcd CA.
+#
+# The etcd CA is used for authenticating the following:
+# 1. etcd node -> etcd node
+# 2. kube-apiserver -> etcd node
+# 3. prometheus (inside kubernetes) -> etcd node
+#
+# The front-proxy CA is needed to authenticate kubernetes apiserver extensions.
+# We need one signed keypair for it.
+#
+# We also need a keypair to sign/verify service accounts.
+#
+#
+# Usage:
+# $0 <cluster_name> <node1> <node2> <node3> <...>
+import argparse
+import datetime
+import ipaddress
+import pathlib
+import socket
+import sys
+
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.x509.oid import NameOID
+
+CERTS_BASE_DIR = pathlib.Path('/opt/puppetlabs/shares/private/kubernetes')
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description='Generates Kubernetes Certificates.',
+        epilog='Usage example: {} prod monsoon pileup whirlwind\n'.format(sys.argv[0])
+        + '               {} dev hozer-72 hozer-73 hozer-74\n'.format(sys.argv[0])
+        + "If you're editing this script, you probably want to wipe the generated directory"
+        + 'to ensure that your changes are applied, rather than reusing old certificates.',
+    )
+    parser.add_argument('cluster_name', help='Name of the cluster')
+    parser.add_argument('nodes', nargs='+', help='Hostnames of the nodes')
+
+    args = parser.parse_args()
+
+    cluster_name = args.cluster_name
+    kube_ca = get_ca(cluster_name, 'kube-ca')
+    etcd_ca = get_ca(cluster_name, 'etcd-ca')
+    front_proxy_ca = get_ca(cluster_name, 'front-proxy-ca')
+
+    # get_signed_key is as follows:
+    # get_signed_key(cluster_name, ca_private_key, file_name, common_name, hostnames=None, subject=None):
+
+    # admin client certificate
+    get_signed_key(cluster_name, kube_ca, 'admin', 'admin', subject='system:masters')
+
+    # controller-manager client certificate
+    get_signed_key(
+        cluster_name,
+        kube_ca,
+        'controller-manager',
+        'system:kube-controller-manager',
+        subject='system:kube-controller-manager',
+    )
+
+    # scheduler client certificate
+    get_signed_key(
+        cluster_name,
+        kube_ca,
+        'scheduler',
+        'system:kube-scheduler',
+        subject='system:kube-scheduler',
+    )
+
+    # apiserver server certificate
+    get_signed_key(
+        cluster_name,
+        kube_ca,
+        'apiserver',
+        'system:kube-apiserver',
+        dns_names=['kube-master.ocf.berkeley.edu', 'localhost'],
+        ip_names=['127.0.0.1'],
+    )
+
+    # kubelet server certificates
+    for node in args.nodes:
+        get_signed_key(
+            cluster_name,
+            kube_ca,
+            '{}-kubelet-server'.format(node),
+            'system:node:{}'.format(node),
+            subject='system:nodes',
+        )
+
+    # kubelet -> apiserver client certificate
+    get_signed_key(
+        cluster_name,
+        kube_ca,
+        'apiserver-kubelet-client',
+        'system:kube-apiserver-kubelet-client',
+        subject='system:masters',
+    )
+
+    # etcd client certificate
+    for node in args.nodes:
+        ip_address = socket.gethostbyname(node)
+        get_signed_key(
+            cluster_name,
+            etcd_ca,
+            '{}-etcd-client'.format(node),
+            '{}-etcd-client'.format(node),
+            ip_names=[ip_address],
+        )
+
+    # etcd server certificate
+    for node in args.nodes:
+        ip_address = socket.gethostbyname(node)
+        get_signed_key(
+            cluster_name,
+            etcd_ca,
+            '{}-etcd-server'.format(node),
+            '{}-etcd-server'.format(node),
+            ip_names=['127.0.0.1', ip_address],
+        )
+
+    # front proxy certificate
+    get_signed_key(
+        cluster_name, front_proxy_ca, 'front-proxy-client', 'front-proxy-client'
+    )
+
+    # service account keypair
+    get_keypair(cluster_name, 'service')
+
+
+def get_ca(cluster_name, ca_name):
+    """Gets the CA for the given cluster with the given name.
+    Generates it if it does not exist."""
+
+    cluster_dir = CERTS_BASE_DIR / cluster_name
+
+    private_key_path = pathlib.Path(cluster_dir / '{}.key'.format(ca_name))
+    public_key_path = pathlib.Path(cluster_dir / '{}.crt'.format(ca_name))
+
+    if not cluster_dir.exists():
+        cluster_dir.mkdir()
+
+    if cluster_dir.exists() and not cluster_dir.is_dir():
+        raise RuntimeError('{} is file but expected directory'.format(cluster_dir))
+
+    if private_key_path.exists() and public_key_path.exists():
+        crt_data = private_key_path.read_bytes()
+        private_key = serialization.load_pem_private_key(
+            crt_data, password=None, backend=default_backend()
+        )
+        return private_key
+
+    private_key = rsa.generate_private_key(
+        public_exponent=65537, key_size=2048, backend=default_backend()
+    )
+
+    certificate = (
+        x509.CertificateBuilder()
+        .subject_name(
+            x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'OCF Kubernetes CA')])
+        )
+        .issuer_name(
+            x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'OCF Kubernetes CA')])
+        )
+        .public_key(private_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.datetime.utcnow())
+        .not_valid_after(datetime.datetime(2100, 1, 1))
+        .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        .sign(
+            private_key=private_key,
+            algorithm=hashes.SHA256(),
+            backend=default_backend(),
+        )
+    )
+
+    assert isinstance(certificate, x509.Certificate)
+
+    with private_key_path.open('wb') as f:
+        f.write(
+            private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption(),
+            )
+        )
+
+    with public_key_path.open('wb') as f:
+        f.write(
+            certificate.public_bytes(
+                encoding=serialization.Encoding.PEM,
+            )
+        )
+
+    return private_key
+
+
+def get_signed_key(
+    cluster_name,
+    ca_private_key,
+    file_name,
+    common_name,
+    ip_names=None,
+    dns_names=None,
+    subject=None,
+):
+    """Generates and signs a certificate with the given CA and CN, with the given SANs"""
+    cluster_dir = CERTS_BASE_DIR / cluster_name
+
+    private_key_path = pathlib.Path(cluster_dir / '{}.key'.format(file_name))
+    public_key_path = pathlib.Path(cluster_dir / '{}.crt'.format(file_name))
+
+    if private_key_path.exists() and public_key_path.exists():
+        return
+
+    private_key = rsa.generate_private_key(
+        public_exponent=65537, key_size=2048, backend=default_backend()
+    )
+
+    subject_name_attributes = [x509.NameAttribute(NameOID.COMMON_NAME, common_name)]
+
+    if subject:
+        subject_name_attributes.append(
+            x509.NameAttribute(NameOID.ORGANIZATION_NAME, subject)
+        )
+
+    builder = (
+        x509.CertificateBuilder()
+        .subject_name(x509.Name(subject_name_attributes))
+        .issuer_name(
+            x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'OCF Kubernetes CA')])
+        )
+        .public_key(private_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(datetime.datetime.utcnow())
+        .not_valid_after(datetime.datetime(2100, 1, 1))
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                key_encipherment=True,
+                data_encipherment=False,
+                key_agreement=False,
+                content_commitment=False,
+                key_cert_sign=False,
+                crl_sign=False,
+                encipher_only=False,
+                decipher_only=False,
+            ),
+            critical=True,
+        )
+        .add_extension(
+            x509.ExtendedKeyUsage(
+                [
+                    x509.oid.ExtendedKeyUsageOID.SERVER_AUTH,
+                    x509.oid.ExtendedKeyUsageOID.CLIENT_AUTH,
+                ]
+            ),
+            critical=False,
+        )
+    )
+
+    x509_names = []
+    if dns_names:
+        x509_names += [x509.DNSName(host) for host in dns_names]
+    if ip_names:
+        x509_names += [x509.IPAddress(ipaddress.ip_address(ip)) for ip in ip_names]
+    if x509_names:
+        builder = builder.add_extension(
+            x509.SubjectAlternativeName(x509_names), critical=False
+        )
+
+    certificate = builder.sign(
+        private_key=ca_private_key, algorithm=hashes.SHA256(), backend=default_backend()
+    )
+
+    assert isinstance(certificate, x509.Certificate)
+
+    with private_key_path.open('wb') as f:
+        f.write(
+            private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption(),
+            )
+        )
+
+    with public_key_path.open('wb') as f:
+        f.write(
+            certificate.public_bytes(
+                encoding=serialization.Encoding.PEM,
+            )
+        )
+
+
+def get_keypair(cluster_name, file_name):
+    """Generates a keypair and writes it to disk"""
+    cluster_dir = CERTS_BASE_DIR / cluster_name
+
+    private_key_path = pathlib.Path(cluster_dir / '{}.key'.format(file_name))
+    public_key_path = pathlib.Path(cluster_dir / '{}.pub'.format(file_name))
+
+    if private_key_path.exists() and public_key_path.exists():
+        return
+
+    private_key = rsa.generate_private_key(
+        public_exponent=65537, key_size=2048, backend=default_backend()
+    )
+
+    with private_key_path.open('wb') as f:
+        f.write(
+            private_key.private_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PrivateFormat.TraditionalOpenSSL,
+                encryption_algorithm=serialization.NoEncryption(),
+            )
+        )
+
+    with public_key_path.open('wb') as f:
+        f.write(
+            private_key.public_key().public_bytes(
+                encoding=serialization.Encoding.PEM,
+                format=serialization.PublicFormat.SubjectPublicKeyInfo,
+            )
+        )
+
+
+if __name__ == '__main__':
+    main()

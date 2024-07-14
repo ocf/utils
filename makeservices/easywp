@@ -91,7 +91,7 @@ fi
 echo "You admin e-mail will be '$(whoami)@ocf.berkeley.edu', the confirmation e-mail will not be sent to you."
 echo "WP-CLI will install wordpress for you. If you wish, enter your desired admin password and press enter; if you want one to be randomly generated for you, press enter."
 # Use --prompt so that password is not left in ~/.bash_history
-wp core install --admin_user="$adminname" --admin_email="$(whoami)@ocf.berkeley.edu" --skip-email --title=$sitetitle --url="https://www.ocf.berkeley.edu/~$user/" --prompt=admin_password
+wp core install --admin_user="$adminname" --admin_email="$(whoami)@ocf.berkeley.edu" --skip-email --title="$sitetitle" --url="https://www.ocf.berkeley.edu/~$user/" --prompt=admin_password
 # As we had `set -e`, installation must be complete as otherwise the script will end. If it is incomplete, people will still know as this step is verbose.
 
 echo "Campus web security regulations require us to disable unauthenticated REST API. We will install a WordPress plug-in to do that.

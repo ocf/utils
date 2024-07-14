@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 '''
 Deploys Kubernetes templates from the given directory. Creates a namespace
-based on the app name, and runs kubernetes-deploy.
+based on the app name, and runs krane.
 '''
 import argparse
 import json
@@ -111,7 +111,7 @@ def main():
         input=json.dumps(j).encode(),
     ).check_returncode()
 
-    # Bindings passed into the kubernetes-deploy templates
+    # Bindings passed into the krane templates
     bindings = {'version': args.appversion}
 
     if os.path.isfile(args.secrets):
@@ -151,11 +151,12 @@ def main():
         bindings_file.flush()
 
         subprocess.run([
-            'kubernetes-deploy',
+            'krane',
+            'deploy',
             namespace_name,
             args.kube_context,
             '--bindings=@' + bindings_file.name,
-            '--template-dir=' + get_kubernetes_dir(),
+            '--filenames=' + get_kubernetes_dir(),
         ]).check_returncode()
 
 

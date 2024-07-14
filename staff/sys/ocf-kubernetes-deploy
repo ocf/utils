@@ -150,14 +150,22 @@ def main():
         # ensure the file gets written to
         bindings_file.flush()
 
+        render = subprocess.Popen([
+            'krane',
+            'render',
+            '--bindings=@' + bindings_file.name,
+            '--filenames=' + get_kubernetes_dir(),
+        ], stdout=subprocess.PIPE)
+
         subprocess.run([
             'krane',
             'deploy',
             namespace_name,
             args.kube_context,
-            '--bindings=@' + bindings_file.name,
-            '--filenames=' + get_kubernetes_dir(),
-        ]).check_returncode()
+            '--filenames=-'
+        ], stdin=render.stdout).check_returncode()
+
+        render.wait()
 
 
 if __name__ == '__main__':

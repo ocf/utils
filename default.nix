@@ -1,4 +1,4 @@
-{ lib, python3Packages, bash }:
+{ lib, python3Packages, bash, wakeonlan }:
 
 python3Packages.buildPythonApplication {
   pname = "ocf-utils";
@@ -15,7 +15,7 @@ python3Packages.buildPythonApplication {
   '';
   doCheck = false;
 
-  buildInputs = [ bash ];
+  buildInputs = [ bash wakeonlan ];
 
   propagatedBuildInputs = with python3Packages; [
     dnspython

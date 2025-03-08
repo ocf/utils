@@ -51,10 +51,6 @@ def refund(args):
         staffer=current_user(),
         reason=args.reason,
     )
-    prompt = bold('Refund {} pages to {}? [yN] '.format(refund.pages, refund.user))
-    if input(prompt) not in {'y', 'yes'}:
-        print('Cancelled.')
-        return
 
     try:
         credentials = staff_creds()

@@ -80,17 +80,44 @@ def main(argv=None):
     subparsers.required = True
 
     parser_view = subparsers.add_parser('view', help="view a user's print quota")
-    parser_view.add_argument('user', nargs='?', type=str, default=current_user())
+    parser_view.add_argument('--user', '-u', type=str)
 
     parser_refund = subparsers.add_parser('refund', help="refund a user's pages")
-    parser_refund.add_argument('--pages', '-p', required=True, type=int)
-    parser_refund.add_argument('--reason', '-r', required=True, type=str)
-    parser_refund.add_argument('user', type=str)
+    parser_refund.add_argument('--pages', '-p', type=int)
+    parser_refund.add_argument('--reason', '-r', type=str)
+    parser_refund.add_argument('--user', '-u', type=str)
 
     if len(argv or sys.argv[1:]) == 0:
-        args = parser.parse_args(['view'])
-    else:
-        args = parser.parse_args(argv)
+        reponse = input(bold('Refund(r) or view(v)? [rV] '))
+        if reponse in {'r', 'R', 'refund'}:
+            argv = ['refund']
+        elif reponse in {'v', 'V', 'view'}:
+            argv = ['view']
+        else:
+            print('Cancelled.')
+            return
+    args = parser.parse_args(argv)
+    
+    if not args.user:
+        response = input(bold('Input Username: '))
+        if not len(response):
+            response = current_user()
+        args.user = response
+
+    if args.command == 'refund':
+        if not args.pages:
+            response = input(bold('Number of Pages: '))
+            try:
+                args.pages = int(response)
+            except ValueError:
+                print(bold(red("Invalid int value: {}".format(response))))
+                return 1
+        if not args.reason:
+            response = input(bold('Reason: '))
+            if not len(response):
+                print(bold(red("Must input a reason.")))
+                return 1
+            args.reason = response
 
     if not user_exists(args.user):
         print(bold(red("The user {} doesn't exist.".format(args.user))))

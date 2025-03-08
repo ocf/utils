@@ -22,27 +22,6 @@ def staff_creds():
     return json.load(open('/etc/ocfprinting.json'))
 
 
-def view(args):
-    with get_connection() as c:
-        quota = get_quota(c, args.user)
-
-    def highlight(num, text, warning_level):
-        if num > warning_level:
-            color = green
-        elif 0 < num <= warning_level:
-            color = yellow
-        else:
-            color = red
-        return bold('  ' + color('→ {}{}'.format(num, text)))
-
-    print('{} printing quota:'.format(bold(quota.user)))
-    if not user_is_group(quota.user):
-        print(highlight(quota.semesterly, ' remaining this semester', 30))
-        print(highlight(quota.daily, ' remaining today', 5))
-    else:
-        print(bold(red("Group accounts can't print. Sorry!")))
-
-
 def refund(args):
     refund = Refund(
         user=args.user,
@@ -66,32 +45,12 @@ def refund(args):
 
 
 def main(argv=None):
-    commands = {
-        'view': view,
-        'refund': refund,
-    }
+    parser = argparse.ArgumentParser(description='Manipulate page quotas.')
 
-    parser = argparse.ArgumentParser(description='View and manipulate page quotas.')
-    subparsers = parser.add_subparsers(dest='command', help='command to run')
-    subparsers.required = True
+    parser.add_argument('--pages', '-p', type=int)
+    parser.add_argument('--reason', '-r', type=str)
+    parser.add_argument('--user', '-u', type=str)
 
-    parser_view = subparsers.add_parser('view', help="view a user's print quota")
-    parser_view.add_argument('--user', '-u', type=str)
-
-    parser_refund = subparsers.add_parser('refund', help="refund a user's pages")
-    parser_refund.add_argument('--pages', '-p', type=int)
-    parser_refund.add_argument('--reason', '-r', type=str)
-    parser_refund.add_argument('--user', '-u', type=str)
-
-    if len(argv or sys.argv[1:]) == 0:
-        reponse = input(bold('Refund(r) or view(v)? [rV] '))
-        if reponse in {'r', 'R', 'refund'}:
-            argv = ['refund']
-        elif reponse in {'v', 'V', 'view'}:
-            argv = ['view']
-        else:
-            print('Cancelled.')
-            return
     args = parser.parse_args(argv)
     
     if not args.user:
@@ -100,26 +59,26 @@ def main(argv=None):
             response = current_user()
         args.user = response
 
-    if args.command == 'refund':
-        if not args.pages:
-            response = input(bold('Number of Pages: '))
-            try:
-                args.pages = int(response)
-            except ValueError:
-                print(bold(red("Invalid int value: {}".format(response))))
-                return 1
-        if not args.reason:
-            response = input(bold('Reason: '))
-            if not len(response):
-                print(bold(red("Must input a reason.")))
-                return 1
-            args.reason = response
+    if not args.pages:
+        response = input(bold('Number of Pages: '))
+        try:
+            args.pages = int(response)
+        except ValueError:
+            print(bold(red("Invalid int value: {}".format(response))))
+            return 1
+    
+    if not args.reason:
+        response = input(bold('Reason: '))
+        if not len(response):
+            print(bold(red("Must input a reason.")))
+            return 1
+        args.reason = response
 
     if not user_exists(args.user):
         print(bold(red("The user {} doesn't exist.".format(args.user))))
         return 1
 
-    return commands[args.command](args)
+    return refund(args)
 
 
 if __name__ == '__main__':

@@ -51,10 +51,6 @@ def refund(args):
         staffer=current_user(),
         reason=args.reason,
     )
-    prompt = bold('Refund {} pages to {}? [yN] '.format(refund.pages, refund.user))
-    if input(prompt) not in {'y', 'yes'}:
-        print('Cancelled.')
-        return
 
     try:
         credentials = staff_creds()
@@ -70,33 +66,40 @@ def refund(args):
 
 
 def main(argv=None):
-    commands = {
-        'view': view,
-        'refund': refund,
-    }
+    parser = argparse.ArgumentParser(description='Manipulate page quotas.')
 
-    parser = argparse.ArgumentParser(description='View and manipulate page quotas.')
-    subparsers = parser.add_subparsers(dest='command', help='command to run')
-    subparsers.required = True
+    parser.add_argument('--pages', '-p', type=int)
+    parser.add_argument('--reason', '-r', type=str)
+    parser.add_argument('--user', '-u', type=str)
 
-    parser_view = subparsers.add_parser('view', help="view a user's print quota")
-    parser_view.add_argument('user', nargs='?', type=str, default=current_user())
+    args = parser.parse_args(argv)
+    
+    if not args.user:
+        response = input(bold('Input Username: '))
+        if not len(response):
+            response = current_user()
+        args.user = response
 
-    parser_refund = subparsers.add_parser('refund', help="refund a user's pages")
-    parser_refund.add_argument('--pages', '-p', required=True, type=int)
-    parser_refund.add_argument('--reason', '-r', required=True, type=str)
-    parser_refund.add_argument('user', type=str)
-
-    if len(argv or sys.argv[1:]) == 0:
-        args = parser.parse_args(['view'])
-    else:
-        args = parser.parse_args(argv)
+    if not args.pages:
+        response = input(bold('Number of Pages: '))
+        try:
+            args.pages = int(response)
+        except ValueError:
+            print(bold(red("Invalid int value: {}".format(response))))
+            return 1
+    
+    if not args.reason:
+        response = input(bold('Reason: '))
+        if not len(response):
+            print(bold(red("Must input a reason.")))
+            return 1
+        args.reason = response
 
     if not user_exists(args.user):
         print(bold(red("The user {} doesn't exist.".format(args.user))))
         return 1
 
-    return commands[args.command](args)
+    return refund(args)
 
 
 if __name__ == '__main__':

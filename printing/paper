@@ -22,6 +22,27 @@ def staff_creds():
     return json.load(open('/etc/ocfprinting.json'))
 
 
+def view(args):
+    with get_connection() as c:
+        quota = get_quota(c, args.user)
+
+    def highlight(num, text, warning_level):
+        if num > warning_level:
+            color = green
+        elif 0 < num <= warning_level:
+            color = yellow
+        else:
+            color = red
+        return bold('  ' + color('→ {}{}'.format(num, text)))
+
+    print('{} printing quota:'.format(bold(quota.user)))
+    if not user_is_group(quota.user):
+        print(highlight(quota.semesterly, ' remaining this semester', 30))
+        print(highlight(quota.daily, ' remaining today', 5))
+    else:
+        print(bold(red("Group accounts can't print. Sorry!")))
+
+
 def refund(args):
     refund = Refund(
         user=args.user,

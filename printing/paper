@@ -62,39 +62,49 @@ def refund(args):
     with get_connection(**credentials) as c:
         add_refund(c, refund)
 
-    print('Added.')
+    print(bold('Refunded {} pages to {}.'.format(refund.pages, refund.user)))
 
 
 def main(argv=None):
     commands = {
-            'view': view,
-            'refund': refund,
-        }
+        'view': view,
+        'refund': refund,
+    }
+    
     parser = argparse.ArgumentParser(description='View and manipulate page quotas.')
     subparsers = parser.add_subparsers(dest='command', help='command to run')
     subparsers.required = True
 
     parser_view = subparsers.add_parser('view', help="view a user's print quota")
-    parser_view.add_argument('user', nargs='?', type=str, default=current_user())
+    parser_view.add_argument('--user', '-u', type=str)
 
     parser_refund = subparsers.add_parser('refund', help="refund a user's pages")
-    parser_refund.add_argument('user', nargs='?', type=str, default=current_user())
-    parser_refund.add_argument('--user', '-u', type=str, default=current_user())
+    parser_refund.add_argument('--user', '-u', type=str)
     parser_refund.add_argument('--pages', '-p', type=int)
     parser_refund.add_argument('--reason', '-r', type=str)
 
     if len(argv or sys.argv[1:]) == 0:
-        args = parser.parse_args(['view'])
-    else:
-        args = parser.parse_args(argv)
+        reponse = input(bold('Refund(r) or view(v)? [rV] '))
+        if reponse in {'r', 'R', 'refund'}:
+            argv = ['refund']
+        elif reponse in {'v', 'V', 'view'}:
+            argv = ['view']
+        else:
+            print('Cancelled.')
+            return
+    args = parser.parse_args(argv)
+
+    if not args.user:
+        response = input(bold('Input Username: '))
+        if not len(response):
+            response = current_user()
+        args.user = response
+
+    if not user_exists(args.user):
+        print(bold(red("The user {} doesn't exist.".format(args.user))))
+        return 1
 
     if args.command == 'refund':
-        if not args.user:
-            response = input(bold('Input Username: '))
-            if not len(response):
-                response = current_user()
-            args.user = response
-
         if not args.pages:
             response = input(bold('Number of Pages: '))
             try:
@@ -110,13 +120,7 @@ def main(argv=None):
                 return 1
             args.reason = response
 
-        if not user_exists(args.user):
-            print(bold(red("The user {} doesn't exist.".format(args.user))))
-            return 1
-
-        return refund(args)
-
-    return view(args)
+    return commands[args.command](args)
 
 if __name__ == '__main__':
     sys.exit(main())

@@ -83,14 +83,27 @@ def main(argv=None):
     parser_view.add_argument('user', nargs='?', type=str, default=current_user())
 
     parser_refund = subparsers.add_parser('refund', help="refund a user's pages")
-    parser_refund.add_argument('--pages', '-p', required=True, type=int)
-    parser_refund.add_argument('--reason', '-r', required=True, type=str)
-    parser_refund.add_argument('user', type=str)
+    parser_refund.add_argument('--pages', '-p', type=int)
+    parser_refund.add_argument('--reason', '-r', type=str)
+    parser_refund.add_argument('user', nargs='?', type=str, default=None)
 
     if len(argv or sys.argv[1:]) == 0:
         args = parser.parse_args(['view'])
     else:
         args = parser.parse_args(argv)
+    
+    if args.command == "refund":
+        if args.user is None:
+            args.user = input(bold("Enter the user you want to refund: "))
+        if args.pages is None:
+            pages_input = input(bold("Enter the number of pages to refund: "))
+            try:
+                args.pages = int(pages_input)
+            except ValueError:
+                print(bold(red("Invalid input.")))
+                return 1
+        if args.reason is None:
+            args.reason = input(bold("Enter the reason for the refund: "))
 
     if not user_exists(args.user):
         print(bold(red("The user {} doesn't exist.".format(args.user))))

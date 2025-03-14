@@ -11,10 +11,10 @@ from ocflib.misc.shell import green
 from ocflib.misc.shell import red
 from ocflib.misc.shell import yellow
 from ocflib.misc.whoami import current_user
-from ocflib.printing.quota import add_refund
+from ocflib.printing.quota import add_adjustment
 from ocflib.printing.quota import get_connection
 from ocflib.printing.quota import get_quota
-from ocflib.printing.quota import Refund
+from ocflib.printing.quota import Payload
 
 
 def staff_creds():
@@ -43,36 +43,37 @@ def view(args):
         print(bold(red("Group accounts can't print. Sorry!")))
 
 
-def refund(args):
-    refund = Refund(
+def adjust(args):
+    payload = Payload(
         user=args.user,
         time=datetime.now(),
         pages=args.pages,
+        action=args.command,
         staffer=current_user(),
         reason=args.reason,
     )
-    prompt = bold('Refund {} pages to {}? [yN] '.format(refund.pages, refund.user))
+
+    stringtype = 'Refund' if payload.action == 'refund' else 'Forward'
+    prompt = bold('{} +  {} pages to {}? [yN] '.format(stringtype, payload.pages, payload.user))
     if input(prompt) not in {'y', 'yes'}:
         print('Cancelled.')
         return
-
     try:
         credentials = staff_creds()
     except FileNotFoundError:
         print(red('Could not find the file for staff credentials.'))
         print(red('Are you running this on supernova?'))
         return 1
-
     with get_connection(**credentials) as c:
-        add_refund(c, refund)
-
+        add_adjustment(c, payload)
     print('Added.')
 
 
 def main(argv=None):
     commands = {
         'view': view,
-        'refund': refund,
+        'refund': adjust,
+        'forward': adjust,
     }
 
     parser = argparse.ArgumentParser(description='View and manipulate page quotas.')
@@ -86,6 +87,11 @@ def main(argv=None):
     parser_refund.add_argument('--pages', '-p', type=int)
     parser_refund.add_argument('--reason', '-r', type=str)
     parser_refund.add_argument('user', nargs='?', type=str, default=None)
+
+    parser_forward = subparsers.add_parser('forward', help="allow a user to print above today's quota")
+    parser_forward.add_argument('--pages', '-p', required=True, type=int)
+    parser_forward.add_argument('--reason', '-r', required=True, type=str)
+    parser_forward.add_argument('user', type=str)
 
     if len(argv or sys.argv[1:]) == 0:
         args = parser.parse_args(['view'])

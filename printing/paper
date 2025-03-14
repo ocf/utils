@@ -44,6 +44,9 @@ def view(args):
 
 
 def refund(args):
+    with get_connection() as c:
+        quota = get_quota(c, args.user)
+        
     refund = Refund(
         user=args.user,
         time=datetime.now(),
@@ -51,10 +54,18 @@ def refund(args):
         staffer=current_user(),
         reason=args.reason,
     )
-    prompt = bold('Refund {} pages to {}? [yN] '.format(refund.pages, refund.user))
-    if input(prompt) not in {'y', 'yes'}:
-        print('Cancelled.')
-        return
+
+    if refund.pages < 0:
+        prompt = bold('Are you sure you want to revoke {} pages from {}? [yN] '.format(-refund.pages, refund.user))
+        if input(prompt) not in {'y', 'yes'}:
+            print('Cancelled.')
+            return
+        if -refund.pages > quota.daily:
+            prompt = bold('This will make the user\'s pagecount negative. Are you sure? [yN]')
+            if input(prompt) not in {'y', 'yes'}:
+                print('Cancelled.')
+                return
+        
 
     try:
         credentials = staff_creds()

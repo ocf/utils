@@ -166,7 +166,7 @@ fi
 
 # check print quota
 echo
-paper view "-u $user"
+paper view "$user"
 
 # check User_Info entries
 User_Info=$([ -f "$User_Info_file" ] && grep "^$user": "$User_Info_file" | cut -d: -f2-)

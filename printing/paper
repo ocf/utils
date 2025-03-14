@@ -51,6 +51,10 @@ def refund(args):
         staffer=current_user(),
         reason=args.reason,
     )
+    prompt = bold('Refund {} pages to {}? [yN] '.format(refund.pages, refund.user))
+    if input(prompt) not in {'y', 'yes'}:
+        print('Cancelled.')
+        return
 
     try:
         credentials = staff_creds()
@@ -70,18 +74,18 @@ def main(argv=None):
         'view': view,
         'refund': refund,
     }
-    
+
     parser = argparse.ArgumentParser(description='View and manipulate page quotas.')
     subparsers = parser.add_subparsers(dest='command', help='command to run')
     subparsers.required = True
 
     parser_view = subparsers.add_parser('view', help="view a user's print quota")
-    parser_view.add_argument('--user', '-u', type=str)
+    parser_view.add_argument('user', nargs='?', type=str, default=None)
 
     parser_refund = subparsers.add_parser('refund', help="refund a user's pages")
-    parser_refund.add_argument('--user', '-u', type=str)
     parser_refund.add_argument('--pages', '-p', type=int)
     parser_refund.add_argument('--reason', '-r', type=str)
+    parser_refund.add_argument('user', nargs='?', type=str, default=None)
 
     if len(argv or sys.argv[1:]) == 0:
         reponse = input(bold('Refund(r) or view(v)? [rV] '))
@@ -119,8 +123,9 @@ def main(argv=None):
                 print(bold(red("Must input a reason.")))
                 return 1
             args.reason = response
-
+    
     return commands[args.command](args)
+
 
 if __name__ == '__main__':
     sys.exit(main())

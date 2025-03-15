@@ -107,7 +107,7 @@ def main(argv=None):
         else:
             print(bold(red('Invalid input.')))
             print('Defaulting to view.')
-            argv['view']
+            argv = ['view']
     args = parser.parse_args(argv)
 
     if not args.user:

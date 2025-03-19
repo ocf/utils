@@ -38,6 +38,12 @@ ip6HostNumber: 2607:f140:8801::1:$IP
 type: $TYPE
 environment: production"
 
+if [ "$TYPE" = "desktop" ]; then
+    read -rp "Your host type is {$TYPE}, enter mac address: " MAC
+    record="${record}
+macAddress: $MAC"
+fi
+
 echo "$record"
 echo "======================"
 read -rp "Add new record? [yN] " choice

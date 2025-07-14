@@ -36,11 +36,11 @@
     },
     "ocflib": {
       "locked": {
-        "lastModified": 1752458168,
-        "narHash": "sha256-8bAhPRRkP8XafIffYJIR2QoBQOBclPB1RBbOJBL2qMc=",
+        "lastModified": 1752459199,
+        "narHash": "sha256-cNK7hdAJD9J8ItCehfNiTgoCslzUHfYOXgH67cQ+2c4=",
         "owner": "ocf",
         "repo": "ocflib",
-        "rev": "194fb41c5d0655d91b9edf80b5ddcb66be4d4ec6",
+        "rev": "82afdc23276e04f80a94edc0c9ab585467f47299",
         "type": "github"
       },
       "original": {

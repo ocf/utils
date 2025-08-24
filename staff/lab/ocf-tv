@@ -6,8 +6,15 @@ import subprocess
 import sys
 import time
 
-TV_SINK = 'alsa_output.pci-0000_00_03.0.hdmi-stereo'
+TV_CARD = 'alsa_output.pci-0000_00_03.0'
 TUNNEL_NAME = 'ocf-tv-remote'
+
+GET_TV_SINK_CMD = "pactl list short sinks | cut -f2 | grep -F '{}'".format(TV_CARD)
+
+
+def get_tv_sink(host):
+    pactl_proc = subprocess.run(('ssh', host, GET_TV_SINK_CMD), capture_output=True)
+    return pactl_proc.stdout.decode().strip()
 
 
 def unused_port():
@@ -136,7 +143,7 @@ def tunnel_audio(args):
 
 
 def volume(args):
-    """Get/set the PulseAudio volume of the TV_SINK on the remote host."""
+    """Get/set the PulseAudio volume of the TV sink on the remote host."""
 
     return set_volume(args.amount, args.host) if args.amount is not None else get_volume(args.host)
 
@@ -152,17 +159,17 @@ def check_volume(val):
 def get_volume(host):
     pre = 'pactl list sinks'
     # print 5th field in 7th line after match, which contains volume info
-    post = "awk '/Name: {}$/ {{ target = NR + 7 }}; NR == target {{ print $5 }}'".format(TV_SINK)
+    post = "awk '/Name: {}/ {{ target = NR + 7 }}; NR == target {{ print $5 }}'".format(TV_CARD)
     return subprocess.call(('ssh', host, '{} | {}'.format(pre, post)))
 
 
 def set_volume(amount, host):
-    cmd = 'pactl set-sink-volume {} {}%; '.format(TV_SINK, amount)
+    cmd = 'pactl set-sink-volume $({}) {}%; '.format(GET_TV_SINK_CMD, amount)
     return subprocess.call(('ssh', host, cmd))
 
 
 def mute(args):
-    cmd = 'pactl set-sink-mute {} toggle'.format(TV_SINK)
+    cmd = 'pactl set-sink-mute $({}) toggle'.format(GET_TV_SINK_CMD)
     return subprocess.call(('ssh', args.host, cmd))
 
 
@@ -172,7 +179,7 @@ if __name__ == '__main__':
         description='Control the OCF television.',
     )
 
-    parser.add_argument('-H', '--host', type=str, default='tv', help='set host (default tv))')
+    parser.add_argument('-H', '--host', type=str, default='tv', help='set host (default tv)')
 
     command_subparser = parser.add_subparsers(dest='command')
 

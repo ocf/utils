@@ -1,0 +1,41 @@
+name: Pre-Commit
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [master]
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  pre-commit:
+    name: Pre-Commit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@v5.0.0
+        with:
+          fetch-depth: 0
+      - name: Set up Python
+        uses: actions/setup-python@v5.6.0
+        with:
+          python-version: 3.11
+      - name: Cache dependencies
+        id: cache_dep
+        uses: actions/cache@v4.2.4
+        with:
+          key: dependencies-${{ hashFiles('**/poetry.lock') }}
+          path: ${{ github.workspace }}/.venv
+      - name: Install dependencies
+        if: steps.cache_dep.cache-hit != 'true'
+        run: |
+          python -m pip install -U pip poetry
+          poetry --version
+          poetry check --no-interaction
+          poetry config virtualenvs.in-project true
+          poetry install --no-interaction
+      - name: Run tests
+        run: |
+          poetry run pre-commit run --all-files

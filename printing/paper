@@ -46,7 +46,7 @@ def view(args):
 def refund(args):
     with get_connection() as c:
         quota = get_quota(c, args.user)
-        
+
     refund = Refund(
         user=args.user,
         time=datetime.now(),
@@ -65,7 +65,6 @@ def refund(args):
             if input(prompt) not in {'y', 'yes'}:
                 print('Cancelled.')
                 return
-        
 
     try:
         credentials = staff_creds()
@@ -126,13 +125,13 @@ def main(argv=None):
             try:
                 args.pages = int(response)
             except ValueError:
-                print(bold(red("Invalid int value: {}".format(response))))
+                print(bold(red('Invalid int value: {}'.format(response))))
                 return 1
 
         if not args.reason:
             response = input(bold('Reason: '))
             args.reason = response
-    
+
     return commands[args.command](args)
 
 

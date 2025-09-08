@@ -60,7 +60,7 @@ def is_special(url_string):
 
 
 def check_vhosting():
-    with open(missing_img, 'w') as m_i, open(missing_disc, 'w') as m_d,\
+    with open(missing_img, 'w') as m_i, open(missing_disc, 'w') as m_d, \
             open(missing_both, 'w') as m_b, open(errors, 'w') as error_file:
         vhosts = get_vhosts()
         vhost_urls = []

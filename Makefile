@@ -1,13 +1,11 @@
+venv:
+	poetry install
+
+.PHONY: install-hooks
+install-hooks: venv
+	poetry run pre-commit install
+
 .PHONY: test
-test: venv
-	venv/bin/pre-commit install
-	venv/bin/pre-commit run --all-files
+test:
+	poetry install
 
-venv: Makefile
-	vendor/venv-update \
-		venv= venv -ppython3 \
-		install= -r requirements-dev.txt
-
-.PHONY: clean
-clean:
-	rm -rf venv

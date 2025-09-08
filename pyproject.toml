@@ -1,0 +1,15 @@
+[tool.poetry]
+name = "ocfutils"
+version = "2024.04.22"
+authors = ["Open Computing Facility <help@ocf.berkeley.edu>"]
+description = "User and staff utilities for the OCF"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.9,<3.12"
+ocflib = "^2025.8"
+dnspython = "*" 
+matplotlib = "*"
+pre-commit = "*"
+tabulate = "*"
+

@@ -4,6 +4,7 @@ version = "2024.04.22"
 authors = ["Open Computing Facility <help@ocf.berkeley.edu>"]
 description = "User and staff utilities for the OCF"
 readme = "README.md"
+package-mode = false
 
 [tool.poetry.dependencies]
 python = ">=3.9,<3.12"

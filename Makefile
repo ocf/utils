@@ -8,4 +8,4 @@ install-hooks: venv
 .PHONY: test
 test:
 	poetry install
-
+	poetry run pre-commit run --all-files

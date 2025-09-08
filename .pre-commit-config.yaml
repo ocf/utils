@@ -1,4 +1,4 @@
-exclude: ^vendor/
+exclude: ^(poetry.lock|pyproject.toml)$
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks.git
     rev: v6.0.0

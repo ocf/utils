@@ -7,9 +7,7 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.9,<3.12"
-ocflib = "^2025.8"
-dnspython = "*" 
-matplotlib = "*"
 pre-commit = "*"
+dnspython = "*"
+matplotlib = "*"
 tabulate = "*"
-

@@ -39,6 +39,7 @@ def view(args):
     if not user_is_group(quota.user):
         print(highlight(quota.semesterly, ' remaining this semester', 30))
         print(highlight(quota.daily, ' remaining today', 5))
+        print(highlight(quota.color, ' color pages remaining', 5))
     else:
         print(bold(red("Group accounts can't print. Sorry!")))
 
@@ -53,6 +54,7 @@ def refund(args):
         pages=args.pages,
         staffer=current_user(),
         reason=args.reason,
+        color=int(args.color),
     )
 
     if refund.pages < 0:
@@ -96,13 +98,14 @@ def main(argv=None):
     parser_refund = subparsers.add_parser('refund', help="refund a user's pages")
     parser_refund.add_argument('--pages', '-p', type=int)
     parser_refund.add_argument('--reason', '-r', type=str)
+    parser_refund.add_argument('--color', '-c', action='store_true')
     parser_refund.add_argument('user', nargs='?', type=str, default=None)
 
     if len(argv or sys.argv[1:]) == 0:
-        reponse = input(bold('Refund(r) or view(v)? [rV] '))
-        if reponse in {'r', 'R', 'refund'}:
+        response = input(bold('Refund(r) or view(v)? [rV] '))
+        if response in {'r', 'R', 'refund'}:
             argv = ['refund']
-        elif reponse in {'v', 'V', 'view'}:
+        elif response in {'v', 'V', 'view'}:
             argv = ['view']
         else:
             print(bold(red('Invalid input.')))
@@ -132,6 +135,18 @@ def main(argv=None):
         if not args.reason:
             response = input(bold('Reason: '))
             args.reason = response
+
+        if not args.color:
+            response = input(bold('Refund color pages? [Yn] '))
+            if response in {'y', 'Y', 'yes'}:
+                args.color = True;
+            elif response in {'n', 'V', 'view'}:
+                args.color = False;
+            else:
+                print(bold(red('Invalid input.')))
+                print('Defaulting to no.')
+                args.color = False;
+
     
     return commands[args.command](args)
 

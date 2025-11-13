@@ -137,10 +137,10 @@ def main(argv=None):
             args.reason = response
 
         if not args.color:
-            response = input(bold('Refund color pages? [Yn] '))
+            response = input(bold('Refund color pages? [yN] '))
             if response in {'y', 'Y', 'yes'}:
                 args.color = True;
-            elif response in {'n', 'N', 'no'}:
+            elif response in {'n', 'N', 'no', ''}:
                 args.color = False;
             else:
                 print(bold(red('Invalid input.')))

@@ -140,12 +140,11 @@ def main(argv=None):
             response = input(bold('Refund color pages? [Yn] '))
             if response in {'y', 'Y', 'yes'}:
                 args.color = True;
-            elif response in {'n', 'V', 'view'}:
+            elif response in {'n', 'N', 'no'}:
                 args.color = False;
             else:
                 print(bold(red('Invalid input.')))
-                print('Defaulting to no.')
-                args.color = False;
+                return 1
 
     
     return commands[args.command](args)

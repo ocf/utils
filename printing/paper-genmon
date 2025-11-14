@@ -24,7 +24,7 @@ def main(argv=None):
             semester_quota = quota.semesterly
             color_quota = quota.color
 
-    PANEL_TEXT = '{} {} left today | {} left this semester | {} left in color'
+    PANEL_TEXT = '{} {} left today | {} left this semester ({} in color)'
     print(PANEL_TEXT.format(daily_quota, 'side of paper' if daily_quota == 1 else 'sides of paper',
                             semester_quota, color_quota
                             ))

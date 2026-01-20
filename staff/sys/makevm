@@ -10,6 +10,7 @@ import os.path
 import random
 import re
 import shlex
+import shutil
 import socket
 import subprocess
 import sys
@@ -60,7 +61,17 @@ def generate_mac_addr():
     return ':'.join('{:02x}'.format(random_byte(i)) for i in range(MAC_BYTES))
 
 
-def create_vm(name, memory, vcpus, vg, os_type, os_variant, network, mac, skip_config):
+def gen_ceph_disk_param(ceph_pool, size):
+    """Generates the --disk argument to virt-install for a Ceph VM in the given pool"""
+    return 'pool={},size={}'.format(ceph_pool, size)
+
+
+def gen_lvm_disk_param(name, vg):
+    """Generates the --disk argument to virt-install for an LVM VM in the given VG"""
+    return '/dev/{}/{},cache=none'.format(vg, name)
+
+
+def create_vm(name, memory, vcpus, disk_arg, os_type, os_variant, network, mac, skip_config):
     """Creates a new VM."""
 
     # try to print info about the domain to see if it already exists
@@ -77,9 +88,9 @@ def create_vm(name, memory, vcpus, vg, os_type, os_variant, network, mac, skip_c
               'when the install is complete, or else the VM configuration cannot continue.')
 
     exec_cmd('virt-install', '-r', str(memory), '--pxe', '--os-type', os_type,
-             '--os-variant', os_variant, '--disk', '/dev/{}/{},cache=none'.format(vg, name),
-             '--vcpus', str(vcpus), '--network', network + ',mac=' + mac, '--graphics', 'vnc',
-             '--serial', 'pty', '--name', name, '--wait', '0' if skip_config else '-1')
+             '--os-variant', os_variant, '--disk', disk_arg, '--vcpus', str(vcpus),
+             '--network', network + ',mac=' + mac, '--graphics', 'vnc', '--serial',
+             'pty', '--name', name, '--wait', '0' if skip_config else '-1')
 
 
 def get_running_vms():
@@ -201,9 +212,13 @@ def _main(args):
                         help='amount of disk storage (in GB)')
     parser.add_argument('-V', '--vg', type=str, default='vg',
                         help='LVM volume group to use for storage')
+    parser.add_argument('-C', '--ceph', action='store_true', default=False,
+                        help='use Ceph storage instead of LVM')
+    parser.add_argument('-P', '--ceph-pool', type=str, default='vm',
+                        help='Ceph Pool to use for storage')
     parser.add_argument('--os-type', type=str, default='linux',
                         help='os type')
-    parser.add_argument('--os-variant', type=str, default='debian9')
+    parser.add_argument('--os-variant', type=str, default='debian10')
     parser.add_argument('--network', type=str, default='bridge=br0',
                         help='network configuration')
     parser.add_argument('--preseed-user', type=str, default='root',
@@ -242,6 +257,27 @@ def _main(args):
             print('Cancelled.')
             sys.exit(2)
 
+    if args.ceph and not shutil.which('ceph'):
+        print("Warning: You are trying to use Ceph but I couldn't find the `ceph` executable.")
+
+        if not confirm():
+            print('Cancelled.')
+            sys.exit(2)
+
+    if args.ceph and args.vg != 'vg':
+        print('Warning: You have Ceph backing storage, but specified a non-default VG.')
+
+        if not confirm():
+            print('Cancelled.')
+            sys.exit(2)
+
+    if not args.ceph and args.ceph_pool != 'vm':
+        print('Warning: You have LVM backing storage, but specified a Ceph pool.')
+
+        if not confirm():
+            print('Cancelled.')
+            sys.exit(2)
+
     # Check to make sure the IP address provided is an OCF IPv4 address
     ip_addr = ip_address(args.ip)
     if not is_ocf_ip(ip_addr) or not isinstance(ip_addr, IPv4Address):
@@ -262,7 +298,12 @@ def _main(args):
     print('\tOS Type: {}'.format(args.os_type))
     print('\tOS Variant: {}'.format(args.os_variant))
     print('\tDisk Space: {} GB'.format(args.storage))
-    print('\tVolume Group: {}'.format(args.vg))
+    if args.ceph:
+        print('\tBacking Storage: Ceph')
+        print('\tCeph Pool: {}'.format(args.ceph_pool))
+    else:
+        print('\tBacking Storage: LVM')
+        print('\tVolume Group: {}'.format(args.vg))
     print('\tMemory: {} MB'.format(args.memory))
     print('\tvCPUs: {}'.format(args.vcpus))
     print('\tNetwork: {}'.format(args.network))
@@ -273,8 +314,14 @@ def _main(args):
 
     mac = generate_mac_addr()
 
-    create_disk(args.vg, args.hostname, args.storage)
-    create_vm(args.hostname, args.memory, args.vcpus, args.vg, args.os_type,
+    disk_param = None
+    if args.ceph:
+        disk_param = gen_ceph_disk_param(args.ceph_pool, args.storage)
+    else:
+        create_disk(args.vg, args.hostname, args.storage)
+        disk_param = gen_lvm_disk_param(args.hostname, args.vg)
+
+    create_vm(args.hostname, args.memory, args.vcpus, disk_param, args.os_type,
               args.os_variant, args.network, mac, args.skip_config)
 
     if args.skip_config:

@@ -1,0 +1,6 @@
+#!/bin/bash -eu
+if [[ "$(hostname)" != "tsunami" && "$(hostname)" != "dev-tsunami" ]]; then
+    echo -e '\033[1;31mYou must run this command on tsunami.\033[0m'
+    exit 1
+fi
+sudo -u ocfmakexmpp /opt/share/utils/makeservices/makexmpp-real

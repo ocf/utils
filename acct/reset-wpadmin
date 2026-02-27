@@ -1,0 +1,59 @@
+#!/bin/bash
+
+# Check for input
+if [ "$#" -ne 1 ]; then
+    echo "Usage: $0 <username>"
+    exit 1
+fi
+
+USERNAME=$1
+FIRST_CHAR=${USERNAME:0:1}
+FIRST_TWO=${USERNAME:0:2}
+
+# Define the dynamic path to wp-config.php
+CONFIG_PATH="/home/${FIRST_CHAR}/${FIRST_TWO}/${USERNAME}/public_html/wp-config.php"
+
+# 1. Check if config file exists
+if [ ! -f "$CONFIG_PATH" ]; then
+    echo "Error: wp-config.php not found at $CONFIG_PATH"
+    exit 1
+fi
+
+# 2. Parse the password from wp-config.php
+# This looks for the DB_PASSWORD definition and extracts the value between the second set of quotes
+DB_PASS=$(grep "DB_PASSWORD" "$CONFIG_PATH" | cut -d "'" -f 4)
+
+if [ -z "$DB_PASS" ]; then
+    echo "Error: Could not extract DB_PASSWORD from $CONFIG_PATH"
+    exit 1
+fi
+
+# 3. Define DB variables (assuming DB name and User match the system username)
+DB_NAME="$USERNAME"
+DB_USER="$USERNAME"
+
+# 4. Fetch the users from the database
+
+USERS=$(mariadb -u "$DB_USER" --password="$DB_PASS" "$DB_NAME" -N -e "SELECT user_login FROM wp_users;" 2>/dev/null)
+
+if [ $? -ne 0 ]; then
+    echo "Error: Could not connect to MariaDB for user $DB_USER"
+    exit 1
+fi
+
+echo "--- Resetting Passwords for Database: $DB_NAME ---"
+
+for WP_USER in $USERS; do
+    # Generate a random 16-character password
+    NEW_PASS=$(openssl rand -base64 12)
+
+    # Update the database
+    mariadb -u "$DB_USER" --password="$DB_PASS" "$DB_NAME" -e "UPDATE wp_users SET user_pass = MD5('$NEW_PASS') WHERE user_login = '$WP_USER';"
+
+    echo "User: $WP_USER"
+    echo "New Password: $NEW_PASS"
+    echo "------------------------------------------------"
+done
+
+# Cleanup
+unset MYSQL_PWD

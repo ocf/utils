@@ -1,0 +1,58 @@
+#!/bin/bash -i
+
+# Check arguments
+if [ "$#" -ne 2 ]; then
+    echo "
+    This script retores a backup of public_html/ into ./public_html_backup
+    Usage: $0 <account_name> <your_username>
+	account_name: account you are restoring backup for
+	your_username: your username
+    "
+
+    exit 1
+fi
+
+# Variables
+USERNAME=$1
+FIRST_CHAR=${USERNAME:0:1}
+FIRST_TWO=${USERNAME:0:2}
+RUN_USER=$2
+SNAPSHOT_DIR="/backup/encrypted/rsnapshot/.sync/nfs/opt/homes/services/http/users/${FIRST_CHAR}/.zfs/snapshot/"
+
+# 1. Fetch directories via SSH to hal
+echo "Fetching snapshot directories from hal..."
+FOLDERS_RAW=$(ssh $RUN_USER@hal "ls -1 ${SNAPSHOT_DIR}" 2>/dev/null)
+
+if [ -z "$FOLDERS_RAW" ]; then
+    echo "Error: No snapshot folders found on hal, or permission denied."
+    exit 1
+fi
+
+# Convert string output to an array
+mapfile -t FOLDERS <<< "$FOLDERS_RAW"
+
+# 2. Local interactive dropdown (using built-in select)
+echo "Select the snapshot folder to restore from:"
+PS3="Enter your choice (number): "
+select SELECTED in "${FOLDERS[@]}"; do
+    if [[ -n "$SELECTED" ]]; then
+        break
+    else
+        echo "Invalid selection. Please try again."
+    fi
+done
+
+# Define final paths
+SRC_PATH="${SNAPSHOT_DIR}${SELECTED}/${USERNAME}/"
+DEST_PATH="/home/${FIRST_CHAR}/${FIRST_TWO}/${USERNAME}/public_html_backup"
+
+echo $SRC_PATH
+
+echo -e "\n--- Initiating Transfer ---"
+echo "Source: hal:${SRC_PATH}"
+echo "Dest:   dataloss:${DEST_PATH}"
+echo "Note: You will be prompted for your sudo password on dataloss."
+
+# 3. Interactive SSH execution
+# -t forces a pseudo-terminal so sudo can prompt normally without breaking rsync
+mkdir -p ${DEST_PATH} && rsync --info=progress2 -avhe ssh --rsync-path='rsync' ${RUN_USER}@hal:${SRC_PATH} ${DEST_PATH}

@@ -14,7 +14,7 @@ Record = namedtuple('Record', ('domain', 'type', 'value'))
 
 
 def _query(domain, record):
-    return resolver.query(domain, record, raise_on_no_answer=False)
+    return resolver.resolve(domain, record, raise_on_no_answer=False)
 
 
 def main(username):

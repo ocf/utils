@@ -62,7 +62,7 @@ fi
 # account creation time
 creation_time=$(ldapsearch -x -LLL uid="$user" creationTime | grep ^creationTime | cut -d' ' -f2)
 if [ -n "$creation_time" ]; then
-  echo "Created on: $(date -d "${creation_time}" '+%Y-%m-%d' 2>/dev/null || echo "${creation_time}")"
+  echo "Created on: $(echo "$creation_time" | cut -c1-4)-$(echo "$creation_time" | cut -c5-6)-$(echo "$creation_time" | cut -c7-8)"
 fi
 
 # check if Kerberos principal exists

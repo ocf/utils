@@ -22,6 +22,7 @@ python312Packages.buildPythonApplication {
     ocflib
     matplotlib
     tabulate
+    mysqlclient
   ];
 
   meta = with lib; {

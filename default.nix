@@ -17,13 +17,14 @@ python312Packages.buildPythonApplication {
 
   buildInputs = [ bash wakeonlan ];
 
+  # TODO turn ocfutils into a proper export from flake.nix
   propagatedBuildInputs = with python312Packages; [
     dnspython
     ocflib
     matplotlib
     tabulate
-    mysqlclient
-    python-dateutil
+    mysqlclient #makemysql
+    python-dateutil #check
   ];
 
   meta = with lib; {

@@ -62,7 +62,7 @@ fi
 # account creation time
 creation_time=$(ldapsearch -x -LLL uid="$user" creationTime | grep ^creationTime | cut -d' ' -f2)
 if [ -n "$creation_time" ]; then
-  echo "Created on: $(python3 -c "import dateutil.parser; print(dateutil.parser.parse('${creation_time}').strftime('%Y-%m-%d'))")"
+  echo "Created on: $(date -d "${creation_time}" '+%Y-%m-%d' 2>/dev/null || echo "${creation_time}")"
 fi
 
 # check if Kerberos principal exists

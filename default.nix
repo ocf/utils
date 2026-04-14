@@ -23,6 +23,7 @@ python312Packages.buildPythonApplication {
     matplotlib
     tabulate
     mysqlclient
+    python-dateutil
   ];
 
   meta = with lib; {

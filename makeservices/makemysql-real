@@ -83,7 +83,7 @@ def main():
         username = pwd.getpwuid(os.getuid()).pw_name
 
         if not username:
-            raise RuntimeError('Unable to read SUDO_USER.')
+            raise RuntimeError('Unable to read pwd.getpwuid(os.getuid()).pw_name.')
 
         # Read config file.
         mysql_host, mysql_root_pw = read_config()

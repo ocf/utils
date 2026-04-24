@@ -18,6 +18,7 @@ is used to parse the config file, so the format is basically the Windows
 INI format.
 """
 import os
+import pwd
 import random
 import string
 import sys
@@ -79,7 +80,7 @@ def main():
     # Without this quiet below will be local variable
     global quiet
     try:
-        username = os.environ.get('SUDO_USER')
+        username = pwd.getpwuid(os.getuid()).pw_name
 
         if not username:
             raise RuntimeError('Unable to read SUDO_USER.')

@@ -8,7 +8,7 @@ from ocflib.infra.hosts import hosts_by_filter
 from ocflib.lab.hours import read_hours_listing
 
 
-ALL_HOSTS_FILTER = '(type=desktop)'
+ALL_HOSTS_FILTER = '(|(type=tv)(type=desktop))'
 
 
 def build_host_filter(hosts):

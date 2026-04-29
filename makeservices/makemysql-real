@@ -80,10 +80,10 @@ def main():
     # Without this quiet below will be local variable
     global quiet
     try:
-        username = pwd.getpwuid(os.getuid()).pw_name
+        username = os.environ.get('ORIGINAL_USER')
 
         if not username:
-            raise RuntimeError('Unable to read pwd.getpwuid(os.getuid()).pw_name.')
+            raise RuntimeError('Unable to read ORIGINAL_USER.')
 
         # Read config file.
         mysql_host, mysql_root_pw = read_config()

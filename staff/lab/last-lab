@@ -143,7 +143,7 @@ def main():
             password = fin.read().strip()
     except FileNotFoundError:
         print('Could not find the file for ocfstats credentials.')
-        print('Are you running this on supernova?')
+        print('Are you running this on koi?')
         return 1
 
     with ocflib.lab.stats.get_connection(user='ocfstats-ro',

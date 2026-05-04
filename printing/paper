@@ -73,7 +73,7 @@ def refund(args):
         credentials = staff_creds()
     except FileNotFoundError:
         print(red('Could not find the file for staff credentials.'))
-        print(red('Are you running this on supernova?'))
+        print(red('Are you running this on koi?'))
         return 1
 
     with get_connection(**credentials) as c:

@@ -11,8 +11,8 @@
 set -euo pipefail
 shopt -s dotglob
 
-if ! [[ "$(hostname)" =~ (dev-)?tsunami ]]; then
-    echo -e '\033[1;31mYou must run this command on tsunami.\033[0m'
+if [[ "$(hostname)" != "tsunami" && "$(hostname)" != "dev-tsunami" && "$(hostname)" != "carp" ]]; then
+    echo -e '\033[1;31mYou must run this command on carp.\033[0m'
     exit 1
 fi
 

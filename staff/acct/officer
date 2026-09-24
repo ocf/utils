@@ -1,0 +1,113 @@
+#!/usr/bin/env python3
+"""List, add, or remove officer role history for an OCF account.
+
+Requires a valid admin Kerberos ticket for write operations (run `kinit
+yourname/admin` first).
+"""
+import argparse
+import sys
+
+from ocflib.account.officers import add_officer_role
+from ocflib.account.officers import officer_roles
+from ocflib.account.officers import remove_officer_role
+from ocflib.account.officers import ROLES
+from ocflib.account.search import user_exists
+
+
+def confirm(action):
+    response = input('{} Type "yes" to continue: '.format(action))
+    if response != 'yes':
+        print('Aborted.')
+        return False
+    return True
+
+
+def display_role(role, term, committee):
+    if committee:
+        return '{} ({}) for {}'.format(role, committee, term)
+    return '{} for {}'.format(role, term)
+
+
+def list_roles(args):
+    roles = officer_roles(args.uid)
+    if not roles:
+        print('{} has no recorded officer roles.'.format(args.uid))
+        return
+
+    for role in roles:
+        if role.committee:
+            print('{}: {} ({})'.format(role.term, role.role, role.committee))
+        else:
+            print('{}: {}'.format(role.term, role.role))
+
+
+def add_role(args):
+    if not user_exists(args.uid):
+        print('No such user: {}'.format(args.uid))
+        return 1
+
+    if args.role == 'head' and not args.committee:
+        print('--committee is required when role is head')
+        return 1
+
+    description = display_role(args.role, args.term, args.committee)
+    if not confirm('About to ADD {} for {}.'.format(description, args.uid)):
+        return 1
+
+    try:
+        add_officer_role(args.uid, args.role, args.term, committee=args.committee)
+    except ValueError as e:
+        print(e)
+        return 1
+
+    print('Added {} for {}.'.format(description, args.uid))
+
+
+def remove_role(args):
+    if not user_exists(args.uid):
+        print('No such user: {}'.format(args.uid))
+        return 1
+
+    description = display_role(args.role, args.term, args.committee)
+    if not confirm('About to REMOVE {} from {}.'.format(description, args.uid)):
+        return 1
+
+    try:
+        remove_officer_role(args.uid, args.role, args.term, committee=args.committee)
+    except ValueError as e:
+        print(e)
+        return 1
+
+    print('Removed {} from {}.'.format(description, args.uid))
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    subparsers = parser.add_subparsers(dest='command')
+    subparsers.required = True
+
+    list_parser = subparsers.add_parser('list', help='list roles held by a user')
+    list_parser.add_argument('uid')
+    list_parser.set_defaults(func=list_roles)
+
+    add_parser = subparsers.add_parser('add', help='record a new role')
+    add_parser.add_argument('uid')
+    add_parser.add_argument('role', choices=ROLES)
+    add_parser.add_argument('term', help="e.g. 'Fall 2026'")
+    add_parser.add_argument('--committee', help='required if role is head')
+    add_parser.set_defaults(func=add_role)
+
+    remove_parser = subparsers.add_parser('remove', help='remove a previously recorded role')
+    remove_parser.add_argument('uid')
+    remove_parser.add_argument('role', choices=ROLES)
+    remove_parser.add_argument('term', help="e.g. 'Fall 2026'")
+    remove_parser.add_argument('--committee', help='required if role is head')
+    remove_parser.set_defaults(func=remove_role)
+
+    args = parser.parse_args()
+    return args.func(args)
+
+
+if __name__ == '__main__':
+    sys.exit(main())
+    

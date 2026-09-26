@@ -32,7 +32,6 @@ CREATE_QUERY = 'CREATE DATABASE {}'
 GRANT_QUERY = "GRANT ALL PRIVILEGES ON {username}.* TO '{username}'@'%' IDENTIFIED BY '{userpass}'"
 
 CONF_FILE = '/opt/share/makeservices/makemysql.conf'
-MYSQL_HOST = 'mysql.ocf.berkeley.edu'
 
 PW_LENGTH = 24
 

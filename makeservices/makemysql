@@ -30,10 +30,10 @@ done
 # makemysql-real will output the new password ONLY on the
 # last line. The --quiet will also make sure it only output the password...
 
-if ! PASS=$(sudo -u mysql /run/current-system/sw/bin/makemysql-real --quiet) ; then
+if ! PASS=$(pkexec --user mysql /run/current-system/sw/bin/makemysql-real --quiet) ; then
     echo 'makemysql-real did not exit properly.'
-    echo 'Run "sudo -u mysql /run/current-system/sw/bin/makemysql-real" for a more verbose output.'
-    echo 'Additionally, you may contact staff members for help. This script will stop.'
+    echo 'Run "pkexec --user mysql /run/current-system/sw/bin/makemysql-real" for a more verbose output.'
+    echo 'Additionally, you may contact staff members for help. Please attach /tmp/makemysqluser.log. This script will stop.'
     exit 1
 fi
 

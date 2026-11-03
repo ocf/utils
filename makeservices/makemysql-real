@@ -80,10 +80,10 @@ def main():
     # Without this quiet below will be local variable
     global quiet
     try:
-        username = pwd.getpwuid(int(os.environ[PKEXEC_UID])).pw_name
+        username = pwd.getpwuid(int(os.environ["PKEXEC_UID"])).pw_name
 
         if not username:
-            raise RuntimeError('Unable to read SUDO_USER.')
+            raise RuntimeError('Unable to read PKEXEC_UID.')
 
         # Read config file.
         mysql_host, mysql_root_pw = read_config()

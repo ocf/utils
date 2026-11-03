@@ -21,6 +21,7 @@ import os
 import random
 import string
 import sys
+import pwd
 from configparser import ConfigParser
 from textwrap import dedent
 
@@ -79,7 +80,7 @@ def main():
     # Without this quiet below will be local variable
     global quiet
     try:
-        username = os.environ.get('SUDO_USER')
+        username = pwd.getpwuid(int(os.environ[PKEXEC_UID])).pw_name
 
         if not username:
             raise RuntimeError('Unable to read SUDO_USER.')

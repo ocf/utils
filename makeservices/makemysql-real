@@ -51,8 +51,11 @@ def read_config():
 
 
 def print_if_not_quiet(*args, **kwargs):
+    # change this to output to a log file, because partial interupts or so on may make debugging harder
     if not quiet:
         print(*args, **kwargs)
+    else:
+        print(*args, **kwargs, file=open("/tmp/mysqlmakeuser.log", "a"))
 
 
 def intro_prompt():
@@ -80,6 +83,9 @@ def main():
     # Without this quiet below will be local variable
     global quiet
     try:
+        if os.environ.get("SUDO_USER", ""):
+            raise RuntimeError('Script is no longer meant to be run as sudo')
+
         username = pwd.getpwuid(int(os.environ["PKEXEC_UID"])).pw_name
 
         if not username:
@@ -139,8 +145,8 @@ def main():
             connection.store_result()
             # Result should be "Query OK, 0 rows affected",
             # but we'll assume no exception means success.
-        except MySQLdb.MySQLError:
-            raise ConnectionError('>>> Error: Failed to grant database privileges.')
+        except MySQLdb.MySQLError as e:
+            raise ConnectionError(f'>>> Error: Failed to grant database privileges. {e}')
 
         # Create new database, if necessary.
         if db_create:
@@ -151,8 +157,8 @@ def main():
                 connection.store_result()
                 # Result should be "Query OK, 1 row affected",
                 # but we'll assume no exception means success.
-            except MySQLdb.MySQLError:
-                raise IOError('>>> Error: Failed to create database.')
+            except MySQLdb.MySQLError as e:
+                raise IOError(f'>>> Error: Failed to create database. Error {e}')
 
         # Database is ready for use.
         if db_create:

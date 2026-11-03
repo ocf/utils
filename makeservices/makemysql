@@ -33,7 +33,7 @@ done
 if ! PASS=$(pkexec --user mysql /run/current-system/sw/bin/makemysql-real --quiet) ; then
     echo 'makemysql-real did not exit properly.'
     echo 'Run "pkexec --user mysql /run/current-system/sw/bin/makemysql-real" for a more verbose output.'
-    echo 'Additionally, you may contact staff members for help. This script will stop.'
+    echo 'Additionally, you may contact staff members for help. Please attach /tmp/makemysqluser.log. This script will stop.'
     exit 1
 fi
 
